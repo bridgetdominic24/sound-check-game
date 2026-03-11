@@ -1415,9 +1415,18 @@ function onAuthSuccess(){
         homeScreen.style.zIndex = '1';
         homeScreen.classList.add('visible');
         
-        // Show bottom nav and sleep button
-        document.getElementById('bottomNav').style.display='flex';
-        document.getElementById('sleepSection').style.display='block';
+        // Show bottom nav and sleep button with FORCED clickability
+        const bottomNav = document.getElementById('bottomNav');
+        bottomNav.style.display='flex';
+        bottomNav.style.pointerEvents='auto';
+        bottomNav.style.position='relative';
+        bottomNav.style.zIndex='1000';
+        
+        const sleepSection = document.getElementById('sleepSection');
+        sleepSection.style.display='block';
+        sleepSection.style.pointerEvents='auto';
+        sleepSection.style.position='relative';
+        sleepSection.style.zIndex='1000';
         
         // Set user info from loaded save
         document.getElementById('userName').textContent = S.name || 'Player';
@@ -1437,6 +1446,9 @@ function onAuthSuccess(){
         renderActions();
         
         console.log('🎮 Game loaded successfully! Buttons should work now!');
+        console.log('🔧 BottomNav pointer-events:', bottomNav.style.pointerEvents);
+        console.log('🔧 BottomNav z-index:', bottomNav.style.zIndex);
+        console.log('🔧 SleepSection pointer-events:', sleepSection.style.pointerEvents);
         
       } else {
         console.log('📝 No save found - showing theme selection');
