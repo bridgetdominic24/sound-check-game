@@ -6079,6 +6079,22 @@ function formatSocial(num){
 }
 
 function updateStats(){
+  // DEBUG: Log energy value
+  console.log('updateStats called - GAME.energy:', GAME.energy, typeof GAME.energy);
+  
+  // FORCE energy to be a number
+  if(typeof GAME.energy !== 'number' || isNaN(GAME.energy)){
+    console.warn('⚠️ Energy is not a number! Converting...');
+    if(GAME.energy && typeof GAME.energy === 'object'){
+      // Old format: {morning, afternoon, night}
+      GAME.energy = (GAME.energy.morning || 0) + (GAME.energy.afternoon || 0) + (GAME.energy.night || 0);
+      console.log('✅ Converted from object to:', GAME.energy);
+    } else {
+      GAME.energy = 150;
+      console.log('✅ Reset to default: 150');
+    }
+  }
+  
   document.getElementById('energy').textContent=GAME.energy;
   document.getElementById('money').textContent=formatMoney(GAME.money);
   document.getElementById('inspiration').textContent=GAME.inspiration;
