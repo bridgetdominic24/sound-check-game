@@ -256,12 +256,6 @@ input[type=range].age-range{-webkit-appearance:none;width:100%;height:4px;backgr
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- Firebase SDK (TEMPORARY - for migration only) -->
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage-compat.js"></script>
-
 </head>
 <body>
 
@@ -649,25 +643,6 @@ function emergencySkip() {
        onmouseout="this.style.background='rgba(255,255,255,0.2)'">
       <div style="font-size:24px">🌍 MULTIPLAYER</div>
       <div style="font-size:13px;opacity:0.9;font-weight:500">Join the World</div>
-    </button>
-    
-    <!-- MIGRATION BUTTON (TEMPORARY) -->
-    <button onclick="window.migrateFromFirebaseToSupabase()" style="
-      background:rgba(255,107,107,0.3);
-      color:white;
-      border:2px solid rgba(255,107,107,0.8);
-      padding:16px 32px;
-      border-radius:12px;
-      font-size:14px;
-      font-weight:700;
-      cursor:pointer;
-      backdrop-filter:blur(10px);
-      transition:all 0.2s;
-      font-family:'Syne',sans-serif;
-      margin-top:20px;
-    " onmouseover="this.style.background='rgba(255,107,107,0.5)'" 
-       onmouseout="this.style.background='rgba(255,107,107,0.3)'">
-      🔄 MIGRATE FROM FIREBASE
     </button>
   </div>
   
@@ -1302,153 +1277,6 @@ if(window.supabase) {
   console.log('✅ Supabase initialized');
 } else {
   console.error('❌ Supabase SDK not loaded!');
-  // Try again after delay
-  setTimeout(() => {
-    if(window.supabase) {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      console.log('✅ Supabase initialized (delayed)');
-    }
-  }, 1000);
-}
-
-// FIREBASE CONFIGURATION (TEMPORARY - FOR MIGRATION ONLY)
-let firebaseApp;
-let firebaseDb;
-
-// Wait for Firebase to load, then initialize
-setTimeout(() => {
-  try {
-    if(typeof firebase === 'undefined') {
-      console.error('❌ Firebase SDK not loaded yet, retrying...');
-      return;
-    }
-    
-    const firebaseConfig = {
-      apiKey: "AIzaSyAC9i02JA_EjlyyjX-rBVn4DPzkV3f1Mi4",
-      authDomain: "sound-check-25845.firebaseapp.com",
-      projectId: "sound-check-25845",
-      storageBucket: "sound-check-25845.firebasestorage.app",
-      messagingSenderId: "270901555559",
-      appId: "1:270901555559:web:7a27aa0a234d68f8a33fc2"
-    };
-
-    firebaseApp = firebase.initializeApp(firebaseConfig);
-    firebaseDb = firebase.firestore();
-    console.log('✅ Firebase initialized for migration');
-  } catch(err) {
-    console.error('❌ Firebase init failed:', err);
-  }
-}, 2000); // Wait 2 seconds for scripts to load
-
-// MIGRATION FUNCTION - Copy Firebase data to Supabase
-window.migrateFromFirebaseToSupabase = async function() {
-  if(!currentUser) {
-    alert('Please log in to Multiplayer first!');
-    return;
-  }
-  
-  if(!firebaseDb) {
-    alert('Firebase is still loading... Wait 5 seconds and try again!');
-    return;
-  }
-  
-  const confirmMigrate = confirm('This will copy your Firebase save to Supabase. Continue?');
-  if(!confirmMigrate) return;
-  
-  try {
-    console.log('🔄 Starting migration for user:', currentUser.uid);
-    alert('Migration starting... Please wait!');
-    
-    // Load from Firebase
-    const firebaseDoc = await firebaseDb.collection('saves').doc(currentUser.uid).get();
-    
-    if(!firebaseDoc.exists) {
-      alert('No Firebase save found for this account!');
-      console.log('❌ No Firebase save for:', currentUser.uid);
-      return;
-    }
-    
-    const firebaseData = firebaseDoc.data();
-    console.log('📥 Loaded Firebase data:', firebaseData);
-    
-    let gameData, characterData;
-    
-    // Check if old format (GAME/CHARACTER) or new format (split)
-    if(firebaseData.GAME && firebaseData.CHARACTER) {
-      console.log('📦 Old format detected');
-      gameData = firebaseData.GAME;
-      characterData = firebaseData.CHARACTER;
-    } else if(firebaseData.week && firebaseData.CHARACTER) {
-      console.log('📦 New split format detected');
-      // New split format - reconstruct GAME
-      const userId = currentUser.uid;
-      const songsDoc = await firebaseDb.collection('saves').doc(userId).collection('data').doc('songs').get();
-      const socialDoc = await firebaseDb.collection('saves').doc(userId).collection('data').doc('social').get();
-      
-      const songsData = songsDoc.exists ? songsDoc.data() : {};
-      const socialData = socialDoc.exists ? socialDoc.data() : {};
-      
-      gameData = {
-        week: firebaseData.week,
-        money: firebaseData.money,
-        buzz: firebaseData.buzz,
-        energy: firebaseData.energy,
-        inspiration: firebaseData.inspiration || 100,
-        age: firebaseData.age,
-        skills: firebaseData.skills,
-        autoSave: firebaseData.autoSave,
-        artistProfile: firebaseData.artistProfile,
-        recordLabel: firebaseData.recordLabel,
-        songs: songsData.songs || [],
-        releases: songsData.releases || [],
-        socialPosts: socialData.socialPosts || [],
-        opportunityHistory: socialData.opportunityHistory || [],
-        managers: socialData.managers || [],
-        collaborations: socialData.collaborations || []
-      };
-      
-      characterData = firebaseData.CHARACTER;
-    } else {
-      alert('Unknown Firebase save format!');
-      console.error('❌ Unknown format:', firebaseData);
-      return;
-    }
-    
-    console.log('✅ Game data ready. Week:', gameData.week, 'Money:', gameData.money);
-    console.log('✅ Character:', characterData.artistName);
-    
-    // Save to Supabase
-    const playerData = {
-      user_id: currentUser.id,
-      email: currentUser.email,
-      artist_name: characterData.artistName || 'Unknown Artist',
-      game_data: gameData,
-      character_data: characterData,
-      online: true,
-      last_active: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    
-    console.log('💾 Saving to Supabase...');
-    
-    const { error } = await supabase
-      .from('players')
-      .upsert(playerData, {
-        onConflict: 'user_id'
-      });
-    
-    if(error) {
-      console.error('❌ Supabase error:', error);
-      throw error;
-    }
-    
-    console.log('✅ Migration complete!');
-    alert('✅ Migration successful! Your save is now in Supabase!\n\nRefresh the page and click Multiplayer to load it!');
-    
-  } catch(err) {
-    console.error('❌ Migration failed:', err);
-    alert('Migration failed: ' + err.message + '\n\nCheck the console for details.');
-  }
 }
 
 // FAILSAFE: Hide loading screen after 10 seconds no matter what
@@ -2282,14 +2110,6 @@ async function checkAndLoadSave(){
         debugLog.innerHTML += '📝 No save found - new account<br>';
         debugLog.scrollTop = debugLog.scrollHeight;
       }
-      
-      // EMERGENCY FIX: Hide loading and show character creation
-      const loadingOverlay = document.getElementById('loadingOverlay');
-      if(loadingOverlay) {
-        loadingOverlay.style.display = 'none';
-        console.log('✅ Force-hiding loading overlay - no save found');
-      }
-      
       return false;
     }
   } catch(error) {
@@ -9019,6 +8839,12 @@ function openSettings(){
         <button class="ms-btn" onclick="manualSave()" style="width:100%;margin-bottom:8px">💾 Save Now</button>
         <button class="ms-btn" onclick="exportSave()" style="width:100%;margin-bottom:8px;background:#4CAF50">📤 Export Save File</button>
         <button class="ms-btn" onclick="importSave()" style="width:100%;background:#2196F3">📥 Import Save File</button>
+      </div>
+      
+      <div style="margin-bottom:24px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px;font-family:var(--fb);color:var(--txt)">Migration Tool</div>
+        <p style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.4">If you have an old save from Firebase, use this tool to transfer it to the new system.</p>
+        <button onclick="window.open('/migrate.html','_blank')" style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">🔄 Migrate from Firebase</button>
       </div>
       
       <div style="margin-bottom:24px">
