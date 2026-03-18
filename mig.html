@@ -72,8 +72,10 @@
   
   <div class="step">
     <h3 style="margin-bottom: 10px;">Step 1: Sign In</h3>
-    <input type="email" id="em" placeholder="Email">
-    <input type="password" id="pw" placeholder="Password">
+    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Use the SAME email for both, but passwords can be different</p>
+    <input type="email" id="em" placeholder="Email (same for both)">
+    <input type="password" id="pw1" placeholder="Firebase Password">
+    <input type="password" id="pw2" placeholder="Supabase Password">
     <button onclick="doLogin()">Sign In</button>
   </div>
   
@@ -115,20 +117,31 @@ function addLog(msg) {
  
 async function doLogin() {
   const e = document.getElementById('em').value;
-  const p = document.getElementById('pw').value;
+  const p1 = document.getElementById('pw1').value;
+  const p2 = document.getElementById('pw2').value;
   
-  if(!e || !p) { addLog('❌ Enter email and password'); return; }
+  if(!e || !p1 || !p2) { addLog('❌ Fill in all fields'); return; }
   
   try {
     addLog('Signing in to Firebase...');
-    const cred = await fbAuth.signInWithEmailAndPassword(e, p);
+    const cred = await fbAuth.signInWithEmailAndPassword(e, p1);
     usr = cred.user;
     addLog('✅ Firebase: ' + usr.email);
     
     addLog('Signing in to Supabase...');
-    const {error} = await sb.auth.signInWithPassword({email:e, password:p});
-    if(error) throw error;
-    addLog('✅ Supabase signed in');
+    let sbResult = await sb.auth.signInWithPassword({email:e, password:p2});
+    
+    if(sbResult.error) {
+      addLog('⚠️ No Supabase account - creating one...');
+      const signUpResult = await sb.auth.signUp({email:e, password:p2});
+      
+      if(signUpResult.error) throw signUpResult.error;
+      
+      addLog('✅ Supabase account created!');
+      addLog('✅ Signed in to Supabase');
+    } else {
+      addLog('✅ Supabase signed in');
+    }
     
     document.getElementById('migbtn').disabled = false;
   } catch(err) {
