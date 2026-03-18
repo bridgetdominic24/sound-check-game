@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Migration Tool</title>
+  
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .box {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 { font-size: 32px; margin-bottom: 20px; color: #667eea; text-align: center; }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+      background: #667eea;
+      color: white;
+    }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .log {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 13px;
+      font-family: monospace;
+    }
+    .step { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+    .step:last-child { border: none; }
+  </style>
+</head>
+<body>
+ 
+<div class="box">
+  <h1>🎸 Migration Tool</h1>
+  
+  <div class="step">
+    <h3 style="margin-bottom: 10px;">Step 1: Sign In</h3>
+    <input type="email" id="em" placeholder="Email">
+    <input type="password" id="pw" placeholder="Password">
+    <button onclick="doLogin()">Sign In</button>
+  </div>
+  
+  <div class="step">
+    <h3 style="margin-bottom: 10px;">Step 2: Migrate</h3>
+    <button id="migbtn" onclick="doMigrate()" disabled>Start Migration</button>
+  </div>
+  
+  <div class="log" id="log">Ready...</div>
+</div>
+ 
+<script>
+const FB_CFG = {
+  apiKey: "AIzaSyAC9i02JA_EjlyyjX-rBVn4DPzkV3f1Mi4",
+  authDomain: "sound-check-25845.firebaseapp.com",
+  projectId: "sound-check-25845",
+  storageBucket: "sound-check-25845.firebasestorage.app",
+  messagingSenderId: "270901555559",
+  appId: "1:270901555559:web:7a27aa0a234d68f8a33fc2"
+};
+ 
+const SB_URL = 'https://pvxrciebegirmrrrzkor.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2eHJjaWViZWdpcm1ycnJ6a29yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3OTQ3NDksImV4cCI6MjA4OTM3MDc0OX0.da-ziWmwhO1LhcM5hZuG0qMsgLxtDtUkPwWJoGep6Ic';
+ 
+let fbApp, fbAuth, fbDb, sb, usr;
+ 
+window.onload = function() {
+  fbApp = firebase.initializeApp(FB_CFG);
+  fbAuth = firebase.auth();
+  fbDb = firebase.firestore();
+  sb = window.supabase.createClient(SB_URL, SB_KEY);
+  addLog('✅ Ready!');
+};
+ 
+function addLog(msg) {
+  document.getElementById('log').innerHTML += msg + '<br>';
+  document.getElementById('log').scrollTop = 999999;
+}
+ 
+async function doLogin() {
+  const e = document.getElementById('em').value;
+  const p = document.getElementById('pw').value;
+  
+  if(!e || !p) { addLog('❌ Enter email and password'); return; }
+  
+  try {
+    addLog('Signing in to Firebase...');
+    const cred = await fbAuth.signInWithEmailAndPassword(e, p);
+    usr = cred.user;
+    addLog('✅ Firebase: ' + usr.email);
+    
+    addLog('Signing in to Supabase...');
+    const {error} = await sb.auth.signInWithPassword({email:e, password:p});
+    if(error) throw error;
+    addLog('✅ Supabase signed in');
+    
+    document.getElementById('migbtn').disabled = false;
+  } catch(err) {
+    addLog('❌ ' + err.message);
+  }
+}
+ 
+async function doMigrate() {
+  if(!usr) { addLog('❌ Sign in first'); return; }
+  
+  document.getElementById('migbtn').disabled = true;
+  document.getElementById('migbtn').textContent = 'Migrating...';
+  
+  try {
+    addLog('Loading Firebase save...');
+    const doc = await fbDb.collection('saves').doc(usr.uid).get();
+    
+    if(!doc.exists) { addLog('❌ No save found'); return; }
+    
+    const d = doc.data();
+    addLog('✅ Save loaded');
+    
+    let gd, cd;
+    
+    if(d.GAME && d.CHARACTER) {
+      addLog('Old format');
+      gd = d.GAME;
+      cd = d.CHARACTER;
+    } else if(d.week && d.CHARACTER) {
+      addLog('New format');
+      const s1 = await fbDb.collection('saves').doc(usr.uid).collection('data').doc('songs').get();
+      const s2 = await fbDb.collection('saves').doc(usr.uid).collection('data').doc('social').get();
+      
+      const sd1 = s1.exists ? s1.data() : {};
+      const sd2 = s2.exists ? s2.data() : {};
+      
+      gd = {
+        week: d.week,
+        money: d.money,
+        buzz: d.buzz,
+        energy: d.energy,
+        inspiration: d.inspiration || 100,
+        age: d.age,
+        skills: d.skills,
+        autoSave: d.autoSave,
+        artistProfile: d.artistProfile,
+        recordLabel: d.recordLabel,
+        songs: sd1.songs || [],
+        releases: sd1.releases || [],
+        socialPosts: sd2.socialPosts || [],
+        opportunityHistory: sd2.opportunityHistory || [],
+        managers: sd2.managers || [],
+        collaborations: sd2.collaborations || []
+      };
+      cd = d.CHARACTER;
+    } else {
+      addLog('❌ Unknown format');
+      return;
+    }
+    
+    addLog('Week: ' + gd.week + ', $' + gd.money);
+    addLog('Artist: ' + cd.artistName);
+    
+    addLog('Saving to Supabase...');
+    const {data:{user}} = await sb.auth.getUser();
+    
+    const pd = {
+      user_id: user.id,
+      email: user.email,
+      artist_name: cd.artistName,
+      game_data: gd,
+      character_data: cd,
+      online: true,
+      last_active: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    const {error} = await sb.from('players').upsert(pd, {onConflict:'user_id'});
+    if(error) throw error;
+    
+    addLog('✅✅✅ SUCCESS!');
+    addLog('🎉 ' + cd.artistName + ' migrated!');
+    addLog('Go back to game and sign in!');
+    
+    document.getElementById('migbtn').textContent = '✅ Done!';
+    
+  } catch(err) {
+    addLog('❌ ' + err.message);
+    document.getElementById('migbtn').disabled = false;
+    document.getElementById('migbtn').textContent = 'Try Again';
+  }
+}
+</script>
+ 
+</body>
+</html>
