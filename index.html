@@ -519,7 +519,7 @@ window.addEventListener('load', () => {
 <div class="phone" id="phone">
 
 <!-- LANDING SCREEN -->
-<!-- LOADING OVERLAY - Shows while Firebase checks for saved game -->
+<!-- LOADING OVERLAY - Shows while checking for saved game -->
 <div id="loadingOverlay" style="
   position:fixed;
   top:0;left:0;right:0;bottom:0;
@@ -1234,7 +1234,7 @@ function emergencySkip() {
 </div>
 <script>
 // IMMEDIATE FAILSAFE - Hide loading screen after 5 seconds NO MATTER WHAT
-// This runs BEFORE Firebase even loads
+// This runs immediately on page load
 (function() {
   let attempts = 0;
   const maxAttempts = 10;
@@ -1348,7 +1348,7 @@ function startSinglePlayer(){
 function startMultiplayer(){
   GAME_MODE = 'multi';
   
-  // Keep loading overlay visible - it will be hidden after Firebase loads
+  // Keep loading overlay visible until auth completes
   
   const landing = document.getElementById('landingScreen');
   landing.classList.remove('visible');
@@ -8843,8 +8843,8 @@ function openSettings(){
       
       <div style="margin-bottom:24px">
         <div style="font-size:14px;font-weight:700;margin-bottom:12px;font-family:var(--fb);color:var(--txt)">Migration Tool</div>
-        <p style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.4">If you have an old save from Firebase, use this tool to transfer it to the new system.</p>
-        <button onclick="window.open('/migrate.html','_blank')" style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">🔄 Migrate from Firebase</button>
+        <p style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.4">If you have an old save from a previous version, use this tool to transfer it.</p>
+        <button onclick="window.open('/migrate.html','_blank')" style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">🔄 Migrate Old Save</button>
       </div>
       
       <div style="margin-bottom:24px">
