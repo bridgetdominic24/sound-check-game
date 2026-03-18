@@ -66,7 +66,7 @@
   </style>
 </head>
 <body>
- 
+
 <div class="box">
   <h1>🎸 Migration Tool</h1>
   
@@ -86,7 +86,7 @@
   
   <div class="log" id="log">Ready...</div>
 </div>
- 
+
 <script>
 const FB_CFG = {
   apiKey: "AIzaSyAC9i02JA_EjlyyjX-rBVn4DPzkV3f1Mi4",
@@ -96,12 +96,12 @@ const FB_CFG = {
   messagingSenderId: "270901555559",
   appId: "1:270901555559:web:7a27aa0a234d68f8a33fc2"
 };
- 
+
 const SB_URL = 'https://pvxrciebegirmrrrzkor.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2eHJjaWViZWdpcm1ycnJ6a29yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3OTQ3NDksImV4cCI6MjA4OTM3MDc0OX0.da-ziWmwhO1LhcM5hZuG0qMsgLxtDtUkPwWJoGep6Ic';
- 
+
 let fbApp, fbAuth, fbDb, sb, usr;
- 
+
 window.onload = function() {
   fbApp = firebase.initializeApp(FB_CFG);
   fbAuth = firebase.auth();
@@ -109,12 +109,12 @@ window.onload = function() {
   sb = window.supabase.createClient(SB_URL, SB_KEY);
   addLog('✅ Ready!');
 };
- 
+
 function addLog(msg) {
   document.getElementById('log').innerHTML += msg + '<br>';
   document.getElementById('log').scrollTop = 999999;
 }
- 
+
 async function doLogin() {
   const e = document.getElementById('em').value;
   const p1 = document.getElementById('pw1').value;
@@ -148,7 +148,7 @@ async function doLogin() {
     addLog('❌ ' + err.message);
   }
 }
- 
+
 async function doMigrate() {
   if(!usr) { addLog('❌ Sign in first'); return; }
   
@@ -235,6 +235,6 @@ async function doMigrate() {
   }
 }
 </script>
- 
+
 </body>
 </html>
