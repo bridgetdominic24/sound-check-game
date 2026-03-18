@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOUND CHECK - Migration Tool</title>
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      padding: 20px;
+    }
+    
+    .container {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    
+    h1 {
+      font-size: 36px;
+      margin: 0 0 10px 0;
+      text-align: center;
+    }
+    
+    p {
+      text-align: center;
+      opacity: 0.9;
+      margin-bottom: 30px;
+    }
+    
+    .step {
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .step-number {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      background: white;
+      color: #667eea;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 30px;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    
+    button {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s;
+      margin-top: 10px;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+    }
+    
+    .btn-primary {
+      background: white;
+      color: #667eea;
+    }
+    
+    .btn-secondary {
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: 2px solid white;
+    }
+    
+    .status {
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .success { color: #4CAF50; }
+    .error { color: #f44336; }
+    .info { color: #2196F3; }
+    
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      font-size: 14px;
+      margin-top: 10px;
+      box-sizing: border-box;
+    }
+    
+    input::placeholder {
+      color: rgba(255,255,255,0.5);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🎸 SOUND CHECK</h1>
+  <p>Firebase → Supabase Migration Tool</p>
+  
+  <div class="step">
+    <div>
+      <span class="step-number">1</span>
+      <strong>Sign in with your email</strong>
+    </div>
+    <input type="email" id="email" placeholder="your@email.com" />
+    <input type="password" id="password" placeholder="Password" />
+    <button class="btn-primary" onclick="signIn()">Sign In</button>
+  </div>
+  
+  <div class="step">
+    <div>
+      <span class="step-number">2</span>
+      <strong>Migrate your save</strong>
+    </div>
+    <p style="font-size: 13px; opacity: 0.8; margin-top: 10px;">
+      This will copy your Firebase save (Bootswidafur, Week 14) to Supabase.
+    </p>
+    <button class="btn-primary" id="migrateBtn" onclick="migrate()" disabled>
+      🔄 Start Migration
+    </button>
+  </div>
+  
+  <div class="step">
+    <div>
+      <span class="step-number">3</span>
+      <strong>Return to game</strong>
+    </div>
+    <button class="btn-secondary" onclick="window.location.href='/'">
+      ← Back to SOUND CHECK
+    </button>
+  </div>
+  
+  <div class="status" id="status">
+    <div class="info">ℹ️ Waiting for you to sign in...</div>
+  </div>
+</div>
+
+<script>
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyAC9i02JA_EjlyyjX-rBVn4DPzkV3f1Mi4",
+  authDomain: "sound-check-25845.firebaseapp.com",
+  projectId: "sound-check-25845",
+  storageBucket: "sound-check-25845.firebasestorage.app",
+  messagingSenderId: "270901555559",
+  appId: "1:270901555559:web:7a27aa0a234d68f8a33fc2"
+};
+
+// Supabase Config
+const SUPABASE_URL = 'https://pvxrciebegirmrrrzkor.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2eHJjaWViZWdpcm1ycnJ6a29yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3OTQ3NDksImV4cCI6MjA4OTM3MDc0OX0.da-ziWmwhO1LhcM5hZuG0qMsgLxtDtUkPwWJoGep6Ic';
+
+// Initialize
+let firebaseApp, firebaseAuth, firebaseDb, supabase, currentUser;
+
+window.addEventListener('load', () => {
+  try {
+    firebaseApp = firebase.initializeApp(firebaseConfig);
+    firebaseAuth = firebase.auth();
+    firebaseDb = firebase.firestore();
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    log('✅ Firebase and Supabase initialized', 'success');
+  } catch(err) {
+    log('❌ Initialization failed: ' + err.message, 'error');
+  }
+});
+
+function log(message, type = 'info') {
+  const status = document.getElementById('status');
+  const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+  const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+  
+  status.innerHTML += `<div class="${className}">${icon} ${message}</div>`;
+  status.scrollTop = status.scrollHeight;
+}
+
+async function signIn() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  
+  if(!email || !password) {
+    log('Please enter email and password', 'error');
+    return;
+  }
+  
+  try {
+    log('Signing in to Firebase...', 'info');
+    
+    const userCredential = await firebaseAuth.signInWithEmailAndPassword(email, password);
+    currentUser = userCredential.user;
+    
+    log('✅ Signed in as: ' + currentUser.email, 'success');
+    
+    // Also sign in to Supabase
+    log('Signing in to Supabase...', 'info');
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
+    
+    if(error) throw error;
+    
+    log('✅ Supabase auth successful', 'success');
+    
+    // Enable migrate button
+    document.getElementById('migrateBtn').disabled = false;
+    
+  } catch(err) {
+    log('❌ Sign in failed: ' + err.message, 'error');
+  }
+}
+
+async function migrate() {
+  if(!currentUser) {
+    log('Please sign in first!', 'error');
+    return;
+  }
+  
+  document.getElementById('migrateBtn').disabled = true;
+  document.getElementById('migrateBtn').textContent = '⏳ Migrating...';
+  
+  try {
+    log('🔍 Loading Firebase save...', 'info');
+    
+    const firebaseDoc = await firebaseDb.collection('saves').doc(currentUser.uid).get();
+    
+    if(!firebaseDoc.exists) {
+      log('❌ No Firebase save found!', 'error');
+      return;
+    }
+    
+    const firebaseData = firebaseDoc.data();
+    log('✅ Firebase save loaded', 'success');
+    
+    let gameData, characterData;
+    
+    // Check format
+    if(firebaseData.GAME && firebaseData.CHARACTER) {
+      log('📦 Old format detected', 'info');
+      gameData = firebaseData.GAME;
+      characterData = firebaseData.CHARACTER;
+    } else if(firebaseData.week && firebaseData.CHARACTER) {
+      log('📦 New split format detected', 'info');
+      
+      const songsDoc = await firebaseDb.collection('saves').doc(currentUser.uid).collection('data').doc('songs').get();
+      const socialDoc = await firebaseDb.collection('saves').doc(currentUser.uid).collection('data').doc('social').get();
+      
+      const songsData = songsDoc.exists ? songsDoc.data() : {};
+      const socialData = socialDoc.exists ? socialDoc.data() : {};
+      
+      gameData = {
+        week: firebaseData.week,
+        money: firebaseData.money,
+        buzz: firebaseData.buzz,
+        energy: firebaseData.energy,
+        inspiration: firebaseData.inspiration || 100,
+        age: firebaseData.age,
+        skills: firebaseData.skills,
+        autoSave: firebaseData.autoSave,
+        artistProfile: firebaseData.artistProfile,
+        recordLabel: firebaseData.recordLabel,
+        songs: songsData.songs || [],
+        releases: songsData.releases || [],
+        socialPosts: socialData.socialPosts || [],
+        opportunityHistory: socialData.opportunityHistory || [],
+        managers: socialData.managers || [],
+        collaborations: socialData.collaborations || []
+      };
+      
+      characterData = firebaseData.CHARACTER;
+    } else {
+      log('❌ Unknown save format', 'error');
+      return;
+    }
+    
+    log('📊 Week: ' + gameData.week + ', Money: $' + gameData.money, 'info');
+    log('👤 Artist: ' + characterData.artistName, 'info');
+    
+    // Save to Supabase
+    log('💾 Saving to Supabase...', 'info');
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const playerData = {
+      user_id: user.id,
+      email: user.email,
+      artist_name: characterData.artistName || 'Unknown Artist',
+      game_data: gameData,
+      character_data: characterData,
+      online: true,
+      last_active: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    const { error } = await supabase
+      .from('players')
+      .upsert(playerData, {
+        onConflict: 'user_id'
+      });
+    
+    if(error) throw error;
+    
+    log('✅ MIGRATION COMPLETE!', 'success');
+    log('✅ ' + characterData.artistName + ' (Week ' + gameData.week + ') saved to Supabase!', 'success');
+    log('🎉 You can now return to the game and sign in!', 'success');
+    
+    document.getElementById('migrateBtn').textContent = '✅ Migration Complete!';
+    
+  } catch(err) {
+    log('❌ Migration failed: ' + err.message, 'error');
+    document.getElementById('migrateBtn').disabled = false;
+    document.getElementById('migrateBtn').textContent = '🔄 Try Again';
+  }
+}
+</script>
+
+</body>
+</html>
