@@ -2285,6 +2285,16 @@ async function checkAndLoadSave(){
       // Load GAME from game_data JSON column
       GAME = JSON.parse(JSON.stringify(data.game_data));
       
+      // PATCH: Fix releases/songs that are missing releaseDay (causes 0 streams bug)
+      if(GAME.releases) {
+        GAME.releases.forEach(r => {
+          if(!r.releaseDay) r.releaseDay = 1;
+          if(r.songs) r.songs.forEach(s => {
+            if(!s.releaseDay) s.releaseDay = 1;
+          });
+        });
+      }
+      
       console.log('💰 Money after parse:', GAME.money, 'Type:', typeof GAME.money);
       
       // Load CHARACTER from character_data JSON column
@@ -4145,7 +4155,7 @@ function updateMusicStats(){
   // Only count streams for songs released 1+ week ago
   const totalStreams=GAME.releases.reduce((sum,r)=>{
     const weeksSinceRelease=Math.floor((GAME.day-r.releaseDay)/7);
-    return weeksSinceRelease>=1?sum+r.streams:sum;
+    return sum+(r.streams||0);
   },0);
   
   const totalSongs=GAME.songs.length;
@@ -7168,7 +7178,7 @@ function nextDay(){
         const weeksSinceRelease=Math.floor((GAME.day-song.releaseDay)/7);
         
         // OFFLINE MODE: Skip stream generation for Week 1 releases
-        if(GAME_MODE === 'single' && weeksSinceRelease < 1){
+        if(GAME_MODE === 'single' && weeksSinceRelease < 1 && song.releaseDay > 0){
           return; // No streams until Week 2!
         }
         
