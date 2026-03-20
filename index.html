@@ -3941,11 +3941,12 @@ function doAction(action){
   else if(action==='busk'){
     if(spendEnergy(15)){
       const earn=Math.floor(Math.random()*30)+10;
-      const buzzGain=Math.random()<0.6?Math.floor(Math.random()*3)+1:0; // 60% chance of 1-3 buzz
+      const buzzGain=Math.floor(Math.random()*3)+1; // Always 1-3 buzz
       GAME.money+=earn;
-      GAME.buzz = (GAME.buzz || 0) + buzzGain;
+      if(!GAME.buzz) GAME.buzz=0;
+      GAME.buzz=Math.min(1000, GAME.buzz + buzzGain);
       updateStats();
-      showEvent('🎸','Street Performance',`People threw $${earn} in your case. ${buzzGain>0?`Gained ${buzzGain} buzz!`:'Nobody really noticed.'}`,['Cool']);
+      showEvent('🎸','Street Performance',`People threw $${earn} in your case. Gained ${buzzGain} buzz!`,['Cool']);
     }
   }
   else if(action==='perform'){
@@ -3953,7 +3954,8 @@ function doAction(action){
       const earn=Math.floor(Math.random()*30)+10;
       const hypeGain=Math.random()<0.6?1:0; // 60% chance of +1 hype
       GAME.money+=earn;
-      GAME.buzz+=hypeGain;
+      if(!GAME.buzz) GAME.buzz=0;
+      GAME.buzz=Math.min(1000, GAME.buzz + hypeGain);
       updateStats();
       showEvent('🎤','Street Performance',`People threw $${earn} in your case. ${hypeGain>0?'A few people stopped to listen!':'Nobody really noticed.'}`,['Cool']);
     }
@@ -3994,7 +3996,8 @@ function doAction(action){
       }
       
       GAME.money+=earn;
-      GAME.buzz+=hypeGain;
+      if(!GAME.buzz) GAME.buzz=0;
+      GAME.buzz=Math.min(1000, GAME.buzz + hypeGain);
       updateStats();
       showEvent('🎵','Busking Session',message,['Nice']);
     }
@@ -9412,7 +9415,15 @@ function handleCoverUpload(event){
 function openMenu(title,content){
   document.getElementById('menuTitle').innerHTML=title;
   document.getElementById('menuContent').innerHTML=content;
-  document.getElementById('menuModal').classList.add('show');
+  // Boost z-index if a platform screen is open so menu appears on top
+  const menuModal = document.getElementById('menuModal');
+  const platformScreens = ['instagramScreen','tiktokScreen','twitterScreen','youtubeScreen','facebookScreen'];
+  const platformOpen = platformScreens.some(id => {
+    const el = document.getElementById(id);
+    return el && el.classList.contains('visible');
+  });
+  menuModal.style.zIndex = platformOpen ? '20000' : '';
+  menuModal.classList.add('show');
 }
 
 function closeMenu(){
