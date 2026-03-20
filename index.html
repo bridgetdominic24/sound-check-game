@@ -1799,114 +1799,117 @@ function showLoginScreen(){
       justify-content:center;
       z-index:10000;
       padding:20px;
+      overflow-y:auto;
     ">
       <div style="
         background:white;
         border-radius:24px;
-        padding:40px;
+        padding:32px 28px;
         max-width:400px;
         width:100%;
         box-shadow:0 20px 60px rgba(0,0,0,0.3);
       ">
-        <h2 style="margin:0 0 8px 0;font-size:28px;font-weight:900;color:#1a1d23;text-align:center">Sign In</h2>
-        <p style="margin:0 0 8px 0;font-size:14px;color:#666;text-align:center">Save your progress to the cloud</p>
-        <p style="margin:0 0 24px 0;font-size:12px;color:#ff6b6b;text-align:center;font-weight:600">⚠️ Check your spam folder for emails!</p>
-        
+        <!-- Game title -->
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:40px;margin-bottom:8px">&#127925;</div>
+          <h2 style="margin:0 0 4px 0;font-size:26px;font-weight:900;color:#1a1d23">SOUND CHECK</h2>
+          <p style="margin:0;font-size:13px;color:#888">Multiplayer · Cloud Saves</p>
+        </div>
+
+        <!-- Reset notice banner -->
+        <div style="background:linear-gradient(135deg,#ff6b6b,#ee5a24);border-radius:14px;padding:16px;margin-bottom:20px;color:white">
+          <div style="font-size:14px;font-weight:900;margin-bottom:6px">&#127881; Fresh Start for Everyone!</div>
+          <div style="font-size:12px;line-height:1.7;opacity:0.95">
+            We did a full reset to fix some bugs — everyone starts fresh. Log in and create a new character! Your old save is gone but the game is way more stable now &#128156;
+          </div>
+        </div>
+
+        <!-- Email input -->
         <input 
           type="email" 
           id="emailInput" 
-          placeholder="Email" 
+          placeholder="Email address" 
           autocomplete="username"
           autocapitalize="off"
           style="
             width:100%;
-            padding:12px;
+            padding:14px;
             border:2px solid #e0e0e0;
-            border-radius:8px;
+            border-radius:12px;
             font-size:15px;
-            margin-bottom:12px;
+            margin-bottom:10px;
             box-sizing:border-box;
+            outline:none;
           ">
         
-        <div style="position:relative;margin-bottom:16px">
+        <!-- Password input -->
+        <div style="position:relative;margin-bottom:20px">
           <input 
             type="password" 
             id="passwordInput" 
-            placeholder="Password" 
+            placeholder="Password (8+ characters)" 
             autocomplete="current-password"
             style="
               width:100%;
-              padding:12px 40px 12px 12px;
+              padding:14px 44px 14px 14px;
               border:2px solid #e0e0e0;
-              border-radius:8px;
+              border-radius:12px;
               font-size:15px;
               box-sizing:border-box;
+              outline:none;
             ">
           <button 
             onclick="togglePasswordVisibility()" 
             type="button"
-            style="
-              position:absolute;
-              right:8px;
-              top:50%;
-              transform:translateY(-50%);
-              background:none;
-              border:none;
-              cursor:pointer;
-              padding:8px;
-              font-size:18px;
-            ">
+            style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;font-size:18px;">
             👁️
           </button>
         </div>
-        
+
+        <!-- Sign In button - solid purple, clearly primary -->
         <button onclick="signInWithEmail()" style="
           width:100%;
-          background:#667eea;
+          background:linear-gradient(135deg,#667eea,#764ba2);
           color:white;
           border:none;
           padding:16px;
-          border-radius:12px;
+          border-radius:14px;
           font-size:16px;
-          font-weight:700;
+          font-weight:800;
           cursor:pointer;
-          margin-bottom:12px;
-        ">Sign In with Email</button>
+          margin-bottom:10px;
+          letter-spacing:0.5px;
+          box-shadow:0 4px 15px rgba(102,126,234,0.4);
+        ">&#128274; Sign In</button>
         
+        <!-- Divider -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="flex:1;height:1px;background:#eee"></div>
+          <div style="font-size:12px;color:#aaa;font-weight:600">NEW HERE?</div>
+          <div style="flex:1;height:1px;background:#eee"></div>
+        </div>
+
+        <!-- Create Account button - green, clearly different -->
         <button onclick="createAccountWithEmail()" style="
           width:100%;
-          background:transparent;
-          color:#667eea;
-          border:2px solid #667eea;
-          padding:14px;
-          border-radius:12px;
-          font-size:15px;
-          font-weight:700;
-          cursor:pointer;
-          margin-bottom:12px;
-        ">Create Account</button>
-        
-        <button onclick="resetPassword()" style="
-          width:100%;
-          background:transparent;
-          color:#999;
+          background:linear-gradient(135deg,#11998e,#38ef7d);
+          color:white;
           border:none;
-          padding:12px;
-          font-size:14px;
+          padding:16px;
+          border-radius:14px;
+          font-size:16px;
+          font-weight:800;
           cursor:pointer;
-          text-decoration:underline;
-        ">Forgot Password?</button>
+          margin-bottom:16px;
+          letter-spacing:0.5px;
+          box-shadow:0 4px 15px rgba(17,153,142,0.4);
+        ">&#10024; Create New Account</button>
         
-        <button onclick="backToLandingFromLogin()" style="
-          width:100%;
-          background:transparent;
-          color:#999;
-          border:none;
-          padding:12px;
-          font-size:14px;
-          cursor:pointer;
-          margin-top:8px;
-        ">← Back</button>
+        <!-- Forgot password + back -->
+        <div style="display:flex;justify-content:space-between">
+          <button onclick="resetPassword()" style="background:none;border:none;color:#aaa;font-size:13px;cursor:pointer;text-decoration:underline;padding:8px 0">Forgot Password?</button>
+          <button onclick="backToLandingFromLogin()" style="background:none;border:none;color:#aaa;font-size:13px;cursor:pointer;padding:8px 0">← Back</button>
+        </div>
       </div>
     </div>
   `;
@@ -1970,8 +1973,8 @@ async function createAccountWithEmail(){
     return;
   }
   
-  if(password.length < 6){
-    alert('Password must be at least 6 characters');
+  if(password.length < 8){
+    alert('Password must be at least 8 characters');
     return;
   }
   
@@ -1988,9 +1991,22 @@ async function createAccountWithEmail(){
     
     // Note: Supabase may require email confirmation depending on settings
     if(data.user && !data.session) {
-      alert('✅ Account created! Please check your email to confirm your account.');
+      alert('✅ Account created! Please check your email to confirm your account, then come back and sign in.');
     } else {
+      // Show migration prompt for new accounts
       onAuthSuccess();
+      setTimeout(() => {
+        const hasSave = GAME && GAME.week && GAME.week > 1;
+        if(!hasSave) {
+          showEvent('👋', 'Welcome to SOUND CHECK!', 
+            'New here? Start creating your artist!\n\nPlayed before on the old version? Tap Settings (⚙️ top right) and hit "Migrate from Firebase" to restore your old save.', 
+            ['Start Fresh', 'Go to Settings'],
+            (choice) => {
+              if(choice === 'Go to Settings') openSettings();
+            }
+          );
+        }
+      }, 1000);
     }
     
   } catch(error) {
@@ -2284,6 +2300,9 @@ async function checkAndLoadSave(){
       
       // Load GAME from game_data JSON column
       GAME = JSON.parse(JSON.stringify(data.game_data));
+      
+      // PATCH: Force money to be a proper number (prevents reset to $200 bug)
+      if(GAME.money !== undefined) GAME.money = Number(GAME.money) || 200;
       
       // PATCH: Fix releases/songs that are missing releaseDay (causes 0 streams bug)
       if(GAME.releases) {
@@ -9089,7 +9108,11 @@ function openSettings(){
         <div style="margin-bottom:24px">
           <div style="font-size:14px;font-weight:700;margin-bottom:12px;font-family:var(--fb);color:var(--txt)">Account</div>
           <button onclick="switchGameMode()" style="width:100%;padding:12px;background:#9C27B0;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;margin-bottom:8px">🔄 Switch to Single Player</button>
-          <button onclick="migrateFromFirebase()" style="width:100%;padding:12px;background:#4CAF50;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;margin-bottom:8px">🔥➡️☁️ Migrate from Firebase</button>
+          <div style="background:#e8f5e9;border:2px solid #4CAF50;border-radius:12px;padding:14px;margin-bottom:12px">
+            <div style="font-size:13px;font-weight:800;color:#2e7d32;margin-bottom:6px">&#128293; Restore Your Old Save</div>
+            <div style="font-size:12px;color:#388e3c;line-height:1.7;margin-bottom:10px">Played before on the old version? Enter your <b>old email + password</b> below to copy your save over automatically. Takes 10 seconds!</div>
+            <button onclick="migrateFromFirebase()" style="width:100%;padding:12px;background:#4CAF50;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">&#128293; Migrate from Firebase</button>
+          </div>
           <button onclick="deleteAccountConfirm()" style="width:100%;padding:12px;background:#ff3b30;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;margin-bottom:8px">🗑️ Delete Save & Account</button>
           <button onclick="logoutUser()" style="width:100%;padding:12px;background:#ff9500;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">🚪 Log Out</button>
         </div>
