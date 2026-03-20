@@ -3029,7 +3029,7 @@ function goToHome(){
   }
   
   // Set user info
-  document.getElementById('userName').textContent=S.name;
+  document.getElementById('userName').textContent=S.artistName||S.sn||S.fn||'Artist';
   if(document.getElementById('realName')){
     document.getElementById('realName').textContent=`${S.fn} ${S.ln}`;
   }
@@ -3142,6 +3142,8 @@ function createFreshGame(){
   },
   activeAnalytics:[], // Currently running analytics {region, startWeek, endWeek}
   social:{instagram:0,tiktok:0,twitter:0,youtube:0,facebook:0},
+  socialUsernames:{instagram:'',tiktok:'',twitter:'',youtube:'',facebook:''},
+  joinedPlatforms:{instagram:false,tiktok:false,twitter:false,youtube:false,facebook:false},
   recordLabel:null, // {name, type, advance, streamRoyalty, merchRoyalty, albumSalesRoyalty, tourRoyalty, albumsRemaining, startWeek, is360Deal, recoupment, benefits, restrictions}
   labelOffers:[], // Pending offers
   lastOfferCheckWeek:null,
@@ -3488,6 +3490,50 @@ function checkAchievements(){
       showEvent(ach.icon,'Achievement Unlocked!',`${ach.name}\n${ach.desc}`,['Nice!']);
     }
   });
+}
+
+
+function showToast(message, color='green'){
+  const colors = {
+    green: 'linear-gradient(135deg,#11998e,#38ef7d)',
+    blue: 'linear-gradient(135deg,#667eea,#764ba2)',
+    red: 'linear-gradient(135deg,#ff6b6b,#ee5a24)',
+    gold: 'linear-gradient(135deg,#f7971e,#ffd200)',
+    purple: 'linear-gradient(135deg,#a18cd1,#fbc2eb)'
+  };
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;
+    top:20px;
+    left:50%;
+    transform:translateX(-50%) translateY(-80px);
+    background:${colors[color]||colors.green};
+    color:white;
+    padding:12px 24px;
+    border-radius:50px;
+    font-size:14px;
+    font-weight:700;
+    z-index:99999;
+    box-shadow:0 4px 20px rgba(0,0,0,0.3);
+    transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    white-space:nowrap;
+    max-width:90vw;
+    text-align:center;
+    pointer-events:none;
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  // Slide in
+  setTimeout(() => {
+    toast.style.transform = 'translateX(-50%) translateY(0)';
+  }, 10);
+  
+  // Slide out after 3 seconds
+  setTimeout(() => {
+    toast.style.transform = 'translateX(-50%) translateY(-80px)';
+    setTimeout(() => toast.remove(), 400);
+  }, 3000);
 }
 
 function addNotification(title,body,type){
@@ -7487,13 +7533,48 @@ function nextDay(){
   // Keep only last 52 weeks (1 year)
   if(GAME.financeHistory.length>52)GAME.financeHistory.shift();
   
+  // Fan gain feedback toast
+  const newTotalFans = Object.values(GAME.fansByRegion||{}).reduce((s,v)=>s+v,0);
+  if(!GAME._lastFanCount) GAME._lastFanCount = 0;
+  const fanDiff = newTotalFans - GAME._lastFanCount;
+  if(fanDiff >= 50){
+    showToast(`👥 +${fanDiff.toLocaleString()} new fans!`, 'gold');
+  }
+  GAME._lastFanCount = newTotalFans;
+  
   // Update stats to reflect new money
   updateStats();
   
-  // Random events disabled temporarily
-  // if(Math.random()<0.4){
-  //   setTimeout(triggerRandomEvent,1000);
-  // }
+  // Weekly recap notification
+  const totalFans = Object.values(GAME.fansByRegion||{}).reduce((s,v)=>s+v,0);
+  const streamEarnings = Math.round(weeklyStreamingRevenue);
+  
+  // Build a meaningful recap message
+  let recapMsg = '';
+  if(streamEarnings > 0){
+    recapMsg += `+$${streamEarnings.toLocaleString()} from streams. `;
+  }
+  if(weeklyJobPay > 0){
+    recapMsg += `+$${weeklyJobPay.toLocaleString()} from your job. `;
+  }
+  if(totalFans > 0){
+    recapMsg += `${totalFans.toLocaleString()} total fans.`;
+  }
+  if(!recapMsg) recapMsg = 'Keep grinding — your break is coming! 💪';
+  
+  addNotification(
+    `📅 Week ${GAME.week} started!`,
+    recapMsg,
+    'week'
+  );
+  
+  // Show a fun toast popup for exciting moments
+  if(streamEarnings > 1000){
+    showToast(`💰 $${streamEarnings.toLocaleString()} from streams this week!`, 'green');
+  }
+  if(weeklyJobPay > 0 && streamEarnings === 0){
+    showToast(`💼 Paycheck: +$${weeklyJobPay.toLocaleString()}`, 'blue');
+  }
 }
 
 function generateManagerGig(){
@@ -9437,7 +9518,7 @@ function showSpotifyUI(){
         
         <!-- Content on top -->
         <div class="spotify-content">
-          <div class="spotify-artist-name">${S.name||'Your Artist'}</div>
+          <div class="spotify-artist-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
           <div class="spotify-monthly">${monthlyListeners.toLocaleString()} monthly listeners</div>
           ${GAME.artistProfile.bio?`<div style="font-size:13px;color:rgba(255,255,255,0.7);margin:8px 0 16px;max-width:400px">${GAME.artistProfile.bio}</div>`:''}
           
@@ -9657,7 +9738,7 @@ function showAppleMusicUI(){
     <div style="position:fixed;top:12px;left:12px;z-index:200"><button onclick="closeAppleMusic()" style="background:rgba(0,0,0,0.3);border:none;border-radius:50%;width:32px;height:32px;color:#fff;font-size:20px">←</button></div>
     <div class="am-header">
       <div class="am-banner" style="background-image:${GAME.artistProfile.profilePicType==='image'?`url('${GAME.artistProfile.profilePic}')`:'none'}"></div>
-      <div class="am-name">${S.name||'Your Artist'}</div>
+      <div class="am-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
       <div class="am-artist">Artist</div>
       <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
         <div class="am-play-btn">▶</div>
@@ -9785,7 +9866,7 @@ function showYouTubeMusicUI(){
       <div class="ytm-gradient"></div>
       <div class="ytm-content">
         ${GAME.artistProfile.profilePicType==='image'?`<div style="width:120px;height:120px;border-radius:50%;background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center;margin:0 auto 16px;border:4px solid #181818"></div>`:''}
-        <div class="ytm-name">${S.name||'Your Artist'}</div>
+        <div class="ytm-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
         <div class="ytm-monthly">${monthlyListeners.toLocaleString()} monthly listeners</div>
         <div class="ytm-controls">
           <button class="ytm-subscribe">SUBSCRIBE</button>
@@ -9886,7 +9967,7 @@ function showAmazonMusicUI(){
   <div class="amz-container">
     <div style="position:fixed;top:12px;left:12px;z-index:200"><button onclick="closeAmazonMusic()" style="background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:32px;height:32px;color:#fff;font-size:20px;cursor:pointer">←</button></div>
     <div class="amz-header">
-      <div class="amz-name">${S.name||'Your Artist'}</div>
+      <div class="amz-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
       <div class="amz-artist">Artist</div>
       <button class="amz-play"><svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></button>
     </div>
@@ -9952,7 +10033,7 @@ function showSoundCloudUI(){
   <div class="sc-container">
     <div style="position:fixed;top:12px;left:12px;z-index:200"><button onclick="closeSoundCloud()" style="background:rgba(0,0,0,0.5);border:none;border-radius:50%;width:32px;height:32px;color:#fff;font-size:20px;cursor:pointer">←</button></div>
     <div class="sc-header">
-      <div class="sc-name">${S.name||'Your Artist'}</div>
+      <div class="sc-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
       <div class="sc-followers">${Math.floor(getTotalFans()*0.2).toLocaleString()} followers</div>
       <button class="sc-follow">Follow</button>
     </div>
@@ -10016,7 +10097,7 @@ function showiTunesUI(){
   <div class="it-container">
     <div style="position:fixed;top:12px;left:12px;z-index:200"><button onclick="closeiTunes()" style="background:rgba(0,0,0,0.3);border:none;border-radius:50%;width:32px;height:32px;color:#000;font-size:20px;cursor:pointer">←</button></div>
     <div class="it-header">
-      <div class="it-name">${S.name||'Your Artist'}</div>
+      <div class="it-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
       <div class="it-artist">Artist</div>
     </div>
     <div class="it-section"><div class="it-title">Top Releases</div>`;
@@ -10063,6 +10144,36 @@ function closeiTunes(){
 // SOCIAL MEDIA PLATFORMS
 function showInstagram(){
   if(!GAME.artistProfile)GAME.artistProfile={bio:'Musician'};
+  if(!GAME.joinedPlatforms)GAME.joinedPlatforms={};
+  if(!GAME.socialUsernames)GAME.socialUsernames={};
+  
+  // If not joined yet, show join screen first
+  if(!GAME.joinedPlatforms.instagram){
+    const suggestedHandle = (S.artistName||S.sn||'artist').toLowerCase().replace(/[^a-z0-9._]/g,'');
+    const joinHtml = `
+      <div style="position:fixed;inset:0;background:linear-gradient(135deg,#f09433,#dc2743,#bc1888);display:flex;align-items:center;justify-content:center;z-index:9999;padding:24px" id="igJoinScreen">
+        <div style="background:white;border-radius:24px;padding:32px 28px;max-width:380px;width:100%;text-align:center">
+          <div style="font-size:48px;margin-bottom:12px">📸</div>
+          <div style="font-family:'Brush Script MT',cursive;font-size:32px;margin-bottom:8px;color:#000">Instagram</div>
+          <p style="color:#666;font-size:14px;margin-bottom:24px">Create your Instagram account to connect with fans!</p>
+          <div style="text-align:left;margin-bottom:16px">
+            <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Choose your username</div>
+            <div style="display:flex;align-items:center;border:2px solid #dbdbdb;border-radius:10px;overflow:hidden;padding:0 12px">
+              <span style="color:#888;font-size:15px">@</span>
+              <input id="igUsernameInput" type="text" value="${suggestedHandle}" 
+                style="flex:1;border:none;padding:12px 8px;font-size:15px;outline:none;color:#000"
+                placeholder="yourname" maxlength="30"
+                oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9._]/g,'')">
+            </div>
+            <div style="font-size:11px;color:#888;margin-top:6px">Letters, numbers, periods and underscores only</div>
+          </div>
+          <button onclick="joinInstagram()" style="width:100%;background:linear-gradient(135deg,#f09433,#dc2743,#bc1888);color:white;border:none;padding:14px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:12px">Create Account ✨</button>
+          <button onclick="document.getElementById('igJoinScreen').remove()" style="background:none;border:none;color:#888;font-size:14px;cursor:pointer">← Back</button>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', joinHtml);
+    return;
+  }
   const followers=formatSocial(Math.floor(getTotalFans()*0.4));
   const posts=(GAME.socialPosts||[]).filter(p=>p.platform==='instagram'||p.platform==='all');
   let html=`<style>
@@ -10106,7 +10217,7 @@ function showInstagram(){
     </div>
     
     <div class="ig-header">
-      <div style="font-size:16px;font-weight:600;margin-bottom:16px">${S.name||'Your Artist'}</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:16px">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
       <div class="ig-profile">
         <div class="ig-pic" onclick="uploadProfilePic('instagram')" style="${GAME.artistProfile&&GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile&&GAME.artistProfile.profilePic?'':'+'}</div>
         <div class="ig-stats">
@@ -10115,7 +10226,8 @@ function showInstagram(){
           <div class="ig-stat"><div class="ig-stat-num">0</div><div class="ig-stat-label">following</div></div>
         </div>
       </div>
-      <div class="ig-name">${S.name||'Your Artist'}</div>
+      <div class="ig-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
+      <div style="font-size:13px;color:#555;margin-bottom:4px">@${GAME.socialUsernames&&GAME.socialUsernames.instagram ? GAME.socialUsernames.instagram : (S.artistName||'artist').toLowerCase().replace(/[^a-z0-9._]/g,'')}</div>
       <div class="ig-bio">${GAME.artistProfile.bio||'Musician'}</div>
       <button class="ig-btn" onclick="editProfile('instagram')">Edit profile</button>
       <button class="ig-btn-sec" onclick="createPost('instagram')">+ Create Post</button>
@@ -10213,7 +10325,7 @@ function viewInstagramPost(postId){
     <div style="position:fixed;top:12px;left:12px;z-index:200"><button onclick="showInstagram()" style="background:rgba(0,0,0,0.3);border:none;border-radius:50%;width:32px;height:32px;color:#fff;font-size:20px;cursor:pointer">←</button></div>
     <div class="ig-post-header">
       <div class="ig-post-pic" style="${GAME.artistProfile&&GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile&&GAME.artistProfile.profilePic?'':'+'}</div>
-      <div style="font-weight:600;font-size:14px">${S.name||'Your Artist'}</div>
+      <div style="font-weight:600;font-size:14px">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
       ${post.sponsored?'<div style="margin-left:auto;background:#f0f0f0;padding:4px 8px;border-radius:4px;font-size:11px;color:#8e8e8e;font-weight:600">Sponsored</div>':''}
     </div>
     ${post.image?`<img src="${post.image}" class="ig-post-image">`:''}
@@ -10260,6 +10372,40 @@ function closeInstagram(){
 }
 
 // INSTAGRAM DMs SYSTEM
+
+function joinInstagram(){
+  const input = document.getElementById('igUsernameInput');
+  const username = input ? input.value.trim() : (S.artistName||'artist').toLowerCase().replace(/[^a-z0-9._]/g,'');
+  if(!username){ alert('Please enter a username!'); return; }
+  if(!GAME.socialUsernames) GAME.socialUsernames = {};
+  if(!GAME.joinedPlatforms) GAME.joinedPlatforms = {};
+  GAME.socialUsernames.instagram = username;
+  GAME.joinedPlatforms.instagram = true;
+  // Give small starting followers
+  if(!GAME.social) GAME.social = {};
+  GAME.social.instagram = Math.floor(Math.random()*50)+10;
+  const joinScreen = document.getElementById('igJoinScreen');
+  if(joinScreen) joinScreen.remove();
+  addNotification('📸 Joined Instagram!', `Welcome to Instagram @${username}! Start posting to grow your following.`, 'social');
+  showInstagram();
+}
+
+function joinTikTok(){
+  const input = document.getElementById('ttUsernameInput');
+  const username = input ? input.value.trim() : (S.artistName||'artist').toLowerCase().replace(/[^a-z0-9._]/g,'');
+  if(!username){ alert('Please enter a username!'); return; }
+  if(!GAME.socialUsernames) GAME.socialUsernames = {};
+  if(!GAME.joinedPlatforms) GAME.joinedPlatforms = {};
+  GAME.socialUsernames.tiktok = username;
+  GAME.joinedPlatforms.tiktok = true;
+  if(!GAME.social) GAME.social = {};
+  GAME.social.tiktok = Math.floor(Math.random()*100)+20;
+  const joinScreen = document.getElementById('ttJoinScreen');
+  if(joinScreen) joinScreen.remove();
+  addNotification('🎵 Joined TikTok!', `Welcome to TikTok @${username}! Post videos to go viral.`, 'social');
+  showTikTok();
+}
+
 function showInstagramDMs(){
   let html = `<style>
   .dm-container{background:#fff;height:100%;overflow-y:auto;color:#000;font-family:-apple-system,sans-serif;padding-top:70px;padding-bottom:20px}
@@ -10740,6 +10886,34 @@ function likeExplorePost(postId){
 
 function showTikTok(){
   if(!GAME.artistProfile)GAME.artistProfile={bio:'Musician'};
+  if(!GAME.joinedPlatforms) GAME.joinedPlatforms = {};
+  if(!GAME.socialUsernames) GAME.socialUsernames = {};
+  
+  if(!GAME.joinedPlatforms.tiktok){
+    const suggestedHandle = (S.artistName||S.sn||'artist').toLowerCase().replace(/[^a-z0-9._]/g,'');
+    const joinHtml = `
+      <div style="position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:9999;padding:24px" id="ttJoinScreen">
+        <div style="background:white;border-radius:24px;padding:32px 28px;max-width:380px;width:100%;text-align:center">
+          <div style="font-size:48px;margin-bottom:12px">&#127925;</div>
+          <div style="font-size:28px;font-weight:900;margin-bottom:8px;color:#000">TikTok</div>
+          <p style="color:#666;font-size:14px;margin-bottom:24px">Join TikTok and share your music with millions!</p>
+          <div style="text-align:left;margin-bottom:16px">
+            <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Choose your username</div>
+            <div style="display:flex;align-items:center;border:2px solid #dbdbdb;border-radius:10px;overflow:hidden;padding:0 12px">
+              <span style="color:#888;font-size:15px">@</span>
+              <input id="ttUsernameInput" type="text" value="${suggestedHandle}"
+                style="flex:1;border:none;padding:12px 8px;font-size:15px;outline:none;color:#000"
+                placeholder="yourname" maxlength="24"
+                oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9._]/g,'')">
+            </div>
+          </div>
+          <button onclick="joinTikTok()" style="width:100%;background:linear-gradient(135deg,#010101,#69C9D0);color:white;border:none;padding:14px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:12px">Create Account &#10024;</button>
+          <button onclick="document.getElementById('ttJoinScreen').remove()" style="background:none;border:none;color:#888;font-size:14px;cursor:pointer">&#8592; Back</button>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', joinHtml);
+    return;
+  }
   const followers=formatSocial(Math.floor(getTotalFans()*0.35));
   const posts=(GAME.socialPosts||[]).filter(p=>p.platform==='tiktok'||p.platform==='all');
   let html=`<style>
@@ -10762,7 +10936,7 @@ function showTikTok(){
     <div style="position:fixed;top:12px;left:12px;z-index:200"><button onclick="closeTikTok()" style="background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:32px;height:32px;color:#fff;font-size:20px;cursor:pointer">←</button></div>
     <div class="tt-header">
       <div class="tt-pic" onclick="uploadProfilePic('tiktok')" style="${GAME.artistProfile&&GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile&&GAME.artistProfile.profilePic?'':'+'}</div>
-      <div class="tt-name">${S.name||'Your Artist'}</div>
+      <div class="tt-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
       <div class="tt-stats">
         <div><div class="tt-stat-num">${followers}</div><div class="tt-stat-label">Followers</div></div>
         <div><div class="tt-stat-num">0</div><div class="tt-stat-label">Following</div></div>
@@ -10901,7 +11075,7 @@ function showTwitter(){
     <div class="tw-banner"></div>
     <div class="tw-header">
       <div class="tw-pic" onclick="uploadProfilePic('twitter')" style="${GAME.artistProfile&&GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile&&GAME.artistProfile.profilePic?'':'+'}</div>
-      <div class="tw-name">${S.name||'Your Artist'}</div>
+      <div class="tw-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
       <div class="tw-handle">@${(S.name||'artist').toLowerCase().replace(/\s/g,'')}</div>
       <div class="tw-bio">${GAME.artistProfile.bio||'Musician'}</div>
       <div class="tw-stats">
@@ -10919,7 +11093,7 @@ function showTwitter(){
       html+=`<div class="tw-post" onclick="viewTwitterPost(${post.id})">
         <div class="tw-post-header">
           <div class="tw-post-pic"></div>
-          <div><div style="font-weight:700">${S.name||'Your Artist'}</div><div style="font-size:13px;color:#71767b">@${(S.name||'artist').toLowerCase().replace(/\s/g,'')}</div></div>
+          <div><div style="font-weight:700">${S.artistName||S.sn||S.fn||'Your Artist'}</div><div style="font-size:13px;color:#71767b">@${(S.name||'artist').toLowerCase().replace(/\s/g,'')}</div></div>
         </div>
         <div class="tw-post-text">${post.text}</div>
         ${post.image?`<img src="${post.image}" style="width:100%;border-radius:16px;margin:8px 0">`:''}
@@ -10955,7 +11129,7 @@ function viewTwitterPost(postId){
     <div class="tw-post-full">
       <div style="display:flex;gap:8px;margin:40px 0 12px">
         <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1d9bf0,#0c7abf);${GAME.artistProfile&&GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile&&GAME.artistProfile.profilePic?'':'+'}</div>
-        <div><div style="font-weight:700">${S.name||'Your Artist'}</div><div style="font-size:13px;color:#71767b">@${(S.name||'artist').toLowerCase().replace(/\s/g,'')}</div></div>
+        <div><div style="font-weight:700">${S.artistName||S.sn||S.fn||'Your Artist'}</div><div style="font-size:13px;color:#71767b">@${(S.name||'artist').toLowerCase().replace(/\s/g,'')}</div></div>
       </div>
       <div style="font-size:23px;line-height:1.4;margin-bottom:12px">${post.text}</div>
       ${post.image?`<img src="${post.image}" style="width:100%;border-radius:16px;margin:12px 0">`:''}
@@ -11032,7 +11206,7 @@ function showYouTube(){
     <div class="yt-banner"></div>
     <div class="yt-header">
       <div class="yt-pic" onclick="uploadProfilePic('youtube')" style="${GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile.profilePic?'':'+'}</div>
-      <div class="yt-name">${S.name||'Your Artist'}</div>
+      <div class="yt-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
       <div class="yt-handle">@${(S.name||'artist').toLowerCase().replace(/\s/g,'')} · ${subs} subscribers</div>
       <button class="yt-btn" onclick="editProfile('youtube')">Edit profile</button>
       <button class="yt-btn-sec" onclick="ytAction()">${tab==='videos'?'Upload Video':'Create Post'}</button>
@@ -11050,7 +11224,7 @@ function showYouTube(){
         html+=`<div class="yt-post" onclick="viewYouTubePost(${post.id})">
           <div class="yt-post-header">
             <div class="yt-post-pic" style="${GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile.profilePic?'':'+'}</div>
-            <div><div style="font-weight:500">${S.name||'Your Artist'}</div><div style="font-size:12px;color:#aaa">${post.date||'Today'}</div></div>
+            <div><div style="font-weight:500">${S.artistName||S.sn||S.fn||'Your Artist'}</div><div style="font-size:12px;color:#aaa">${post.date||'Today'}</div></div>
           </div>
           <div class="yt-post-text">${post.text}</div>
           ${post.image?`<img src="${post.image}" style="width:100%;border-radius:8px;margin:12px 0">`:''}
@@ -11101,7 +11275,7 @@ function viewYouTubePost(postId){
     <div class="yt-post-full">
       <div style="display:flex;gap:12px;margin:40px 0 12px">
         <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#cc0000,#8b0000);${GAME.artistProfile&&GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile&&GAME.artistProfile.profilePic?'':'+'}</div>
-        <div><div style="font-weight:500">${S.name||'Your Artist'}</div><div style="font-size:12px;color:#aaa">${post.date||'Today'}</div></div>
+        <div><div style="font-weight:500">${S.artistName||S.sn||S.fn||'Your Artist'}</div><div style="font-size:12px;color:#aaa">${post.date||'Today'}</div></div>
       </div>
       <div style="font-size:14px;line-height:1.5;margin:12px 0">${post.text}</div>
       ${post.image?`<img src="${post.image}" style="width:100%;border-radius:8px;margin:12px 0">`:''}
@@ -11181,7 +11355,7 @@ function showFacebook(){
     <div class="fb-banner"></div>
     <div class="fb-header">
       <div class="fb-pic" onclick="uploadProfilePic('facebook')" style="${GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile.profilePic?'':'+'}</div>
-      <div class="fb-name">${S.name||'Your Artist'}</div>
+      <div class="fb-name">${S.artistName||S.sn||S.fn||'Your Artist'}</div>
       <div class="fb-stats">${followers} followers</div>
       <button class="fb-btn" onclick="editProfile('facebook')">Edit profile</button>
       <button class="fb-btn-sec" onclick="createPost('facebook')">Create Post</button>
@@ -11195,7 +11369,7 @@ function showFacebook(){
       html+=`<div class="fb-post" onclick="viewFacebookPost(${post.id})">
         <div class="fb-post-header">
           <div class="fb-post-pic" style="${GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile.profilePic?'':'+'}</div>
-          <div><div style="font-weight:600">${S.name||'Your Artist'}</div><div style="font-size:13px;color:#b0b3b8">${post.date||'Today'}</div></div>
+          <div><div style="font-weight:600">${S.artistName||S.sn||S.fn||'Your Artist'}</div><div style="font-size:13px;color:#b0b3b8">${post.date||'Today'}</div></div>
         </div>
         <div class="fb-post-text">${post.text}</div>
         ${post.image?`<img src="${post.image}" style="width:100%;border-radius:8px;margin:12px 0">`:''}
@@ -11234,7 +11408,7 @@ function viewFacebookPost(postId){
     <div class="fb-post-full">
       <div style="display:flex;gap:12px;margin:40px 0 12px">
         <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1877f2,#0c5cbf);${GAME.artistProfile&&GAME.artistProfile.profilePic?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:''}">${GAME.artistProfile&&GAME.artistProfile.profilePic?'':'+'}</div>
-        <div><div style="font-weight:600">${S.name||'Your Artist'}</div><div style="font-size:13px;color:#b0b3b8">${post.date||'Today'}</div></div>
+        <div><div style="font-weight:600">${S.artistName||S.sn||S.fn||'Your Artist'}</div><div style="font-size:13px;color:#b0b3b8">${post.date||'Today'}</div></div>
       </div>
       <div style="font-size:15px;line-height:1.4;margin:12px 0">${post.text}</div>
       ${post.image?`<img src="${post.image}" style="width:100%;border-radius:8px;margin:12px 0">`:''}
@@ -13066,6 +13240,8 @@ function releaseSingle(songId){
     const songCount=release.songs.length;
     const title=type==='single'?`"${mainSong.title}"`:`"${release.title}" (${songCount} songs)`;
     showEvent('SUCCESS',`${releaseType} Released!`,`${title} is now available on all platforms!${promoMsg}\n\nCheck back after the first week to see how it's performing.`,['OK']);
+  // Toast feedback
+  setTimeout(()=>showToast(`🚀 "${title}" is out now!`, 'purple'), 500);
   }
 }
 
