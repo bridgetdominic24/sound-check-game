@@ -1720,40 +1720,37 @@ async function deleteAccountNow(){
     // Show loading
     const loading = document.createElement('div');
     loading.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:99999';
-    loading.innerHTML = '<div style="color:white;font-size:18px">Deleting account...</div>';
+    loading.innerHTML = '<div style="color:white;font-size:18px;text-align:center">Deleting save data...<br><small style="opacity:0.7;font-size:14px">Please wait</small></div>';
     document.body.appendChild(loading);
     
     const userId = currentUser.id;
     
-    // Delete from Supabase players table
-    await supabase
+    // Step 1: Delete save from players table
+    const { error: deleteError } = await supabase
       .from('players')
       .delete()
       .eq('user_id', userId);
+    
+    if(deleteError) throw deleteError;
     console.log('✅ Save deleted from Supabase');
     
-    // Delete Supabase Auth account
-    const { error } = await supabase.auth.admin.deleteUser(userId);
-    if(error) {
-      console.error('Auth deletion error:', error);
-      // Try alternative method - sign out and let them know
-      await supabase.auth.signOut();
-    }
-    console.log('✅ Account deleted');
+    // Step 2: Sign out (we cant delete the auth account with anon key,
+    // but with no save data the account is effectively empty)
+    await supabase.auth.signOut();
+    console.log('✅ Signed out');
     
-    // Clear local data
-    localStorage.removeItem('SOUND CHECK_SAVE');
-    localStorage.removeItem('SOUND CHECK_CHARACTER');
+    // Step 3: Clear ALL local data
+    localStorage.clear();
     
-    // Reset app state
+    // Step 4: Reset all app state
     currentUser = null;
     GAME_MODE = null;
     GAME = null;
-    window.S = null;
+    S = {theme:'',step:0,fn:'',ln:'',sn:'',country:'',city:'',pronoun:'She/Her',age:18,ageSit:'broke',instrument:'Vocals',genre:'R&B',path:'Solo',origin:'Basement'};
     
     loading.remove();
     
-    // Hide all screens
+    // Hide all screens and nav
     document.querySelectorAll('.screen').forEach(s => {
       s.classList.remove('visible');
       s.style.display = 'none';
@@ -1761,16 +1758,20 @@ async function deleteAccountNow(){
     document.getElementById('bottomNav').style.display = 'none';
     document.getElementById('sleepSection').style.display = 'none';
     
-    // Show landing
+    // Remove any floating debug logs
+    const debugLog = document.getElementById('debugLog');
+    if(debugLog) debugLog.remove();
+    
+    // Show landing screen
     const landing = document.getElementById('landingScreen');
     landing.style.display = 'flex';
     landing.classList.add('visible');
     
-    alert('✅ Account and save data deleted successfully. You can create a new account now.');
+    alert('✅ Save deleted! Your login email still works — just sign in and start a brand new character!');
     
   } catch(error) {
     console.error('Delete error:', error);
-    alert('❌ Delete failed: ' + error.message + '\n\nYou may need to re-authenticate to delete your account.');
+    alert('❌ Delete failed: ' + error.message);
   }
 }
 
