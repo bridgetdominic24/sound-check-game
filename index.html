@@ -2448,6 +2448,7 @@ async function saveToCloud(){
     const songCount = GAME.songs?.length || 0;
     const releaseCount = GAME.releases?.length || 0;
     
+    GAME.saveLoaded = true;
     console.log('💾 SAVED! Week:', GAME.week, 'Money:', GAME.money, 'Songs:', songCount, 'Releases:', releaseCount, 'Streams:', totalStreams);
     if(debugLog) {
       debugLog.innerHTML += '💾 SAVED! W' + GAME.week + ' $' + GAME.money + ' Songs:' + songCount + '<br>';
@@ -6683,7 +6684,7 @@ function updateStats(){
   document.getElementById('energy').textContent=GAME.energy;
   document.getElementById('money').textContent=formatMoney(GAME.money);
   document.getElementById('inspiration').textContent=GAME.inspiration || 100;
-  document.getElementById('buzz').textContent=GAME.buzz || GAME.hype || 0; // Support old saves with "hype"
+  document.getElementById('buzz').textContent=GAME.buzz !== undefined ? GAME.buzz : (GAME.hype || 0);
   
   document.getElementById('weekCount').textContent=GAME.week;
   document.getElementById('playerAge').textContent=GAME.age;
@@ -9409,7 +9410,7 @@ function handleCoverUpload(event){
 
 // FULL-SCREEN MENU SYSTEM
 function openMenu(title,content){
-  document.getElementById('menuTitle').textContent=title;
+  document.getElementById('menuTitle').innerHTML=title;
   document.getElementById('menuContent').innerHTML=content;
   document.getElementById('menuModal').classList.add('show');
 }
@@ -9642,9 +9643,9 @@ function autoSave(){
   
   if(GAME.autoSave===false)return; // Skip if disabled
   
-  // CRITICAL: Don't save until we've loaded existing data!
-  if(GAME_MODE === 'multi' && GAME.week === 1 && !GAME.saveLoaded){
-    console.log('⚠️ Skipping auto-save - waiting for save to load first');
+  // Allow save once character is created, even for brand new accounts
+  if(GAME_MODE === 'multi' && !GAME.saveLoaded && !S.artistName){
+    console.log('⚠️ Skipping auto-save - character not created yet');
     return;
   }
   
@@ -12012,6 +12013,13 @@ function upVideo(){
 
 function createPost(platform='all'){
   if(!GAME.socialPosts)GAME.socialPosts=[];
+  if(!GAME.joinedPlatforms)GAME.joinedPlatforms={};
+  // Block posting if not joined (except 'all' which is from the main social tab button)
+  if(platform !== 'all' && !GAME.joinedPlatforms[platform]){
+    const names={instagram:'Instagram',tiktok:'TikTok',twitter:'X (Twitter)',youtube:'YouTube',facebook:'Facebook'};
+    showEvent('&#128683;','Not Joined Yet',`You haven't created a ${names[platform]||platform} account yet!\n\nTap the platform icon to create your account first.`,['Got it']);
+    return;
+  }
   
   // Label suggestions for controlling labels
   let labelSuggestion='';
@@ -12174,6 +12182,19 @@ function publishPost(platform='all'){
       GAME.socialPosts.push(post);GAME.pendingPostImage=null;
     });
   }
+  
+  // Posting boosts buzz + social followers
+  const numPlatforms = postToAll ? 5 : selectedPlatforms.length;
+  const buzzGain = Math.floor(Math.random()*3*numPlatforms)+1;
+  const followerGain = Math.floor(Math.random()*15*numPlatforms)+3;
+  GAME.buzz = Math.min(1000, (GAME.buzz||0) + buzzGain);
+  if(!GAME.social) GAME.social = {};
+  if(postToAll || selectedPlatforms.includes('instagram')) GAME.social.instagram = (GAME.social.instagram||0) + Math.floor(followerGain*0.4);
+  if(postToAll || selectedPlatforms.includes('tiktok')) GAME.social.tiktok = (GAME.social.tiktok||0) + Math.floor(followerGain*0.35);
+  if(postToAll || selectedPlatforms.includes('twitter')) GAME.social.twitter = (GAME.social.twitter||0) + Math.floor(followerGain*0.15);
+  if(postToAll || selectedPlatforms.includes('youtube')) GAME.social.youtube = (GAME.social.youtube||0) + Math.floor(followerGain*0.07);
+  if(postToAll || selectedPlatforms.includes('facebook')) GAME.social.facebook = (GAME.social.facebook||0) + Math.floor(followerGain*0.03);
+  showToast('Posted! +'+buzzGain+' buzz &#128293;', 'purple');
   
   // TODO: MULTIPLAYER - Migrate to Supabase
   // Currently disabled - posts only saved locally
@@ -13432,14 +13453,15 @@ function showPromotionOptions(songId){
     {name:'Oceania',emoji:'🏝️'}
   ];
   
-  // Base budgets for SINGLES (will be multiplied by region AND release type)
+  // Base budgets for SINGLES - scaled for early game affordability
   const baseBudgets=[
     {name:'No Promo',cost:0,multiplier:1,reach:0},
-    {name:'Small Push',cost:10000,multiplier:1.5,reach:25},
-    {name:'Regional Campaign',cost:50000,multiplier:2,reach:50},
-    {name:'Major Blitz',cost:200000,multiplier:3,reach:75},
-    {name:'Nationwide Push',cost:1000000,multiplier:5,reach:100},
-    {name:'Superstar Campaign',cost:5000000,multiplier:10,reach:150}
+    {name:'Small Push',cost:200,multiplier:1.3,reach:10},
+    {name:'Local Campaign',cost:800,multiplier:1.6,reach:25},
+    {name:'Regional Campaign',cost:3000,multiplier:2,reach:40},
+    {name:'Major Blitz',cost:15000,multiplier:3,reach:65},
+    {name:'Nationwide Push',cost:75000,multiplier:5,reach:85},
+    {name:'Superstar Campaign',cost:500000,multiplier:10,reach:150}
   ];
   
   // Region-specific price multipliers (North America most expensive!)
@@ -13524,11 +13546,12 @@ function updatePromo(region,budgetIndex){
   // Base budgets matching the main function
   const baseBudgets=[
     {name:'No Promo',cost:0,multiplier:1,reach:0},
-    {name:'Small Push',cost:10000,multiplier:1.5,reach:25},
-    {name:'Regional Campaign',cost:50000,multiplier:2,reach:50},
-    {name:'Major Blitz',cost:200000,multiplier:3,reach:75},
-    {name:'Nationwide Push',cost:1000000,multiplier:5,reach:100},
-    {name:'Superstar Campaign',cost:5000000,multiplier:10,reach:150}
+    {name:'Small Push',cost:200,multiplier:1.3,reach:10},
+    {name:'Local Campaign',cost:800,multiplier:1.6,reach:25},
+    {name:'Regional Campaign',cost:3000,multiplier:2,reach:40},
+    {name:'Major Blitz',cost:15000,multiplier:3,reach:65},
+    {name:'Nationwide Push',cost:75000,multiplier:5,reach:85},
+    {name:'Superstar Campaign',cost:500000,multiplier:10,reach:150}
   ];
   
   // Region multipliers
