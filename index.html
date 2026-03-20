@@ -2243,8 +2243,17 @@ function onAuthSuccess(){
         console.log('🔧 SleepSection pointer-events:', sleepSection.style.pointerEvents);
         
       } else {
-        console.log('📝 No save found - showing theme selection');
-        // New user, show theme/character creation
+        console.log('📝 No save found - clearing cache and showing theme selection');
+        
+        // CRITICAL: Clear ALL local storage so old saves can never bleed back in
+        localStorage.clear();
+        console.log('🧹 localStorage cleared for fresh start');
+        
+        // Reset GAME and S to fresh state
+        GAME = createFreshGame();
+        S = {theme:'',step:0,fn:'',ln:'',sn:'',country:'',city:'',pronoun:'She/Her',age:18,ageSit:'broke',instrument:'Vocals',genre:'R&B',path:'Solo',origin:'Basement'};
+        
+        // New user - show theme/character creation
         const themeScreen = document.getElementById('themeScreen');
         themeScreen.style.display = 'flex';
         themeScreen.classList.add('visible');
@@ -2263,6 +2272,12 @@ function backToLandingFromLogin(){
 // CLOUD SAVE FUNCTIONS
 async function checkAndLoadSave(){
   const debugLog = document.getElementById('debugLog');
+  
+  // ALWAYS clear localStorage in multiplayer - Supabase is the only source of truth
+  if(GAME_MODE === 'multi') {
+    localStorage.clear();
+    console.log('🧹 Cleared localStorage - using Supabase as source of truth');
+  }
   
   console.log('🔍 checkAndLoadSave START - GAME before load:', GAME ? {week: GAME.week, money: GAME.money} : 'null');
   
