@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Setup Supabase Storage</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body style="font-family:sans-serif;padding:40px;max-width:600px;margin:0 auto">
+<h1>Supabase Storage Setup</h1>
+<div id="status" style="padding:20px;background:#f5f5f5;border-radius:8px;margin:20px 0">
+  <p>Setting up storage bucket...</p>
+</div>
+<button id="setupBtn" style="padding:12px 24px;background:#000;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:16px;font-weight:600">Create Storage Bucket</button>
+
+<script>
+const SUPABASE_URL = 'https://pvxrciebegirmrrrzkor.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2eHJjaWViZWdpcm1ycnJ6a29yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3OTQ3NDksImV4cCI6MjA4OTM3MDc0OX0.da-ziWmwhO1LhcM5hZuG0qMsgLxtDtUkPwWJoGep6Ic';
+
+var supabaseClient;
+
+setTimeout(function(){
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('Supabase initialized');
+}, 500);
+
+document.getElementById('setupBtn').onclick = async function(){
+  const status = document.getElementById('status');
+  status.innerHTML = '<p>⏳ Creating storage bucket...</p>';
+  
+  try {
+    // Create the bucket
+    const { data, error } = await supabaseClient.storage.createBucket('game-images', {
+      public: true,
+      fileSizeLimit: 5242880 // 5MB
+    });
+    
+    if(error){
+      if(error.message.includes('already exists')){
+        status.innerHTML = '<p style="color:green">✅ Bucket already exists! You\'re all set.</p>';
+      } else {
+        throw error;
+      }
+    } else {
+      status.innerHTML = '<p style="color:green">✅ Storage bucket created successfully!</p><p>Bucket name: <code>game-images</code></p><p>Public: Yes</p><p>You can now upload images in the game.</p>';
+    }
+    
+  } catch(err){
+    status.innerHTML = '<p style="color:red">❌ Error: ' + err.message + '</p><p>You may need to create the bucket manually in the Supabase dashboard.</p>';
+    console.error(err);
+  }
+};
+</script>
+</body>
+</html>
