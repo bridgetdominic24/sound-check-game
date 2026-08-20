@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Sound Check — Labels v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#0f0f14;display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif}
+
+.phone{
+  width:390px;height:844px;background:#f5f6fa;
+  border-radius:46px;overflow:hidden;position:relative;
+  box-shadow:0 40px 100px rgba(0,0,0,0.8),0 0 0 10px #1c1c1e,0 0 0 11px #3a3a3c;
+  --bg:#f5f6fa;--surf:#fff;--bord:#e8ecf0;
+  --txt:#1a1a2e;--mut:#8892a4;--acc:#667eea;
+  --acc-bg:rgba(102,126,234,0.08);--acc-txt:#fff;
+}
+
+.sb{display:flex;justify-content:space-between;padding:16px 24px 8px;font-size:12px;font-weight:600;color:var(--txt);flex-shrink:0;background:var(--surf);border-bottom:1px solid var(--bord)}
+.screen{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column}
+.screen.active{display:flex}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:90px}
+.scroll::-webkit-scrollbar{display:none}
+
+/* NAV */
+.nav{position:absolute;bottom:0;left:0;right:0;background:var(--surf);border-top:1px solid var(--bord);display:flex;padding:10px 0 28px;z-index:100}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;font-weight:700;letter-spacing:0.3px;color:var(--mut);text-transform:uppercase;cursor:pointer}
+.ni.active{color:var(--acc)}
+
+/* HEADER */
+.ph{background:var(--surf);border-bottom:1px solid var(--bord);padding:16px 16px 14px;flex-shrink:0}
+.ph-title{font-size:22px;font-weight:900;color:var(--txt);letter-spacing:-0.5px;display:flex;align-items:center;gap:10px}
+.ph-icon{width:40px;height:40px;border-radius:10px;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:20px;color:white;flex-shrink:0}
+.ph-sub{font-size:12px;color:var(--mut);font-weight:500;margin-top:4px}
+
+/* BACK HEADER */
+.bh{background:var(--surf);border-bottom:1px solid var(--bord);padding:12px 16px;flex-shrink:0;display:flex;align-items:center;gap:10px}
+.back-btn{background:var(--bg);border:1px solid var(--bord);border-radius:8px;padding:7px 11px;font-size:12px;font-weight:700;color:var(--txt);cursor:pointer;font-family:'Inter',sans-serif;flex-shrink:0}
+
+/* SECTIONS */
+.sec{padding:14px 16px 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase}
+
+/* CARDS */
+.card{background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin:0 16px 12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.ch{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--bord)}
+.ct{font-size:13px;font-weight:800;color:var(--txt);letter-spacing:-0.2px}
+.ca{font-size:11px;font-weight:700;color:var(--acc);cursor:pointer}
+
+/* ROWS */
+.row{display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--bord);cursor:pointer}
+.row:last-child{border-bottom:none}
+.ri{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.rin{flex:1;min-width:0}
+.rt{font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-0.1px}
+.rs{font-size:11px;color:var(--mut);margin-top:1px;font-weight:500}
+.rr{text-align:right;flex-shrink:0}
+.rv{font-size:13px;font-weight:800;color:var(--txt)}
+.rs2{font-size:10px;color:var(--mut);margin-top:1px}
+
+/* PILLS */
+.pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700}
+.pg{background:#dcfce7;color:#166534}
+.pb{background:#dbeafe;color:#1e40af}
+.pp{background:#ede9fe;color:#5b21b6}
+.po{background:#ffedd5;color:#9a3412}
+.py{background:#fef9c3;color:#854d0e}
+.pgr{background:#f1f5f9;color:#475569}
+.pr{background:#fee2e2;color:#991b1b}
+.pbl{background:#f0f9ff;color:#0369a1}
+
+/* TIER IDENTITY CARD */
+.tc{margin:0 16px 12px;border-radius:10px;overflow:hidden;border:1px solid var(--bord);box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.tc-top{padding:16px;display:flex;gap:14px;align-items:flex-start;border-bottom:1px solid var(--bord);background:var(--surf)}
+.logo{width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;border:1px solid var(--bord);background:var(--surf)}
+.lname{font-size:20px;font-weight:900;color:var(--txt);letter-spacing:-0.5px;line-height:1.1}
+.lmeta{font-size:12px;color:var(--mut);font-weight:500;margin-top:3px}
+.tstrip{padding:10px 16px;background:var(--surf);display:flex;align-items:center;justify-content:space-between}
+.tname{font-size:11px;font-weight:800;letter-spacing:0.5px}
+.tdesc{font-size:10px;color:var(--mut);font-weight:500;margin-top:1px}
+
+.t-indie .tstrip{border-left:3px solid #22c55e}.t-indie .tname{color:#166534}
+.t-mid .tstrip{border-left:3px solid #667eea}.t-mid .tname{color:#4338ca}
+.t-major .tstrip{border-left:3px solid #a855f7}.t-major .tname{color:#6d28d9}
+.t-global .tstrip{border-left:3px solid #f59e0b}.t-global .tname{color:#92400e}
+
+/* STAT GRID */
+.sg{display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--surf)}
+.sv{padding:12px;text-align:center;border-right:1px solid var(--bord)}
+.sv:last-child{border-right:none}
+.svv{font-size:16px;font-weight:800;color:var(--txt);letter-spacing:-0.3px}
+.svl{font-size:9px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
+
+/* STARS */
+.stars{display:inline-flex;gap:2px;font-size:13px}
+
+/* PROGRESS PERK */
+.pp-row{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bord)}
+.pp-row:last-child{border-bottom:none}
+.pp-icon{font-size:16px;width:26px;text-align:center;flex-shrink:0;margin-top:1px}
+.pp-info{flex:1;min-width:0}
+.pp-name{font-size:12px;font-weight:700;color:var(--txt)}
+.pp-sub{font-size:10px;color:var(--mut);margin-top:2px}
+.pbar{height:3px;background:var(--bord);border-radius:2px;overflow:hidden;margin-top:5px}
+.pfill{height:100%;border-radius:2px}
+.pp-pct{font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px}
+
+/* BTNS */
+.btn{border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;border:none;touch-action:manipulation}
+.acc{background:var(--acc);color:white}
+.sec-btn{background:var(--surf);color:var(--txt);border:1.5px solid var(--bord)}
+.red{background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca}
+.bsm{font-size:11px;padding:7px 12px;border-radius:6px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+
+/* OFFER */
+.offer{background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin:0 16px 12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.ot{padding:13px 14px;border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:10px}
+.ologo{width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;border:1px solid var(--bord)}
+.term{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 14px;border-bottom:1px solid #f8fafc;font-size:12px;gap:8px}
+.term:last-child{border-bottom:none}
+.tk{color:var(--mut);font-weight:500;display:flex;align-items:center;gap:5px;flex-shrink:0}
+.tv{color:var(--txt);font-weight:700;text-align:right}
+.oact{display:grid;gap:6px;padding:12px 14px;background:var(--bg);border-top:1px solid var(--bord)}
+
+/* FEED */
+.fi{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bord);align-items:flex-start}
+.fi:last-child{border-bottom:none}
+.fd{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.ft{font-size:12px;color:var(--txt);line-height:1.5;flex:1}
+.ftime{font-size:10px;color:var(--mut);flex-shrink:0}
+
+/* CHIPS */
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{padding:6px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--bord);background:var(--surf);color:var(--mut)}
+.chip.on{border-color:var(--acc);background:var(--acc-bg);color:var(--acc)}
+
+/* TOGGLE */
+.tog-row{display:flex;justify-content:space-between;align-items:center;background:var(--bg);padding:10px 12px;border-radius:8px;border:1px solid var(--bord)}
+.tog{width:40px;height:22px;border-radius:11px;position:relative;cursor:pointer;flex-shrink:0}
+.tog.on{background:#22c55e}.tog.off{background:var(--bord)}
+.tog-dot{position:absolute;top:2px;width:18px;height:18px;background:white;border-radius:50%}
+.tog.on .tog-dot{right:2px}.tog.off .tog-dot{left:2px}
+
+/* MGR SCROLL */
+.ms{display:flex;gap:10px;overflow-x:auto;padding:12px 16px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.ms::-webkit-scrollbar{display:none}
+.mc{flex-shrink:0;width:108px;background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:12px 10px;text-align:center}
+.ma{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;border:1px solid var(--bord)}
+.mn{font-size:12px;font-weight:700;color:var(--txt)}
+.mr{font-size:10px;color:var(--mut);margin-top:2px}
+.mp{font-size:10px;font-weight:700;color:var(--acc);margin-top:3px}
+.mb{margin-top:8px;padding:5px;border-radius:5px;font-size:10px;font-weight:700;width:100%;border:none;cursor:pointer;font-family:'Inter',sans-serif}
+
+/* ALERT BOX */
+.alert{border-radius:8px;padding:12px 14px;margin:0 16px 12px;font-size:12px;line-height:1.5}
+.alert-yellow{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.alert-green{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+.alert-red{background:#fef2f2;border:1px solid #fecaca;color:#dc2626}
+.alert-blue{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.alert-purple{background:#faf5ff;border:1px solid #ddd6fe;color:#6d28d9}
+
+/* SWITCHER */
+.switcher{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:3px;background:rgba(15,15,20,0.88);padding:5px 7px;border-radius:30px;z-index:999;backdrop-filter:blur(10px);flex-wrap:wrap;max-width:380px;justify-content:center}
+.sw{background:transparent;border:none;padding:5px 9px;border-radius:20px;font-size:9px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;color:rgba(255,255,255,0.45);letter-spacing:0.2px;white-space:nowrap}
+.sw.on{background:white;color:#1a1a2e}
+</style>
+</head>
+<body>
+<div class="phone">
+
+<!-- ═══════════════════════════════
+  S1 — UNSIGNED / INDIE ARTIST
+═══════════════════════════════ -->
+<div class="screen active" id="s1">
+  <div class="sb"><span>9:41</span><span>📶 🔋</span></div>
+  <div class="ph">
+    <div class="ph-title"><div class="ph-icon">🏷️</div>Labels & Management</div>
+    <div class="ph-sub">Manage your career relationships.</div>
+  </div>
+  <div class="scroll">
+    <div style="height:10px"></div>
+
+    <!-- STATUS CARD -->
+    <div class="tc t-indie">
+      <div class="tc-top">
+        <div class="logo">🎤</div>
+        <div style="flex:1">
+          <div class="lname">Nova Reign</div>
+          <div class="lmeta">Independent · Since Week 1</div>
+          <div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap">
+            <span class="pill pg">✦ Indie</span>
+            <span class="pill pgr">Unsigned</span>
+            <span class="pill pbl">Publishing: Owned</span>
+          </div>
+        </div>
+      </div>
+      <div class="sg" style="border-bottom:1px solid var(--bord)">
+        <div class="sv"><div class="svv">100%</div><div class="svl">Your Cut</div></div>
+        <div class="sv"><div class="svv">Wk 18</div><div class="svl">Career</div></div>
+        <div class="sv"><div class="svv" style="color:#22c55e">None</div><div class="svl">Debt</div></div>
+      </div>
+      <div class="tstrip">
+        <div>
+          <div class="tname">INDIE ARTIST</div>
+          <div class="tdesc">Full creative control · Keep everything</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INCOMING OFFER -->
+    <div class="sec">Incoming Offers</div>
+    <div class="offer">
+      <div class="ot">
+        <div class="ologo" style="background:#eff6ff">🌊</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:800;color:var(--txt)">Starwave Records</div>
+          <div style="margin-top:3px;display:flex;align-items:center;gap:6px">
+            <span class="pill pb">Mid-Tier</span>
+            <div class="stars"><span>⭐</span><span>⭐</span><span>⭐</span><span>⭐</span><span style="opacity:0.3">⭐</span></div>
+            <span style="font-size:10px;color:var(--mut)">4.2</span>
+          </div>
+        </div>
+        <span style="font-size:10px;color:var(--mut)">2d ago</span>
+      </div>
+
+      <!-- CORE DEAL -->
+      <div style="padding:10px 14px;border-bottom:1px solid var(--bord);background:var(--bg)">
+        <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Core Deal</div>
+        <div class="grid2" style="gap:6px">
+          <div style="background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:9px;text-align:center">
+            <div style="font-size:16px;font-weight:800;color:#22c55e">75%</div>
+            <div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Your cut</div>
+          </div>
+          <div style="background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:9px;text-align:center">
+            <div style="font-size:16px;font-weight:800;color:var(--txt)">2 yrs</div>
+            <div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Contract</div>
+          </div>
+          <div style="background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:9px;text-align:center">
+            <div style="font-size:16px;font-weight:800;color:var(--acc)">$2K</div>
+            <div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Wk advance</div>
+          </div>
+          <div style="background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:9px;text-align:center">
+            <div style="font-size:16px;font-weight:800;color:var(--txt)">$5K</div>
+            <div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Promo/release</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTRACT CLAUSES -->
+      <div style="padding:10px 14px 4px;border-bottom:1px solid var(--bord)">
+        <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Contract Clauses</div>
+      </div>
+      <div class="term"><span class="tk">🎵 Deal type</span><span class="tv">Standard (not 360°)</span></div>
+      <div class="term"><span class="tk">📝 Publishing rights</span><span class="tv" style="color:#ef4444">Label owned</span></div>
+      <div class="term"><span class="tk">💿 Masters ownership</span><span class="tv" style="color:#ef4444">Label owned</span></div>
+      <div class="term"><span class="tk">📀 Catalogue after exit</span><span class="tv" style="color:#ef4444">Label keeps</span></div>
+      <div class="term"><span class="tk">🎭 Solo work</span><span class="tv">Allowed w/ approval</span></div>
+      <div class="term"><span class="tk">🤝 Collabs</span><span class="tv">Label approval required</span></div>
+      <div class="term"><span class="tk">🎵 Release quota</span><span class="tv">2 singles/yr minimum</span></div>
+      <div class="term"><span class="tk">😴 Hiatus clause</span><span class="tv">Label can release shelved music</span></div>
+      <div class="term"><span class="tk">🚫 Non-compete</span><span class="tv">90 days after exit</span></div>
+      <div class="term"><span class="tk">💰 Advance recoupment</span><span class="tv">Before royalties paid</span></div>
+      <div class="term"><span class="tk">📻 Radio exclusives</span><span class="tv">First 2 weeks per release</span></div>
+      <div class="term"><span class="tk">🎬 Sync licensing</span><span class="tv">Label negotiates, 60/40 split</span></div>
+
+      <!-- WHAT YOU GET -->
+      <div style="padding:10px 14px;border-top:1px solid var(--bord);background:var(--bg)">
+        <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">What You Get</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:12px;color:var(--txt)">📣 $5,000 promo budget per release</div>
+          <div style="font-size:12px;color:var(--txt)">🎭 Mid-tier exclusive gigs unlocked</div>
+          <div style="font-size:12px;color:var(--txt)">📰 Guaranteed press feature on release</div>
+          <div style="font-size:12px;color:var(--txt)">📻 Radio premiere on first single</div>
+          <div style="font-size:12px;color:var(--txt)">🎬 Sync licensing opportunities (60%)</div>
+          <div style="font-size:12px;color:var(--txt)">👩 Tour Manager assigned — Rachel Kim</div>
+          <div style="font-size:12px;color:var(--txt)">⚖️ Legal team for disputes & samples</div>
+          <div style="font-size:12px;color:var(--txt)">🌍 Neighbouring rights collection</div>
+          <div style="font-size:12px;color:var(--txt)">💵 $2,000/wk advance (recoupable)</div>
+        </div>
+      </div>
+
+      <!-- WHAT YOU LOSE -->
+      <div style="padding:10px 14px;border-top:1px solid var(--bord)">
+        <div style="font-size:10px;font-weight:800;color:#ef4444;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">What You Give Up</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:12px;color:var(--mut)">🎵 Publishing rights — label earns from your songs forever</div>
+          <div style="font-size:12px;color:var(--mut)">💿 Masters — label owns recordings during contract</div>
+          <div style="font-size:12px;color:var(--mut)">📀 Catalogue — label keeps old songs after you leave</div>
+          <div style="font-size:12px;color:var(--mut)">🎨 Creative direction — label can veto concepts</div>
+          <div style="font-size:12px;color:var(--mut)">💰 Advance is a loan — no royalties until recouped</div>
+        </div>
+      </div>
+
+      <div class="oact">
+        <div class="grid3">
+          <button class="btn red bsm">Decline</button>
+          <button class="btn sec-btn bsm" onclick="showS('s-counter')">Counter ↔</button>
+          <button class="btn acc bsm" onclick="showS('s-signed')">Sign ✓</button>
+        </div>
+        <div style="font-size:10px;color:var(--mut);text-align:center">Bidding war — 1 other label also made an offer</div>
+      </div>
+    </div>
+
+    <!-- BLACKLIST STATUS -->
+    <div class="sec">Industry Standing</div>
+    <div class="card">
+      <div class="row" style="cursor:default">
+        <div class="ri" style="background:#f0fdf4">🤝</div>
+        <div class="rin">
+          <div class="rt">Reputation</div>
+          <div class="rs">No disputes on record · Clean history</div>
+        </div>
+        <div class="stars"><span>⭐</span><span>⭐</span><span>⭐</span><span>⭐</span><span>⭐</span></div>
+      </div>
+      <div class="row" style="cursor:default">
+        <div class="ri" style="background:#f0fdf4">✅</div>
+        <div class="rin">
+          <div class="rt">Blacklist Status</div>
+          <div class="rs">Not blacklisted by any label</div>
+        </div>
+        <span class="pill pg">Clear</span>
+      </div>
+    </div>
+
+    <!-- CREATE LABEL -->
+    <div class="sec">Run Your Own Label</div>
+    <div class="card">
+      <div style="padding:14px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div style="font-size:28px">🏢</div>
+          <div><div style="font-size:14px;font-weight:800;color:var(--txt)">Start a Label</div><div style="font-size:11px;color:var(--mut);margin-top:2px">Sign artists, build a roster, earn passive income</div></div>
+        </div>
+        <div style="margin-bottom:14px;display:flex;flex-direction:column;gap:8px">
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:11px;color:var(--mut)">Fans needed</span><span style="font-size:11px;font-weight:700;color:var(--txt)">2,400 / 10,000</span></div>
+            <div style="height:4px;background:var(--bord);border-radius:2px;overflow:hidden"><div style="height:100%;width:24%;background:var(--acc);border-radius:2px"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:11px;color:var(--mut)">Career week</span><span style="font-size:11px;font-weight:700;color:var(--txt)">Wk 18 / 52</span></div>
+            <div style="height:4px;background:var(--bord);border-radius:2px;overflow:hidden"><div style="height:100%;width:35%;background:var(--acc);border-radius:2px"></div></div>
+          </div>
+        </div>
+        <button class="btn sec-btn" style="width:100%;font-size:12px;padding:10px;opacity:0.5" disabled>Not Eligible Yet</button>
+      </div>
+    </div>
+
+    <!-- MANAGERS -->
+    <div class="sec">Managers & Agents</div>
+    <div class="card">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--bord)">
+        <div style="font-size:12px;font-weight:700;color:var(--txt)">NPC Managers</div>
+        <div style="font-size:11px;color:var(--mut);margin-top:2px">Handle bookings, press & finances. Each takes a % of earnings.</div>
+      </div>
+      <div class="ms">
+        <div class="mc"><div class="ma" style="background:#fef3c7">👩</div><div class="mn">Rachel Kim</div><div class="mr">Tour Manager</div><div class="mp">10% cut</div><button class="mb" style="background:var(--acc-bg);color:var(--acc)">Hire</button></div>
+        <div class="mc"><div class="ma" style="background:#ede9fe">👨</div><div class="mn">Dylan Cross</div><div class="mr">PR Specialist</div><div class="mp">12% cut</div><button class="mb" style="background:var(--acc-bg);color:var(--acc)">Hire</button></div>
+        <div class="mc"><div class="ma" style="background:#dcfce7">🧑</div><div class="mn">Martin Cole</div><div class="mr">Finance Expert</div><div class="mp">10% cut</div><button class="mb" style="background:#dcfce7;color:#166534">✓ Hired</button></div>
+        <div class="mc"><div class="ma" style="background:#fce7f3">👩‍💼</div><div class="mn">Sofia Reyes</div><div class="mr">A&R Rep</div><div class="mp">15% cut</div><button class="mb" style="background:var(--acc-bg);color:var(--acc)">Hire</button></div>
+        <div class="mc"><div class="ma" style="background:#f0fdf4">👨‍⚖️</div><div class="mn">James Okon</div><div class="mr">Legal Advisor</div><div class="mp">8% cut</div><button class="mb" style="background:var(--acc-bg);color:var(--acc)">Hire</button></div>
+        <div class="mc"><div class="ma" style="background:#fef9c3">🧑‍💻</div><div class="mn">Mia Park</div><div class="mr">Social Media</div><div class="mp">8% cut</div><button class="mb" style="background:var(--acc-bg);color:var(--acc)">Hire</button></div>
+      </div>
+    </div>
+
+  </div>
+  <div class="nav"><div class="ni">🏠<span style="font-size:8px">HOME</span></div><div class="ni">🌍<span style="font-size:8px">DISCOVER</span></div><div class="ni">🎵<span style="font-size:8px">MUSIC</span></div><div class="ni active">👤<span style="font-size:8px">PROFILE</span></div></div>
+</div>
+
+
+<!-- ═══════════════════════════════
+  S2 — COUNTER OFFER
+═══════════════════════════════ -->
+<div class="screen" id="s-counter">
+  <div class="sb"><span>9:41</span><span>📶 🔋</span></div>
+  <div class="bh">
+    <button class="back-btn" onclick="showS('s1')">← Back</button>
+    <div><div style="font-size:15px;font-weight:800;color:var(--txt)">Counter Offer</div><div style="font-size:11px;color:var(--mut)">Starwave Records · Round 1 of 3</div></div>
+  </div>
+  <div class="scroll">
+    <div style="height:10px"></div>
+    <div class="alert alert-yellow">⚖️ Your Negotiation skill (8) gives you a 62% base acceptance chance. Each round uses skill energy. Max 3 rounds.</div>
+
+    <div class="card">
+      <div class="ch"><div class="ct">Negotiate Your Terms</div></div>
+      <div style="padding:14px;display:flex;flex-direction:column;gap:14px">
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Your Revenue Cut <span style="color:var(--mut);font-weight:500;text-transform:none;letter-spacing:0px">(they offered 75%)</span></div>
+          <div class="chips">
+            <div class="chip">75%</div><div class="chip on">80%</div><div class="chip">85%</div><div class="chip">90%</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Contract Length <span style="color:var(--mut);font-weight:500;text-transform:none;letter-spacing:0px">(they offered 2 years)</span></div>
+          <div class="chips">
+            <div class="chip on">6 months</div><div class="chip">1 year</div><div class="chip">2 years</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Weekly Advance <span style="color:var(--mut);font-weight:500;text-transform:none;letter-spacing:0px">(they offered $2K)</span></div>
+          <div class="chips">
+            <div class="chip">$2K</div><div class="chip on">$3K</div><div class="chip">$4K</div><div class="chip">$5K</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Publishing Rights</div>
+          <div class="chips">
+            <div class="chip">Label owned</div><div class="chip on">Co-owned 50/50</div><div class="chip">Artist owned</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Masters Ownership</div>
+          <div class="chips">
+            <div class="chip">Label owned</div><div class="chip on">Revert after 5yrs</div><div class="chip">Artist owned</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Deal Type</div>
+          <div class="chips">
+            <div class="chip on">Standard</div><div class="chip">360° (all income)</div>
+          </div>
+          <div style="font-size:10px;color:var(--mut);margin-top:5px">360° deals give label a cut of gigs, merch & sync too</div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Solo & Collab Rights</div>
+          <div class="chips">
+            <div class="chip on">Approval needed</div><div class="chip">Unrestricted</div>
+          </div>
+        </div>
+
+        <!-- ACCEPTANCE METER -->
+        <div style="background:var(--bg);border:1px solid var(--bord);border-radius:8px;padding:12px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:11px;color:var(--mut)">Acceptance probability</span>
+            <span style="font-size:14px;font-weight:800;color:#f59e0b">41%</span>
+          </div>
+          <div style="height:5px;background:var(--bord);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:41%;background:#f59e0b;border-radius:3px"></div>
+          </div>
+          <div style="font-size:10px;color:var(--mut);margin-top:6px">You're pushing hard — lower your ask slightly to improve odds</div>
+        </div>
+
+        <div class="grid2">
+          <button class="btn sec-btn" onclick="showS('s1')">Cancel</button>
+          <button class="btn acc">Send Counter →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════
+  S3 — SIGNED ARTIST VIEW
+═══════════════════════════════ -->
+<div class="screen" id="s-signed">
+  <div class="sb"><span>9:41</span><span>📶 🔋</span></div>
+  <div class="ph"><div class="ph-title"><div class="ph-icon">🏷️</div>Labels & Management</div><div class="ph-sub">Signed to Starwave Records</div></div>
+  <div class="scroll">
+    <div style="height:10px"></div>
+
+    <!-- TIER CARD -->
+    <div class="tc t-mid">
+      <div class="tc-top">
+        <div class="logo" style="background:#eff6ff">🌊</div>
+        <div style="flex:1">
+          <div class="lname">Starwave Records</div>
+          <div class="lmeta">Signed Wk 22 · Ends Wk 126</div>
+          <div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+            <div class="stars"><span>⭐</span><span>⭐</span><span>⭐</span><span>⭐</span><span style="opacity:0.3">⭐</span></div>
+            <span style="font-size:10px;color:var(--mut)">4.2 rep</span>
+          </div>
+        </div>
+      </div>
+      <div class="sg" style="border-bottom:1px solid var(--bord)">
+        <div class="sv"><div class="svv" style="color:#22c55e">75%</div><div class="svl">Your Cut</div></div>
+        <div class="sv"><div class="svv">104</div><div class="svl">Wks Left</div></div>
+        <div class="sv"><div class="svv" style="color:var(--acc)">$2K</div><div class="svl">Wk Advance</div></div>
+      </div>
+      <div class="tstrip">
+        <div><div class="tname">MID-TIER LABEL</div><div class="tdesc">Standard deal · Publishing: Label owned</div></div>
+        <button class="btn red bsm" style="font-size:10px;padding:5px 10px">Exit?</button>
+      </div>
+    </div>
+
+    <!-- ADVANCE RECOUPMENT -->
+    <div class="alert alert-yellow">💰 Advance recoupment: $14,000 remaining before royalties flow. Currently recouping at ~$800/week.</div>
+
+    <!-- ACTIVE PERKS -->
+    <div class="sec">Active Perks</div>
+    <div class="card">
+      <div class="pp-row"><div class="pp-icon">💰</div><div class="pp-info"><div class="pp-name">$2,000/week advance <span class="pill pg" style="font-size:9px">Active</span></div><div class="pp-sub">Recoupable — $14K remaining before royalties</div></div></div>
+      <div class="pp-row"><div class="pp-icon">📣</div><div class="pp-info"><div class="pp-name">$5,000 promo per release <span class="pill pg" style="font-size:9px">Active</span></div></div></div>
+      <div class="pp-row"><div class="pp-icon">📻</div><div class="pp-info"><div class="pp-name">Radio premiere — first 2 weeks <span class="pill pg" style="font-size:9px">Active</span></div><div class="pp-sub">+800 hype on release day</div></div></div>
+      <div class="pp-row"><div class="pp-icon">📰</div><div class="pp-info"><div class="pp-name">Press feature guaranteed <span class="pill pg" style="font-size:9px">Active</span></div></div></div>
+      <div class="pp-row"><div class="pp-icon">🎬</div><div class="pp-info"><div class="pp-name">Sync licensing (60% your share) <span class="pill pg" style="font-size:9px">Active</span></div><div class="pp-sub">Random weekly chance · Last deal: $8,400</div></div></div>
+      <div class="pp-row"><div class="pp-icon">⚖️</div><div class="pp-info"><div class="pp-name">Legal team — disputes & sampling <span class="pill pg" style="font-size:9px">Active</span></div></div></div>
+      <div class="pp-row"><div class="pp-icon">🌍</div><div class="pp-info"><div class="pp-name">Neighbouring rights collected <span class="pill pg" style="font-size:9px">Active</span></div><div class="pp-sub">+$340 this month from international radio</div></div></div>
+    </div>
+
+    <!-- LOCKED PERKS WITH PROGRESS -->
+    <div class="sec">Unlocks at Major Tier</div>
+    <div class="card">
+      <div class="pp-row" style="opacity:0.6"><div class="pp-icon">🎬</div><div class="pp-info"><div class="pp-name" style="color:var(--mut)">Music video budget</div><div class="pp-sub">273K / 500K roster streams</div><div class="pbar"><div class="pfill" style="width:55%;background:#a855f7"></div></div></div><div class="pp-pct" style="color:#a855f7">55%</div></div>
+      <div class="pp-row" style="opacity:0.6"><div class="pp-icon">🤝</div><div class="pp-info"><div class="pp-name" style="color:var(--mut)">A&R team assigned</div><div class="pp-sub">3 / 5 artists signed to label</div><div class="pbar"><div class="pfill" style="width:60%;background:#a855f7"></div></div></div><div class="pp-pct" style="color:#a855f7">60%</div></div>
+      <div class="pp-row" style="opacity:0.6"><div class="pp-icon">🏆</div><div class="pp-info"><div class="pp-name" style="color:var(--mut)">Award show nominations lobbied</div><div class="pp-sub">Major tier required</div></div><span class="pill pgr">Locked</span></div>
+      <div class="pp-row" style="opacity:0.4"><div class="pp-icon">📊</div><div class="pp-info"><div class="pp-name" style="color:var(--mut)">Full analytics dashboard</div><div class="pp-sub">Global tier required</div></div><span class="pill pgr">Locked</span></div>
+    </div>
+
+    <!-- CONTRACT CLAUSES REMINDER -->
+    <div class="sec">Your Contract Restrictions</div>
+    <div class="card">
+      <div class="pp-row"><div class="pp-icon">📝</div><div class="pp-info"><div class="pp-name" style="color:#ef4444">Publishing owned by label</div><div class="pp-sub">Label earns from your songs — even after you leave</div></div></div>
+      <div class="pp-row"><div class="pp-icon">💿</div><div class="pp-info"><div class="pp-name" style="color:#ef4444">Masters owned by label</div><div class="pp-sub">Revert to you in 5 in-game years</div></div></div>
+      <div class="pp-row"><div class="pp-icon">🎵</div><div class="pp-info"><div class="pp-name">Release quota: 2 singles/year</div><div class="pp-sub">1 released this year · 1 remaining · 18 weeks left</div></div></div>
+      <div class="pp-row"><div class="pp-icon">😴</div><div class="pp-info"><div class="pp-name">Hiatus clause active</div><div class="pp-sub">30+ days inactive = label can release shelved music</div></div></div>
+      <div class="pp-row"><div class="pp-icon">🚫</div><div class="pp-info"><div class="pp-name">Non-compete: 90 days after exit</div><div class="pp-sub">Can't sign to another label immediately</div></div></div>
+    </div>
+
+    <!-- PENDING RELEASE APPROVAL -->
+    <div class="sec">Awaiting Label Approval</div>
+    <div class="card">
+      <div class="row">
+        <div class="ri" style="background:#fef9c3">🎵</div>
+        <div class="rin"><div class="rt">"Midnight Run"</div><div class="rs">Single · Quality 82/100 · Submitted 1d ago</div></div>
+        <span class="pill py">Pending</span>
+      </div>
+    </div>
+
+    <!-- ROSTER -->
+    <div class="sec">Label Roster (4)</div>
+    <div class="card">
+      <div class="row"><div class="ri" style="background:#e8edf5">🎤</div><div class="rin"><div class="rt">Nova Reign <span class="pill pb" style="font-size:9px">You</span></div><div class="rs">R&B · 2.4K fans</div></div><div class="rr"><div class="rv" style="color:#22c55e">4.2M</div><div class="rs2">streams</div></div></div>
+      <div class="row"><div class="ri" style="background:#e8f5e9">🎵</div><div class="rin"><div class="rt">Lookinaher ⭐</div><div class="rs">Pop · 1.8K fans · Spotlight</div></div><div class="rr"><div class="rv" style="color:#22c55e">1.1M</div><div class="rs2">streams</div></div></div>
+      <div class="row"><div class="ri" style="background:#fff7ed">🎸</div><div class="rin"><div class="rt">SilverHaze</div><div class="rs">Alt Rock · 950 fans</div></div><div class="rr"><div class="rv" style="color:#22c55e">420K</div><div class="rs2">streams</div></div></div>
+      <div class="row"><div class="ri" style="background:#ede9fe">🎧</div><div class="rin"><div class="rt">Echo Drift</div><div class="rs">Electronic · 620 fans</div></div><div class="rr"><div class="rv" style="color:#22c55e">180K</div><div class="rs2">streams</div></div></div>
+    </div>
+
+    <!-- ASSIGNED TEAM -->
+    <div class="sec">Label Management Team</div>
+    <div class="card">
+      <div class="row"><div class="ri" style="background:#fef3c7">👩</div><div class="rin"><div class="rt">Rachel Kim</div><div class="rs">Tour Manager · Assigned by label</div></div><span class="pill pg">Active</span></div>
+      <div class="row"><div class="ri" style="background:#ede9fe">👨</div><div class="rin"><div class="rt">Dylan Cross</div><div class="rs">PR Specialist · Assigned by label</div></div><span class="pill pg">Active</span></div>
+      <div class="row" style="opacity:0.4"><div class="ri" style="background:#f1f5f9">🔒</div><div class="rin"><div class="rt" style="color:var(--mut)">A&R Rep — unlocks at Major</div></div><span class="pill pgr">Locked</span></div>
+    </div>
+
+  </div>
+  <div class="nav"><div class="ni">🏠<span style="font-size:8px">HOME</span></div><div class="ni">🌍<span style="font-size:8px">DISCOVER</span></div><div class="ni">🎵<span style="font-size:8px">MUSIC</span></div><div class="ni active">👤<span style="font-size:8px">PROFILE</span></div></div>
+</div>
+
+
+<!-- ═══════════════════════════════
+  S4 — LABEL OWNER DASHBOARD
+═══════════════════════════════ -->
+<div class="screen" id="s-owner">
+  <div class="sb"><span>9:41</span><span>📶 🔋</span></div>
+  <div class="ph"><div class="ph-title"><div class="ph-icon" style="background:#f59e0b">👑</div>Nova Empire Records</div><div class="ph-sub">Your label · Mid-Tier · Est. Week 52</div></div>
+  <div class="scroll">
+    <div style="height:10px"></div>
+
+    <!-- LABEL IDENTITY -->
+    <div class="tc t-mid">
+      <div class="tc-top">
+        <div class="logo" style="background:#fff7ed;font-size:30px">👑</div>
+        <div style="flex:1">
+          <div class="lname">Nova Empire Records</div>
+          <div class="lmeta">Player-run · Founded Week 52</div>
+          <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
+            <span class="pill pb">Mid-Tier</span>
+            <span class="pill po">3 Artists</span>
+            <div class="stars" style="font-size:11px"><span>⭐</span><span>⭐</span><span>⭐</span><span>⭐</span><span>⭐</span></div>
+            <span style="font-size:10px;color:var(--mut)">4.8 rep</span>
+          </div>
+        </div>
+      </div>
+      <div class="sg" style="border-bottom:1px solid var(--bord)">
+        <div class="sv"><div class="svv" style="color:#22c55e">$4.2K</div><div class="svl">Wk Earnings</div></div>
+        <div class="sv"><div class="svv">847</div><div class="svl">Label Hype</div></div>
+        <div class="sv"><div class="svv" style="color:#22c55e">$0</div><div class="svl">Label Debt</div></div>
+      </div>
+      <div class="tstrip">
+        <div><div class="tname">MID-TIER LABEL</div><div class="tdesc">273K / 500K streams to Major</div></div>
+        <div style="font-size:11px;font-weight:700;color:#4338ca">55% ↑</div>
+      </div>
+    </div>
+
+    <!-- TIER PROGRESS -->
+    <div class="card">
+      <div class="ch"><div class="ct">Path to Major</div></div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:var(--mut)">Roster streams</span><span style="font-size:11px;font-weight:700;color:var(--txt)">273K / 500K</span></div>
+          <div style="height:5px;background:var(--bord);border-radius:3px;overflow:hidden"><div style="height:100%;width:55%;background:#a855f7;border-radius:3px"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:var(--mut)">Artists signed</span><span style="font-size:11px;font-weight:700;color:var(--txt)">3 / 5</span></div>
+          <div style="height:5px;background:var(--bord);border-radius:3px;overflow:hidden"><div style="height:100%;width:60%;background:#a855f7;border-radius:3px"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:var(--mut)">Label reputation</span><span style="font-size:11px;font-weight:700;color:var(--txt)">4.8 / 5.0</span></div>
+          <div style="height:5px;background:var(--bord);border-radius:3px;overflow:hidden"><div style="height:100%;width:96%;background:#22c55e;border-radius:3px"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIVITY FEED -->
+    <div class="sec">Label Activity</div>
+    <div class="card">
+      <div class="fi"><div class="fd" style="background:#22c55e"></div><div class="ft"><strong>Lookinaher</strong> released "Golden Hour" — charting #4 globally · label hype +12</div><div class="ftime">2h</div></div>
+      <div class="fi"><div class="fd" style="background:#667eea"></div><div class="ft"><strong>Sync deal landed</strong> — "Neon City Lights" placed in Netflix show · $8,400 split</div><div class="ftime">1d</div></div>
+      <div class="fi"><div class="fd" style="background:#f59e0b"></div><div class="ft"><strong>SilverHaze</strong> hit 500K streams — label hype +15 · advance recoupment complete</div><div class="ftime">2d</div></div>
+      <div class="fi"><div class="fd" style="background:#a855f7"></div><div class="ft"><strong>Signing offer</strong> sent to Aaliyah Blaze · awaiting response</div><div class="ftime">3d</div></div>
+      <div class="fi"><div class="fd" style="background:#ef4444"></div><div class="ft"><strong>Echo Drift</strong> missed release quota deadline — contract warning issued · rep -0.1</div><div class="ftime">5d</div></div>
+      <div class="fi"><div class="fd" style="background:#22c55e"></div><div class="ft"><strong>Weekly advance</strong> paid to all artists — $1,500 total out · on time · rep +0.1</div><div class="ftime">1wk</div></div>
+    </div>
+
+    <!-- ROSTER + HYPE BREAKDOWN -->
+    <div class="sec">Signed Roster</div>
+    <div class="card">
+      <div class="ch"><div class="ct">Artists (3) · $4,200 this week</div><div class="ca" onclick="showS('s-signing')">+ Sign Artist</div></div>
+      <!-- SPOTLIGHT -->
+      <div style="background:var(--acc-bg);padding:10px 14px;border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:8px">
+        <div style="font-size:13px">⭐</div>
+        <div style="flex:1"><div style="font-size:11px;font-weight:700;color:var(--acc)">Weekly spotlight: Lookinaher</div><div style="font-size:10px;color:var(--mut)">+20% hype this week · contributes 38% of label hype</div></div>
+        <button class="btn sec-btn bsm" style="font-size:10px;padding:5px 9px">Change</button>
+      </div>
+      <div class="row">
+        <div class="ri" style="background:#e8f5e9">🎵</div>
+        <div class="rin"><div class="rt">Lookinaher ⭐</div><div class="rs">Pop · 25% cut · Recouped · Quota met ✓</div></div>
+        <div class="rr"><div class="rv" style="color:#22c55e">$840</div><div class="rs2">this week</div></div>
+      </div>
+      <div class="row">
+        <div class="ri" style="background:#fff7ed">🎸</div>
+        <div class="rin"><div class="rt">SilverHaze</div><div class="rs">Alt Rock · 25% cut · $3K advance left</div></div>
+        <div class="rr"><div class="rv" style="color:#22c55e">$420</div><div class="rs2">this week</div></div>
+      </div>
+      <div class="row">
+        <div class="ri" style="background:#ede9fe">🎧</div>
+        <div class="rin"><div class="rt">Echo Drift ⚠️</div><div class="rs">Electronic · 25% cut · Quota warning</div></div>
+        <div class="rr"><div class="rv" style="color:#22c55e">$182</div><div class="rs2">this week</div></div>
+      </div>
+    </div>
+
+    <!-- RELEASE APPROVALS -->
+    <div class="sec">Release Approvals (2)</div>
+    <div class="card">
+      <div class="row">
+        <div class="ri" style="background:#fef9c3">🎵</div>
+        <div class="rin"><div class="rt">Lookinaher — "Heat Wave"</div><div class="rs">Single · Quality 82/100 · 1d ago</div></div>
+        <div style="display:flex;gap:5px"><button class="btn red bsm">✗</button><button class="btn acc bsm">✓</button></div>
+      </div>
+      <div class="row">
+        <div class="ri" style="background:#fef9c3">🎵</div>
+        <div class="rin"><div class="rt">SilverHaze — "Dark Matter"</div><div class="rs">Single · Quality 71/100 · 3d ago ⚠️ Deadline soon</div></div>
+        <div style="display:flex;gap:5px"><button class="btn red bsm">✗</button><button class="btn acc bsm">✓</button></div>
+      </div>
+    </div>
+
+    <!-- CATALOGUE & PUBLISHING INCOME -->
+    <div class="sec">Catalogue & Publishing</div>
+    <div class="card">
+      <div class="row" style="cursor:default"><div class="ri" style="background:#f0fdf4">💿</div><div class="rin"><div class="rt">Masters owned (3 songs)</div><div class="rs">Licensing income from back catalogue</div></div><div class="rr"><div class="rv" style="color:#22c55e">$240</div><div class="rs2">this month</div></div></div>
+      <div class="row" style="cursor:default"><div class="ri" style="background:#eff6ff">📝</div><div class="rin"><div class="rt">Publishing rights (6 songs)</div><div class="rs">Composition rights — all roster songs</div></div><div class="rr"><div class="rv" style="color:#22c55e">$580</div><div class="rs2">this month</div></div></div>
+      <div class="row" style="cursor:default"><div class="ri" style="background:#faf5ff">🎬</div><div class="rin"><div class="rt">Sync licensing</div><div class="rs">TV/film placements — 3 active deals</div></div><div class="rr"><div class="rv" style="color:#22c55e">$4.2K</div><div class="rs2">this month</div></div></div>
+      <div class="row" style="cursor:default"><div class="ri" style="background:#fff7ed">🌍</div><div class="rin"><div class="rt">Neighbouring rights</div><div class="rs">International radio royalties</div></div><div class="rr"><div class="rv" style="color:#22c55e">$120</div><div class="rs2">this month</div></div></div>
+    </div>
+
+    <!-- OUTGOING OFFERS -->
+    <div class="sec">Outgoing Offers (1)</div>
+    <div class="card">
+      <div class="row">
+        <div class="ri" style="background:#fce7f3">🎤</div>
+        <div class="rin"><div class="rt">Aaliyah Blaze</div><div class="rs">25% cut · 1yr · No advance · Sent 3d ago</div></div>
+        <span class="pill po">Pending</span>
+      </div>
+    </div>
+
+    <!-- BIDDING WAR -->
+    <div class="alert alert-purple">⚡ Bidding war — Prism Wave has 2 label offers. Your offer competes with Eclipse Music Group. Consider sweetening your terms.</div>
+
+    <!-- TEAM -->
+    <div class="sec">Label Team (2/5 slots)</div>
+    <div class="card">
+      <div class="ch"><div class="ct">Staff</div><div class="ca">Hire More</div></div>
+      <div class="row"><div class="ri" style="background:#fef3c7">👩</div><div class="rin"><div class="rt">Rachel Kim</div><div class="rs">Tour Manager · Managing all 3 artists</div></div><span class="pill pg">Active</span></div>
+      <div class="row"><div class="ri" style="background:#dcfce7">🧑</div><div class="rin"><div class="rt">Martin Cole</div><div class="rs">Finance Expert · Splits, advances, reports</div></div><span class="pill pg">Active</span></div>
+      <div class="row" style="opacity:0.4"><div class="ri" style="background:#f1f5f9">🔒</div><div class="rin"><div class="rt" style="color:var(--mut)">A&R Representative</div><div class="rs">Scouts and recruits talent — Major tier</div></div><span class="pill pgr">Locked</span></div>
+      <div class="row" style="opacity:0.4"><div class="ri" style="background:#f1f5f9">🔒</div><div class="rin"><div class="rt" style="color:var(--mut)">Legal Team</div><div class="rs">Disputes, contracts, sample clearance — Major</div></div><span class="pill pgr">Locked</span></div>
+      <div class="row" style="opacity:0.35"><div class="ri" style="background:#f1f5f9">🔒</div><div class="rin"><div class="rt" style="color:var(--mut)">Marketing Director</div><div class="rs">Brand deals, sync pitching — Global tier</div></div><span class="pill pgr">Locked</span></div>
+    </div>
+
+    <!-- REP THREATS -->
+    <div class="sec">Reputation Risks</div>
+    <div class="card">
+      <div class="pp-row"><div class="pp-icon">⏰</div><div class="pp-info"><div class="pp-name">SilverHaze approval overdue</div><div class="pp-sub">Approve or decline "Dark Matter" in 2 days or rep -0.3</div></div><span class="pill pr">Urgent</span></div>
+      <div class="pp-row"><div class="pp-icon">⚠️</div><div class="pp-info"><div class="pp-name">Echo Drift — release quota</div><div class="pp-sub">They need 1 more release this year or penalty triggers</div></div><span class="pill po">Warning</span></div>
+      <div class="pp-row" style="opacity:0.5"><div class="pp-icon">✅</div><div class="pp-info"><div class="pp-name">Advances paid on time</div><div class="pp-sub">All 3 artists paid this week · +0.1 rep</div></div><span class="pill pg">Good</span></div>
+    </div>
+
+    <!-- LABEL PERKS -->
+    <div class="sec">Label Perks — Mid-Tier</div>
+    <div class="card">
+      <div class="pp-row"><div class="pp-icon">💰</div><div class="pp-info"><div class="pp-name">25% roster earnings weekly <span class="pill pg" style="font-size:9px">Active</span></div></div></div>
+      <div class="pp-row"><div class="pp-icon">📣</div><div class="pp-info"><div class="pp-name">Shared promo budget across roster <span class="pill pg" style="font-size:9px">Active</span></div></div></div>
+      <div class="pp-row"><div class="pp-icon">🎭</div><div class="pp-info"><div class="pp-name">Label showcase gig type <span class="pill pg" style="font-size:9px">Active</span></div></div></div>
+      <div class="pp-row"><div class="pp-icon">💿</div><div class="pp-info"><div class="pp-name">Catalogue & publishing income <span class="pill pg" style="font-size:9px">Active</span></div></div></div>
+      <div class="pp-row" style="opacity:0.55"><div class="pp-icon">🎬</div><div class="pp-info"><div class="pp-name" style="color:var(--mut)">Music video funding</div><div class="pp-sub">Major tier · 273K / 500K streams</div><div class="pbar"><div class="pfill" style="width:55%;background:#a855f7"></div></div></div><div class="pp-pct" style="color:#a855f7">55%</div></div>
+      <div class="pp-row" style="opacity:0.55"><div class="pp-icon">🤝</div><div class="pp-info"><div class="pp-name" style="color:var(--mut)">A&R scouting system</div><div class="pp-sub">Major tier · 3 / 5 artists</div><div class="pbar"><div class="pfill" style="width:60%;background:#a855f7"></div></div></div><div class="pp-pct" style="color:#a855f7">60%</div></div>
+      <div class="pp-row" style="opacity:0.35"><div class="pp-icon">🏆</div><div class="pp-info"><div class="pp-name" style="color:var(--mut)">Award nominations lobbied</div><div class="pp-sub">Global tier</div></div><span class="pill pgr">Locked</span></div>
+    </div>
+
+  </div>
+  <div class="nav"><div class="ni">🏠<span style="font-size:8px">HOME</span></div><div class="ni">🌍<span style="font-size:8px">DISCOVER</span></div><div class="ni">🎵<span style="font-size:8px">MUSIC</span></div><div class="ni active">👤<span style="font-size:8px">PROFILE</span></div></div>
+</div>
+
+
+<!-- ═══════════════════════════════
+  S5 — SIGN AN ARTIST
+═══════════════════════════════ -->
+<div class="screen" id="s-signing">
+  <div class="sb"><span>9:41</span><span>📶 🔋</span></div>
+  <div class="bh"><button class="back-btn" onclick="showS('s-owner')">← Back</button><div><div style="font-size:15px;font-weight:800;color:var(--txt)">Sign an Artist</div><div style="font-size:11px;color:var(--mut)">Nova Empire Records</div></div></div>
+  <div class="scroll">
+    <div style="height:10px"></div>
+
+    <div class="card">
+      <div class="ch"><div class="ct">Build Your Offer</div></div>
+      <div style="padding:14px;display:flex;flex-direction:column;gap:14px">
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Label's Cut</div>
+          <div class="chips"><div class="chip">10%</div><div class="chip on">25%</div><div class="chip">35%</div><div class="chip">40%</div><div class="chip">Custom</div></div>
+          <div style="font-size:10px;color:var(--mut);margin-top:5px">Lower cut = easier to sign artists. Higher = more label income.</div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Deal Type</div>
+          <div class="chips"><div class="chip on">Standard</div><div class="chip">360° deal</div></div>
+          <div style="font-size:10px;color:var(--mut);margin-top:5px">360° = label takes cut of gigs, merch, sync, endorsements too</div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Publishing Rights</div>
+          <div class="chips"><div class="chip on">Label owned</div><div class="chip">Co-owned 50/50</div><div class="chip">Artist keeps</div></div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Masters Ownership</div>
+          <div class="chips"><div class="chip on">Label owned</div><div class="chip">Revert 5yrs</div><div class="chip">Artist keeps</div></div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Contract Length</div>
+          <div class="chips"><div class="chip">6 months</div><div class="chip on">1 year</div><div class="chip">2 years</div><div class="chip">3 years</div></div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Weekly Advance (from your label funds)</div>
+          <div class="chips"><div class="chip on">None</div><div class="chip">$500</div><div class="chip">$1K</div><div class="chip">$2K</div></div>
+        </div>
+
+        <div>
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Release Quota</div>
+          <div class="chips"><div class="chip">None</div><div class="chip on">1/yr</div><div class="chip">2/yr</div><div class="chip">4/yr</div></div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">Contract Terms</div>
+          <div class="tog-row"><div><div style="font-size:12px;font-weight:700;color:var(--txt)">Release approval required</div><div style="font-size:10px;color:var(--mut)">You approve before they drop</div></div><div class="tog on"><div class="tog-dot"></div></div></div>
+          <div class="tog-row"><div><div style="font-size:12px;font-weight:700;color:var(--txt)">Solo work allowed</div><div style="font-size:10px;color:var(--mut)">Can release outside the label</div></div><div class="tog off"><div class="tog-dot"></div></div></div>
+          <div class="tog-row"><div><div style="font-size:12px;font-weight:700;color:var(--txt)">Collab approval required</div><div style="font-size:10px;color:var(--mut)">You approve their collab partners</div></div><div class="tog on"><div class="tog-dot"></div></div></div>
+          <div class="tog-row"><div><div style="font-size:12px;font-weight:700;color:var(--txt)">Non-compete on exit</div><div style="font-size:10px;color:var(--mut)">90 days before signing elsewhere</div></div><div class="tog on"><div class="tog-dot"></div></div></div>
+          <div class="tog-row"><div><div style="font-size:12px;font-weight:700;color:var(--txt)">Hiatus clause</div><div style="font-size:10px;color:var(--mut)">Label can release shelved music if inactive</div></div><div class="tog off"><div class="tog-dot"></div></div></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- UNSIGNED ARTISTS -->
+    <div class="sec">Available Artists (Unsigned)</div>
+    <div class="card">
+      <div class="row"><div class="ri" style="background:#fce7f3">🎤</div><div class="rin"><div class="rt">Aaliyah Blaze</div><div class="rs">Pop · Europe · 1.1K fans · Clean history</div></div><button class="btn acc bsm">Send Offer</button></div>
+      <div class="row"><div class="ri" style="background:#e3f2fd">🎧</div><div class="rin"><div class="rt">Prism Wave</div><div class="rs">Electronic · Asia · 740 fans · In bidding war</div></div><button class="btn acc bsm">Send Offer</button></div>
+      <div class="row"><div class="ri" style="background:#f0fdf4">🎸</div><div class="rin"><div class="rt">Night Chorus</div><div class="rs">Indie · Africa · 380 fans · Rising fast</div></div><button class="btn acc bsm">Send Offer</button></div>
+      <div class="row"><div class="ri" style="background:#fff7ed">⚠️</div><div class="rin"><div class="rt">Rex Volta</div><div class="rs">Hip-hop · NA · 290 fans · Left prev label badly</div></div><button class="btn sec-btn bsm">Risky</button></div>
+    </div>
+
+    <!-- BLACKLIST WARNING -->
+    <div class="alert alert-red">🚫 Rex Volta left Eclipse Music Group under bad terms 8 weeks ago. Signing them may cause industry friction. Label rep risk: -0.4 if dispute escalates.</div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════
+  S6 — OFFER RECEIVED (artist POV)
+═══════════════════════════════ -->
+<div class="screen" id="s-offer">
+  <div class="sb"><span>9:41</span><span>📶 🔋</span></div>
+  <div class="ph"><div class="ph-title"><div class="ph-icon">📬</div>Label Offer</div><div class="ph-sub">You received a contract offer.</div></div>
+  <div class="scroll">
+    <div style="height:10px"></div>
+    <div class="alert alert-green">🎉 Nova Empire Records wants to sign you. Review every clause carefully — this affects your career for years.</div>
+
+    <div class="offer">
+      <div class="ot">
+        <div class="ologo" style="background:#fff7ed;font-size:22px">👑</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:800;color:var(--txt)">Nova Empire Records</div>
+          <div style="font-size:11px;color:var(--mut);margin-top:1px">Run by Nova Reign · Mid-Tier · Est. Wk 52</div>
+          <div style="margin-top:5px;display:flex;align-items:center;gap:5px">
+            <div class="stars"><span>⭐</span><span>⭐</span><span>⭐</span><span>⭐</span><span>⭐</span></div>
+            <span style="font-size:10px;color:var(--mut)">4.8 rep · Never missed a payment · 3 artists signed</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--bord)">
+        <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Core Terms</div>
+        <div class="grid2" style="gap:6px">
+          <div style="background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:9px;text-align:center"><div style="font-size:16px;font-weight:800;color:#22c55e">75%</div><div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Your cut</div></div>
+          <div style="background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:9px;text-align:center"><div style="font-size:16px;font-weight:800;color:var(--txt)">1 yr</div><div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Contract</div></div>
+          <div style="background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:9px;text-align:center"><div style="font-size:16px;font-weight:800;color:var(--acc)">None</div><div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Advance</div></div>
+          <div style="background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:9px;text-align:center"><div style="font-size:16px;font-weight:800;color:var(--txt)">1/yr</div><div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Release quota</div></div>
+        </div>
+      </div>
+
+      <div class="term"><span class="tk">📝 Publishing</span><span class="tv" style="color:#ef4444">Label owned</span></div>
+      <div class="term"><span class="tk">💿 Masters</span><span class="tv" style="color:#ef4444">Label owned</span></div>
+      <div class="term"><span class="tk">📀 Catalogue on exit</span><span class="tv" style="color:#ef4444">Label keeps</span></div>
+      <div class="term"><span class="tk">🎭 Solo work</span><span class="tv" style="color:#ef4444">Not allowed</span></div>
+      <div class="term"><span class="tk">🤝 Collabs</span><span class="tv">Label approval needed</span></div>
+      <div class="term"><span class="tk">🔒 Non-compete exit</span><span class="tv">90 days</span></div>
+      <div class="term"><span class="tk">😴 Hiatus clause</span><span class="tv" style="color:#22c55e">Not included</span></div>
+      <div class="term"><span class="tk">💰 360° deal</span><span class="tv" style="color:#22c55e">No — standard only</span></div>
+
+      <!-- WHAT YOU GET -->
+      <div style="padding:10px 14px;border-top:1px solid var(--bord);background:var(--bg)">
+        <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">What You Get</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:12px;color:var(--txt)">📣 $3,000 promo budget per release</div>
+          <div style="font-size:12px;color:var(--txt)">🎭 Mid-tier exclusive gigs</div>
+          <div style="font-size:12px;color:var(--txt)">📰 Press feature guaranteed on release</div>
+          <div style="font-size:12px;color:var(--txt)">🎬 Sync licensing (60% your share)</div>
+          <div style="font-size:12px;color:var(--txt)">👩 Tour Manager — Rachel Kim</div>
+          <div style="font-size:12px;color:var(--txt)">⚖️ Legal team for disputes & samples</div>
+          <div style="font-size:12px;color:var(--txt)">🌍 Neighbouring rights collected</div>
+        </div>
+      </div>
+
+      <!-- LABEL ROSTER PREVIEW -->
+      <div style="padding:10px 14px;border-top:1px solid var(--bord)">
+        <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Current Roster</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="font-size:12px;color:var(--txt)">🎵 Lookinaher — Pop · 1.8K fans · #4 Global charts</div>
+          <div style="font-size:12px;color:var(--txt)">🎸 SilverHaze — Alt Rock · 950 fans · 500K streams</div>
+        </div>
+      </div>
+
+      <div class="oact">
+        <div class="alert alert-yellow" style="margin:0 0 8px;font-size:11px">⚠️ Publishing and masters are label-owned. Even after you leave, they earn from your catalogue. Consider countering on this.</div>
+        <div class="grid3">
+          <button class="btn red bsm" onclick="showS('s1')">Decline</button>
+          <button class="btn sec-btn bsm" onclick="showS('s-counter')">Counter ↔</button>
+          <button class="btn acc bsm" onclick="showS('s-signed')">Accept ✓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLACKLIST STATUS OF LABEL -->
+    <div class="sec">Label Track Record</div>
+    <div class="card">
+      <div class="row" style="cursor:default"><div class="ri" style="background:#f0fdf4">✅</div><div class="rin"><div class="rt">Payment history</div><div class="rs">Never missed or delayed an advance</div></div><span class="pill pg">Clean</span></div>
+      <div class="row" style="cur      <div class="row" style="cursor:default"><div class="ri" style="background:#f0fdf4">✅</div><div class="rin"><div class="rt">Release approvals</div><div class="rs">Avg response time 1.2 days</div></div><span class="pill pg">Fast</span></div>
+      <div class="row" style="cursor:default"><div class="ri" style="background:#fff7ed">⚠️</div><div class="rin"><div class="rt">Artist disputes</div><div class="rs">1 past dispute — resolved amicably</div></div><span class="pill py">1 dispute</span></div>
+      <div class="row" style="cursor:default"><div class="ri" style="background:#f0fdf4">✅</div><div class="rin"><div class="rt">Blacklist activity</div><div class="rs">Has not blacklisted any artists</div></div><span class="pill pg">None</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ S7 — BLACKLISTED ARTIST ═══ -->
+<div class="screen" id="s-blacklist">
+  <div class="sb"><span>9:41</span><span>📶 🔋</span></div>
+  <div class="ph"><div class="ph-title"><div class="ph-icon" style="background:#ef4444">🚫</div>Industry Standing</div><div class="ph-sub">Your current reputation status.</div></div>
+  <div class="scroll">
+    <div style="height:10px"></div>
+
+    <div class="alert alert-red">🚫 You are currently blacklisted by Eclipse Music Group. This affects your ability to get certain gigs and sign with new labels. Fades in 22 days.</div>
+
+    <div class="tc" style="border:1.5px solid #fecaca">
+      <div class="tc-top" style="background:#fef2f2">
+        <div class="logo" style="background:#fee2e2;font-size:28px">⚠️</div>
+        <div style="flex:1">
+          <div class="lname" style="color:#dc2626">Blacklisted</div>
+          <div class="lmeta">By Eclipse Music Group · Since Week 88</div>
+          <div style="margin-top:6px">
+            <div class="stars"><span style="opacity:0.3">⭐</span><span style="opacity:0.3">⭐</span><span>⭐</span><span>⭐</span><span>⭐</span></div>
+            <span style="font-size:10px;color:#dc2626;margin-left:4px">Rep dropped to 2.8</span>
+          </div>
+        </div>
+      </div>
+      <div class="sg" style="border-bottom:1px solid #fecaca;background:#fef2f2">
+        <div class="sv"><div class="svv" style="color:#dc2626">22</div><div class="svl">Days Left</div></div>
+        <div class="sv"><div class="svv" style="color:#dc2626">-0.4</div><div class="svl">Rep/day</div></div>
+        <div class="sv"><div class="svv" style="color:#dc2626">2.8</div><div class="svl">Rep Score</div></div>
+      </div>
+      <div style="padding:12px 16px;background:#fef2f2;border-top:1px solid #fecaca">
+        <div style="font-size:10px;font-weight:800;color:#dc2626;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">What's Affected</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="font-size:12px;color:#dc2626">🎭 Exclusive gig types unavailable for 22 days</div>
+          <div style="font-size:12px;color:#dc2626">📩 Signing offer acceptance rate -30%</div>
+          <div style="font-size:12px;color:#dc2626">🤝 Eclipse roster artists auto-decline collabs</div>
+          <div style="font-size:12px;color:#dc2626">📰 Negative press chance increased this week</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">How to Recover Faster</div>
+    <div class="card">
+      <div class="pp-row"><div class="pp-icon">🎵</div><div class="pp-info"><div class="pp-name">Release a high-quality song</div><div class="pp-sub">Quality 80+ restores +0.3 rep</div></div></div>
+      <div class="pp-row"><div class="pp-icon">🤝</div><div class="pp-info"><div class="pp-name">Complete a successful collab</div><div class="pp-sub">Restores +0.2 rep · shows professionalism</div></div></div>
+      <div class="pp-row"><div class="pp-icon">🎭</div><div class="pp-info"><div class="pp-name">Play 5 gigs without incident</div><div class="pp-sub">Restores +0.2 rep</div></div></div>
+      <div class="pp-row"><div class="pp-icon">⚖️</div><div class="pp-info"><div class="pp-name">Hire a Legal Advisor</div><div class="pp-sub">Attempt formal dispute resolution — costs $500</div></div></div>
+      <div class="pp-row"><div class="pp-icon">⏳</div><div class="pp-info"><div class="pp-name">Wait it out</div><div class="pp-sub">Blacklist fully fades after 30 in-game days</div></div></div>
+    </div>
+
+    <div class="sec">What Started This</div>
+    <div class="card">
+      <div style="padding:14px">
+        <div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:6px">Contract dispute — Eclipse Music Group</div>
+        <div style="font-size:12px;color:var(--mut);line-height:1.6">You sued to exit your contract 6 weeks before its end date. Eclipse claimed breach of the release quota clause. The dispute was settled but the relationship soured. They flagged you in the network.</div>
+        <div style="margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:6px;font-size:11px;color:var(--mut)">Tip: Always fulfil your release quota before attempting to exit a contract early.</div>
+      </div>
+    </div>
+
+  </div>
+  <div class="nav"><div class="ni">🏠<span style="font-size:8px">HOME</span></div><div class="ni">🌍<span style="font-size:8px">DISCOVER</span></div><div class="ni">🎵<span style="font-size:8px">MUSIC</span></div><div class="ni active">👤<span style="font-size:8px">PROFILE</span></div></div>
+</div>
+
+</div><!-- end phone -->
+
+<div class="switcher">
+  <button class="sw on" onclick="sw(this,'s1')">Unsigned</button>
+  <button class="sw" onclick="sw(this,'s-counter')">Counter</button>
+  <button class="sw" onclick="sw(this,'s-signed')">Signed</button>
+  <button class="sw" onclick="sw(this,'s-owner')">Owner</button>
+  <button class="sw" onclick="sw(this,'s-signing')">Sign</button>
+  <button class="sw" onclick="sw(this,'s-offer')">Offer POV</button>
+  <button class="sw" onclick="sw(this,'s-blacklist')">Blacklisted</button>
+</div>
+
+<script>
+function showS(n){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(n).classList.add('active')}
+function sw(btn,n){document.querySelectorAll('.sw').forEach(b=>b.classList.remove('on'));btn.classList.add('on');showS(n)}
+</script>
+</body>
+</html>
