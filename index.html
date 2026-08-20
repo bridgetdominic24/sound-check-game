@@ -12611,6 +12611,15 @@ const LABEL_TIERS = {
   global: {name:'Global', maxRoster:50, maxStaff:30, maintenance:100000,color:'#f59e0b', streamMult:2.0}
 };
 
+const LABEL_LOAN_TIERS = {
+  indie:  {max: 20000,   rate: 0.08},
+  mid:    {max: 75000,   rate: 0.06},
+  major:  {max: 250000,  rate: 0.05},
+  global: {max: 1000000, rate: 0.04}
+};
+
+const LABEL_SHOWCASE_COST = {indie: 5000, mid: 8000, major: 20000, global: 50000};
+
 const LABEL_STAFF_TYPES = {
   tourManager:    {name:'Tour Manager',    dept:'Tour & Live',    minTier:'indie', baseCut:0.10, signingBonus:5000,  desc:'Books venues, manages tour logistics, coordinates rehearsals.'},
   prSpecialist:   {name:'PR Specialist',   dept:'Marketing & PR', minTier:'indie', baseCut:0.12, signingBonus:8000,  desc:'Handles press, industry articles, responds to controversies.'},
@@ -13273,7 +13282,7 @@ async function confirmCreateLabel(){
   const nameEl = document.getElementById('labelNameInput');
   const name = nameEl ? nameEl.value.trim() : '';
   if(!name){showEvent('⚠️','Name Required','Please enter a name for your label.',['OK']);return;}
-  if((GAME.money||0) < 8000){showEvent('💸','Not Enough Money','You need at least $25,000 to start a label.',['OK']);return;}
+  if((GAME.money||0) < 25000){showEvent('💸','Not Enough Money','You need at least $25,000 to start a label.',['OK']);return;}
 
   const label = {
     id: 'lbl_'+Date.now(),
@@ -13304,15 +13313,6 @@ async function confirmCreateLabel(){
 
   GAME.ownedLabel = label;
   GAME.money -= 25000;
-
-  // Auto-sign owner to their own label
-  GAME.signedLabel = {
-    labelId: label.id, labelName: label.name, logoEmoji: label.logoEmoji,
-    logoImage: label.logoImage || null, tier: label.tier, labelRep: label.rep,
-    isOwner: true,
-    terms: { cut: label.defaultCut, dealType: 'standard', publishing: 'artist', masters: 'artist', length: 'indefinite' },
-    signedWeek: GAME.week || 1, expiresWeek: Infinity, status: 'active'
-  };
 
   // Auto-sign the owner to their own label (owner is always on the roster)
   GAME.signedLabel = {
@@ -13641,12 +13641,49 @@ async function acceptLabelOffer_v2(offerId){
   GAME.labelOffersPending = offers.filter(o=>o.id!==offerId);
   GAME.industryRep = Math.min(5, (GAME.industryRep||5) + 0.1);
 
-  // Notify label owner
-  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined'){
+  // Add to label owner's roster and notify them
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && offer.fromUserId){
     try {
-      const {data: labelOwner} = await supabase.from('players').select('*').eq('id', offer.labelId.replace('lbl_','')).single();
-      // Add to their label's roster and notify
-    } catch(e){}
+      const {data: ownerRow} = await supabase.from('players').select('*').eq('user_id', offer.fromUserId).single();
+      if(ownerRow){
+        let gd = {};
+        try { gd = typeof ownerRow.game_data === 'string' ? JSON.parse(ownerRow.game_data) : (ownerRow.game_data||{}); } catch(e){ gd = {}; }
+        if(gd.ownedLabel){
+          gd.ownedLabel.roster = (gd.ownedLabel.roster||[]).filter(a=>a.userId !== currentUser?.id);
+          gd.ownedLabel.roster.push({
+            id: GAME.playerId || null,
+            userId: currentUser?.id || null,
+            artistName: GAME.sn || GAME.artistName || 'Artist',
+            profilePic: (GAME.artistProfile && GAME.artistProfile.profilePic) || '🎤',
+            genre: GAME.genre || 'Pop',
+            cut: offer.terms.cut || 25,
+            dealType: offer.terms.dealType || 'standard',
+            weeklyAdvance: offer.terms.advance || 0,
+            weeklyEarnings: 0,
+            totalStreams: getTotalStreams(),
+            signedWeek: signedWeek,
+            spotlight: false,
+            quotaWarning: false,
+            pendingReleases: []
+          });
+          gd.ownedLabel.activity = gd.ownedLabel.activity || [];
+          gd.ownedLabel.activity.unshift({text:`<strong>${GAME.sn||GAME.artistName||'A new artist'}</strong> signed to the label!`,color:'#22c55e',time:'now'});
+          await supabase.from('players').update({game_data: gd}).eq('user_id', offer.fromUserId);
+          if(ownerRow.user_id){
+            await supabase.from('notifications').insert({
+              user_id: ownerRow.user_id,
+              type: 'label_signed',
+              platform: 'system',
+              fromuserid: currentUser?.id || null,
+              fromusername: GAME.sn || 'Artist',
+              message: `${GAME.sn||'An artist'} accepted your offer and joined ${offer.labelName}!`,
+              timestamp: Date.now(),
+              read: false
+            }).catch(()=>{});
+          }
+        }
+      }
+    } catch(e){ console.warn('Roster sync error:', e); }
   }
 
   updateStats();
@@ -13872,6 +13909,17 @@ function processLabelWeekly(){
       }
     });
 
+    // Weekly interest on outstanding debt/loans
+    if(ol.debt > 0){
+      const loanTier = LABEL_LOAN_TIERS[ol.tier] || LABEL_LOAN_TIERS.indie;
+      const interest = Math.round(ol.debt * loanTier.rate);
+      ol.debt += interest;
+      if(interest > 0){
+        ol.activity = ol.activity || [];
+        ol.activity.unshift({text:`Weekly loan interest: <strong>-$${_fmt(interest)}</strong> added to debt.`,color:'#ef4444',time:'now'});
+      }
+    }
+
     // Tier upgrade check
     _checkLabelTierUpgrade(ol);
   }
@@ -13947,8 +13995,276 @@ function _perkRow(icon,name,sub,pillClass){ return `<div style="display:flex;ali
 function _restrictRow(icon,name,sub){ return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bord)"><div style="font-size:16px;width:26px;text-align:center;flex-shrink:0;margin-top:1px">${icon}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700;color:#ef4444">${name}</div><div style="font-size:10px;color:var(--mut);margin-top:2px">${sub}</div></div></div>`; }
 function _togRow(label,sub,key,defaultOn){ return `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg);padding:10px 12px;border-radius:8px;border:1px solid var(--bord)"><div><div style="font-size:12px;font-weight:700;color:var(--txt)">${label}</div><div style="font-size:10px;color:var(--mut)">${sub}</div></div><div onclick="window._sendTerms['${key}']=!window._sendTerms['${key}'];this.style.background=window._sendTerms['${key}']?'#22c55e':'var(--bord)';this.querySelector('.dot').style.right=window._sendTerms['${key}']?'2px':'auto';this.querySelector('.dot').style.left=window._sendTerms['${key}']?'auto':'2px'" style="width:40px;height:22px;border-radius:11px;position:relative;cursor:pointer;flex-shrink:0;background:${defaultOn?'#22c55e':'var(--bord)'};transition:background 0.2s"><div class="dot" style="position:absolute;${defaultOn?'right:2px':'left:2px'};top:2px;width:18px;height:18px;background:white;border-radius:50%"></div></div></div>`; }
 
-function showLabelLoans(){ showEvent('🏦','Coming Soon','Bank loan system is in development.',['OK']); }
-function showLabelShowcase(){ showEvent('🎪','Coming Soon','Label showcase planning is in development.',['OK']); }
+// ── BANK LOANS ──────────────────────────────────────────────────────
+function showLabelLoans(){
+  const ol = GAME.ownedLabel;
+  if(!ol){ return; }
+  const loanTier = LABEL_LOAN_TIERS[ol.tier] || LABEL_LOAN_TIERS.indie;
+  const debt = ol.debt || 0;
+  const room = Math.max(0, loanTier.max - debt);
+  const money = GAME.money || 0;
+
+  let html = `<div style="padding:16px;padding-bottom:100px">`;
+
+  html += `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#1e40af;line-height:1.5">🏦 Loans cover your label's overhead when cash is tight, but they charge weekly interest (${Math.round(loanTier.rate*100)}% for a ${LABEL_TIERS[ol.tier]?.name||'Indie'} label). Pay them down before they grow.</div>`;
+
+  html += `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+    <div style="display:grid;grid-template-columns:1fr 1fr;background:var(--surf)">
+      <div style="padding:14px;text-align:center;border-right:1px solid var(--bord)">
+        <div style="font-size:18px;font-weight:800;color:${debt>0?'#ef4444':'#22c55e'}">$${_fmt(debt)}</div>
+        <div style="font-size:9px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Outstanding Debt</div>
+      </div>
+      <div style="padding:14px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:var(--txt)">$${_fmt(loanTier.max)}</div>
+        <div style="font-size:9px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Borrowing Cap</div>
+      </div>
+    </div>
+  </div>`;
+
+  if(debt > 0){
+    const pay25 = Math.min(debt, Math.round(debt*0.25));
+    const pay50 = Math.min(debt, Math.round(debt*0.5));
+    const payFull = debt;
+    const canPay = (amt) => money >= amt;
+    html += `<div style="padding:14px 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Pay Down Debt</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      <button onclick="payDownLabelDebt(${pay25})" ${canPay(pay25)?'':'disabled'} style="background:${canPay(pay25)?'var(--surf)':'var(--bg)'};color:${canPay(pay25)?'var(--txt)':'var(--mut)'};border:1.5px solid var(--bord);border-radius:8px;padding:11px 6px;font-size:12px;font-weight:700;cursor:${canPay(pay25)?'pointer':'default'};font-family:var(--fb)">25%<br><span style="font-size:10px;font-weight:500">$${_fmt(pay25)}</span></button>
+      <button onclick="payDownLabelDebt(${pay50})" ${canPay(pay50)?'':'disabled'} style="background:${canPay(pay50)?'var(--surf)':'var(--bg)'};color:${canPay(pay50)?'var(--txt)':'var(--mut)'};border:1.5px solid var(--bord);border-radius:8px;padding:11px 6px;font-size:12px;font-weight:700;cursor:${canPay(pay50)?'pointer':'default'};font-family:var(--fb)">50%<br><span style="font-size:10px;font-weight:500">$${_fmt(pay50)}</span></button>
+      <button onclick="payDownLabelDebt(${payFull})" ${canPay(payFull)?'':'disabled'} style="background:${canPay(payFull)?'var(--acc)':'var(--bg)'};color:${canPay(payFull)?'white':'var(--mut)'};border:none;border-radius:8px;padding:11px 6px;font-size:12px;font-weight:700;cursor:${canPay(payFull)?'pointer':'default'};font-family:var(--fb)">Full<br><span style="font-size:10px;font-weight:500">$${_fmt(payFull)}</span></button>
+    </div>`;
+  }
+
+  html += `<div style="padding:14px 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Take a New Loan</div>`;
+  if(room <= 0){
+    html += `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:16px;text-align:center;font-size:12px;color:var(--mut);margin-bottom:16px">You've hit your borrowing cap for a ${LABEL_TIERS[ol.tier]?.name||'Indie'} label. Pay down debt or grow to the next tier to unlock more.</div>`;
+  } else {
+    const options = [5000,10000,25000,50000,100000].filter(a=>a<=room);
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      ${options.map(a=>`<button onclick="takeLabelLoan(${a})" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb)">+$${_fmt(a)}</button>`).join('')}
+    </div>
+    <div style="font-size:10px;color:var(--mut);margin-bottom:16px">Up to $${_fmt(room)} more available at this tier.</div>`;
+  }
+
+  html += `</div>`;
+  openMenu('🏦 Bank Loans', html);
+}
+
+function takeLabelLoan(amount){
+  const ol = GAME.ownedLabel;
+  if(!ol || !amount) return;
+  const loanTier = LABEL_LOAN_TIERS[ol.tier] || LABEL_LOAN_TIERS.indie;
+  const debt = ol.debt || 0;
+  if(debt + amount > loanTier.max){ showEvent('🏦','Over the Cap',`That would put you over your $${_fmt(loanTier.max)} borrowing cap.`,['OK']); return; }
+  GAME.money = (GAME.money||0) + amount;
+  ol.debt = debt + amount;
+  ol.loans = ol.loans || [];
+  ol.loans.push({amount, takenWeek: GAME.week||1, rate: loanTier.rate});
+  ol.activity = ol.activity || [];
+  ol.activity.unshift({text:`Took out a <strong>$${_fmt(amount)}</strong> bank loan.`,color:'#f59e0b',time:'now'});
+  markDirty(); saveToCloud(); updateStats();
+  closeMenu(); showLabelLoans();
+}
+
+function payDownLabelDebt(amount){
+  const ol = GAME.ownedLabel;
+  if(!ol || !amount) return;
+  const debt = ol.debt || 0;
+  amount = Math.min(amount, debt);
+  if((GAME.money||0) < amount){ showEvent('💸','Not Enough Money','You don\'t have enough cash to make that payment.',['OK']); return; }
+  GAME.money -= amount;
+  ol.debt = Math.max(0, debt - amount);
+  ol.rep = Math.min(5, (ol.rep||5) + 0.05);
+  ol.activity = ol.activity || [];
+  ol.activity.unshift({text:`Paid down <strong>$${_fmt(amount)}</strong> of label debt.`,color:'#22c55e',time:'now'});
+  markDirty(); saveToCloud(); updateStats();
+  closeMenu(); showLabelLoans();
+}
+
+// ── LABEL SHOWCASE ──────────────────────────────────────────────────
+function showLabelShowcase(){
+  const ol = GAME.ownedLabel;
+  if(!ol){ return; }
+  const roster = ol.roster || [];
+  const cost = LABEL_SHOWCASE_COST[ol.tier] || 5000;
+  const alreadyBooked = ol.lastShowcaseWeek === (GAME.week||1);
+
+  let html = `<div style="padding:16px;padding-bottom:100px">`;
+  html += `<div style="background:#faf5ff;border:1px solid #ddd6fe;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#6d28d9;line-height:1.5">🎪 Book a label showcase for one of your artists — a curated industry event that boosts their hype and your label's reputation. One showcase per week, $${_fmt(cost)}.</div>`;
+
+  if(alreadyBooked){
+    html += `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:16px;text-align:center;font-size:12px;color:var(--mut);margin-bottom:16px">You already booked a showcase this week. Check back next week.</div>`;
+  }
+
+  html += `<div style="padding:14px 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Your Roster</div>`;
+  if(roster.length === 0){
+    html += `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:20px;text-align:center;font-size:12px;color:var(--mut);margin-bottom:12px">Sign your first artist before booking a showcase.</div>`;
+  } else {
+    html += `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+      ${roster.map((a,i)=>`<div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--bord)">
+        <div style="width:38px;height:38px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${a.profilePic||'🎤'}</div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt)">${a.artistName}</div><div style="font-size:11px;color:var(--mut);margin-top:1px">${a.genre||'Pop'}</div></div>
+        <button onclick="bookLabelShowcase(${i})" ${alreadyBooked||(GAME.money||0)<cost?'disabled':''} style="background:${alreadyBooked||(GAME.money||0)<cost?'var(--bg)':'var(--acc)'};color:${alreadyBooked||(GAME.money||0)<cost?'var(--mut)':'white'};border:none;border-radius:6px;padding:7px 12px;font-size:11px;font-weight:700;cursor:${alreadyBooked||(GAME.money||0)<cost?'default':'pointer'};font-family:var(--fb)">Book</button>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  html += `</div>`;
+  openMenu('🎪 Label Showcase', html);
+}
+
+function bookLabelShowcase(rosterIdx){
+  const ol = GAME.ownedLabel;
+  if(!ol) return;
+  const artist = (ol.roster||[])[rosterIdx];
+  if(!artist) return;
+  const cost = LABEL_SHOWCASE_COST[ol.tier] || 5000;
+  if(ol.lastShowcaseWeek === (GAME.week||1)){ showEvent('🎪','Already Booked','You already booked a showcase this week.',['OK']); return; }
+  if((GAME.money||0) < cost){ showEvent('💸','Not Enough Money',`You need $${_fmt(cost)} to book a showcase.`,['OK']); return; }
+
+  GAME.money -= cost;
+  ol.lastShowcaseWeek = GAME.week||1;
+  const hypeGain = 15 + Math.round(Math.random()*15);
+  ol.hype = (ol.hype||0) + hypeGain;
+  ol.rep = Math.min(5, (ol.rep||5) + 0.05);
+  ol.activity = ol.activity || [];
+  ol.activity.unshift({text:`Booked a showcase for <strong>${artist.artistName}</strong> — label hype +${hypeGain}.`,color:'#a855f7',time:'now'});
+
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && artist.userId){
+    (async () => {
+      try {
+        const {data: artistRow} = await supabase.from('players').select('*').eq('user_id', artist.userId).single();
+        if(artistRow){
+          let gd = {};
+          try { gd = typeof artistRow.game_data === 'string' ? JSON.parse(artistRow.game_data) : (artistRow.game_data||{}); } catch(e){ gd = {}; }
+          gd.buzz = (gd.buzz||0) + 15;
+          await supabase.from('players').update({game_data: gd}).eq('user_id', artist.userId);
+          await supabase.from('notifications').insert({
+            user_id: artist.userId,
+            type: 'label_showcase',
+            platform: 'system',
+            fromuserid: currentUser?.id || null,
+            fromusername: ol.name,
+            message: `${ol.name} booked a showcase for you — hype rising!`,
+            timestamp: Date.now(),
+            read: false
+          }).catch(()=>{});
+        }
+      } catch(e){ console.warn('Showcase sync error:', e); }
+    })();
+  }
+
+  markDirty(); saveToCloud(); updateStats();
+  closeMenu(); showLabelShowcase();
+}
+
+// ── LABEL SETTINGS ──────────────────────────────────────────────────
+function showLabelOwnerSettings(){
+  const ol = GAME.ownedLabel;
+  if(!ol){ return; }
+  const emojis = ['🏢','👑','🎵','🎙️','🌊','⚡','🔥','💎','🌙','🦅','🌺','🏆','🎸','🎹','🥁','🎺','🦁','🐺','🦋','🌟','🚀'];
+  const genres = ['R&B / Soul','Hip-Hop','Pop','Afrobeats','Electronic','Indie','Rock','Jazz','Classical','Country','Mixed'];
+  const regions = ['North America','Europe','Africa','Asia','South America','Oceania','Global'];
+  window._settingsLabelEmoji = ol.logoEmoji || '🏢';
+  window._settingsLabelGenres = (ol.genreFocus||[]).slice();
+  window._settingsLabelRegion = ol.region || 'North America';
+  window._settingsLabelCut = ol.defaultCut || 25;
+
+  let html = `<div style="padding:16px;padding-bottom:100px">`;
+
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Label Name</div>
+  <input id="settingsLabelName" type="text" value="${(ol.name||'').replace(/"/g,'&quot;')}" style="background:var(--bg);border:1.5px solid var(--bord);border-radius:8px;padding:11px 14px;font-size:14px;font-weight:600;color:var(--txt);width:100%;font-family:var(--fb);outline:none;display:block;margin-bottom:16px" maxlength="50">`;
+
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Logo Emoji</div>
+  <div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:16px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:10px 12px">
+      ${emojis.map(e=>`<div onclick="window._settingsLabelEmoji='${e}';document.querySelectorAll('[id^=\\'stgemoji_\\']').forEach(el=>{el.style.border='2px solid transparent';el.style.background='transparent'});this.style.border='2px solid var(--acc)';this.style.background='var(--acc-bg)'" id="stgemoji_${e}" style="font-size:22px;padding:6px;border-radius:8px;text-align:center;cursor:pointer;border:2px solid ${e===ol.logoEmoji?'var(--acc)':'transparent'};background:${e===ol.logoEmoji?'var(--acc-bg)':'transparent'}">${e}</div>`).join('')}
+    </div>
+  </div>`;
+
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Genre Focus</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+    ${genres.map(g=>{const on=(ol.genreFocus||[]).includes(g); return `<div onclick="const i=window._settingsLabelGenres.indexOf('${g}');if(i>-1){window._settingsLabelGenres.splice(i,1);this.style.borderColor='var(--bord)';this.style.background='var(--surf)';this.style.color='var(--mut)'}else{window._settingsLabelGenres.push('${g}');this.style.borderColor='var(--acc)';this.style.background='var(--acc-bg)';this.style.color='var(--acc)'}" style="padding:6px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid ${on?'var(--acc)':'var(--bord)'};background:${on?'var(--acc-bg)':'var(--surf)'};color:${on?'var(--acc)':'var(--mut)'}">${g}</div>`;}).join('')}
+  </div>`;
+
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Home Region</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="stgRegionChips">
+    ${regions.map(r=>`<div onclick="window._settingsLabelRegion='${r}';document.querySelectorAll('#stgRegionChips > div').forEach(c=>{c.style.borderColor='var(--bord)';c.style.background='var(--surf)';c.style.color='var(--mut)'});this.style.borderColor='var(--acc)';this.style.background='var(--acc-bg)';this.style.color='var(--acc)'" style="padding:6px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid ${r===ol.region?'var(--acc)':'var(--bord)'};background:${r===ol.region?'var(--acc-bg)':'var(--surf)'};color:${r===ol.region?'var(--acc)':'var(--mut)'}">${r}</div>`).join('')}
+  </div>`;
+
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Default Signing Cut</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px" id="stgCutChips">
+    ${[15,20,25,30,40].map(c=>`<div onclick="window._settingsLabelCut=${c};document.querySelectorAll('#stgCutChips > div').forEach(el=>{el.style.borderColor='var(--bord)';el.style.background='var(--surf)';el.style.color='var(--mut)'});this.style.borderColor='var(--acc)';this.style.background='var(--acc-bg)';this.style.color='var(--acc)'" style="padding:6px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid ${c===(ol.defaultCut||25)?'var(--acc)':'var(--bord)'};background:${c===(ol.defaultCut||25)?'var(--acc-bg)':'var(--surf)'};color:${c===(ol.defaultCut||25)?'var(--acc)':'var(--mut)'}">${c}%</div>`).join('')}
+  </div>`;
+
+  html += `<button onclick="saveLabelSettings()" style="background:var(--acc);color:white;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;width:100%;cursor:pointer;font-family:var(--fb);margin-bottom:24px;touch-action:manipulation">Save Changes</button>`;
+
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:#ef4444;letter-spacing:1.5px;text-transform:uppercase">Danger Zone</div>
+  <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px">
+    <div style="font-size:12px;color:#dc2626;line-height:1.5;margin-bottom:10px">Dissolving your label is permanent. Your roster will be notified and released from their contracts. The registration fee is not refunded.</div>
+    <button onclick="dissolveLabel()" style="background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;border-radius:8px;padding:11px;font-size:13px;font-weight:700;width:100%;cursor:pointer;font-family:var(--fb)">Dissolve Label</button>
+  </div>`;
+
+  html += `</div>`;
+  openMenu('⚙️ Label Settings', html);
+}
+
+function saveLabelSettings(){
+  const ol = GAME.ownedLabel;
+  if(!ol) return;
+  const nameEl = document.getElementById('settingsLabelName');
+  const name = nameEl ? nameEl.value.trim() : '';
+  if(!name){ showEvent('⚠️','Name Required','Please enter a name for your label.',['OK']); return; }
+
+  ol.name = name;
+  ol.logoEmoji = window._settingsLabelEmoji || ol.logoEmoji;
+  ol.genreFocus = window._settingsLabelGenres || ol.genreFocus;
+  ol.region = window._settingsLabelRegion || ol.region;
+  ol.defaultCut = window._settingsLabelCut || ol.defaultCut;
+
+  if(GAME.signedLabel && GAME.signedLabel.isOwner){
+    GAME.signedLabel.labelName = ol.name;
+    GAME.signedLabel.logoEmoji = ol.logoEmoji;
+  }
+
+  markDirty(); saveToCloud(); updateStats();
+  closeMenu();
+  showEvent('✅','Settings Saved','Your label details have been updated.',['OK']);
+}
+
+async function dissolveLabel(){
+  const ol = GAME.ownedLabel;
+  if(!ol) return;
+  if(!confirm(`Dissolve ${ol.name}? This cannot be undone and your roster will be released from their contracts.`)) return;
+  if(!confirm('Absolutely sure? Your registration fee will not be refunded.')) return;
+
+  // Release each roster artist from their contract
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined'){
+    for(const a of (ol.roster||[])){
+      if(!a.userId) continue;
+      try {
+        const {data: artistRow} = await supabase.from('players').select('*').eq('user_id', a.userId).single();
+        if(artistRow){
+          let gd = {};
+          try { gd = typeof artistRow.game_data === 'string' ? JSON.parse(artistRow.game_data) : (artistRow.game_data||{}); } catch(e){ gd = {}; }
+          if(gd.signedLabel && gd.signedLabel.labelId === ol.id) gd.signedLabel = null;
+          await supabase.from('players').update({game_data: gd}).eq('user_id', a.userId);
+          await supabase.from('notifications').insert({
+            user_id: a.userId, type:'label_dissolved', platform:'system',
+            fromuserid: currentUser?.id || null, fromusername: ol.name,
+            message: `${ol.name} has dissolved. You're now a free agent.`, timestamp: Date.now(), read:false
+          }).catch(()=>{});
+        }
+      } catch(e){ console.warn('Dissolve notify error:', e); }
+    }
+    try { await supabase.from('labels').delete().eq('id', ol.id); } catch(e){}
+  }
+
+  GAME.ownedLabel = null;
+  if(GAME.signedLabel && GAME.signedLabel.isOwner) GAME.signedLabel = null;
+  markDirty(); saveToCloud(); updateStats();
+  closeMenu();
+  showEvent('🏢','Label Dissolved','Your label has been dissolved. You\'re back to being an independent artist.',['OK']);
+}
 function showCounterOffer(offerId){
   const offer = (GAME.labelOffersPending||[]).find(o=>o.id===offerId);
   if(!offer){ showToast('Offer not found','red'); return; }
@@ -14201,8 +14517,57 @@ function resendOffer(offerId){
   showSignArtistFlow();
   showToast('Terms pre-loaded — edit and re-send','green');
 }
-function showLabelOwnerSettings(){ showEvent('⚙️','Label Settings','Label settings coming soon.',['OK']); }
-function approveLabelRelease(id,approved){ showEvent(approved?'✅':'❌',approved?'Release Approved':'Release Declined',approved?'The artist has been notified.':'The artist has been notified.','label'); }
+function approveLabelRelease(id,approved){
+  const ol = GAME.ownedLabel;
+  if(!ol){ return; }
+  let release = null, artist = null;
+  (ol.roster||[]).forEach(a=>{
+    const r = (a.pendingReleases||[]).find(pr=>pr.id===id && pr.status==='pending');
+    if(r){ release = r; artist = a; }
+  });
+  if(!release){ showEvent(approved?'✅':'❌',approved?'Release Approved':'Release Declined','The artist has been notified.',['OK']); return; }
+
+  release.status = approved ? 'approved' : 'declined';
+  artist.pendingReleases = (artist.pendingReleases||[]).filter(pr=>pr.id!==id);
+  ol.activity = ol.activity || [];
+  ol.activity.unshift({text: approved
+    ? `You approved <strong>${artist.artistName}</strong>'s release "${release.title}".`
+    : `You declined <strong>${artist.artistName}</strong>'s release "${release.title}".`,
+    color: approved ? '#22c55e' : '#ef4444', time:'now'});
+  ol.rep = approved ? Math.min(5, (ol.rep||5)+0.05) : Math.max(0, (ol.rep||5)-0.1);
+
+  // Write the decision back to the artist's own save so their release can proceed
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && artist.userId){
+    (async () => {
+      try {
+        const {data: artistRow} = await supabase.from('players').select('*').eq('user_id', artist.userId).single();
+        if(artistRow){
+          let gd = {};
+          try { gd = typeof artistRow.game_data === 'string' ? JSON.parse(artistRow.game_data) : (artistRow.game_data||{}); } catch(e){ gd = {}; }
+          if(gd.signedLabel){
+            gd.signedLabel.pendingApprovals = (gd.signedLabel.pendingApprovals||[]).filter(p=>p.id!==id);
+            gd.signedLabel.lastApprovalResult = { id, title: release.title, approved, decidedWeek: GAME.week||1 };
+          }
+          await supabase.from('players').update({game_data: gd}).eq('user_id', artist.userId);
+          await supabase.from('notifications').insert({
+            user_id: artist.userId,
+            type: 'label_release_decision',
+            platform: 'system',
+            fromuserid: currentUser?.id || null,
+            fromusername: ol.name,
+            message: approved ? `${ol.name} approved "${release.title}" — you're clear to release it!` : `${ol.name} declined "${release.title}". Check the label tab for details.`,
+            timestamp: Date.now(),
+            read: false
+          }).catch(()=>{});
+        }
+      } catch(e){ console.warn('Release decision sync error:', e); }
+    })();
+  }
+
+  markDirty(); saveToCloud();
+  closeMenu(); showLabelOwnerDashboard();
+  showEvent(approved?'✅':'❌',approved?'Release Approved':'Release Declined','The artist has been notified.',['OK']);
+}
 
 
 function showRecordLabel(){
