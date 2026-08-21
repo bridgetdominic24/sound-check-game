@@ -2812,9 +2812,7 @@ async function onAuthSuccess(){
             await supabase.auth.signOut();
             _authSuccessRunning = false;
             if(loadingOverlay) loadingOverlay.style.display = 'none';
-            showEvent('🔄','Game Restarted',
-              'Sound Check has been reset!\n\nAll saves have been cleared. Log back in to create your new artist. 🎵',
-              ['Log In Again']);
+            // Notification removed - game reset handled silently
             return;
           }
         } catch(e){ /* non-critical */ }
@@ -2922,9 +2920,7 @@ async function onAuthSuccess(){
               // and server has moved ahead — not on first login
               if(serverVersion > seenVersion && seenVersion > 0){
                 localStorage.setItem('sc_reset_seen_v', String(serverVersion));
-                showEvent('🔄', 'Game Restarted',
-                  'Sound Check has been reset!\n\nAll previous saves have been cleared and everyone is starting fresh.\n\nWelcome back — let\'s build something bigger this time. 🎵',
-                  ['Let\'s go!']);
+                // Game reset notification removed - handled silently
               } else {
                 // Just update silently
                 localStorage.setItem('sc_reset_seen_v', String(serverVersion));
