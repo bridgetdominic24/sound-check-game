@@ -1928,10 +1928,15 @@ async function logoutUser(){
       window._timerInitialised = false;
       window._dayWriting = false;
       _authSuccessRunning = false;
-      
+
       // CRITICAL: Reset ALL session data to prevent bleeding between accounts
       GAME = null;
       S = {theme:'',step:0,fn:'',ln:'',sn:'',country:'',city:'',pronoun:'She/Her',age:18,ageSit:'broke',instrument:'Vocals',genre:'R&B',path:'Solo',origin:'Basement'};
+
+      // CRITICAL FIX: Clear localStorage account data when logging out
+      localStorage.removeItem('SOUND CHECK_SAVE');
+      localStorage.removeItem('SOUND CHECK_CHARACTER');
+      localStorage.removeItem('SOUND CHECK_USER_ID');
       
       // Clear localStorage completely — prevents stale S/GAME from previous sessions
       localStorage.clear();
@@ -18623,6 +18628,10 @@ function autoSave(){
     // Save locally
     localStorage.setItem('SOUND CHECK_SAVE',JSON.stringify(cleanGAME));
     localStorage.setItem('SOUND CHECK_CHARACTER',JSON.stringify(S));
+    // CRITICAL FIX: Store current user ID to prevent cross-account contamination
+    if(currentUser?.id){
+      localStorage.setItem('SOUND CHECK_USER_ID', currentUser.id);
+    }
     
     // Also save to cloud if in multiplayer mode
     if(GAME_MODE === 'multi'){
@@ -18648,6 +18657,9 @@ function autoSave(){
           social: GAME.social
         };
         localStorage.setItem('SOUND CHECK_SAVE',JSON.stringify(minimalSave));
+        if(currentUser?.id){
+          localStorage.setItem('SOUND CHECK_USER_ID', currentUser.id);
+        }
       }catch(e2){
         console.error('Even minimal save failed:', e2);
       }
@@ -18716,17 +18728,30 @@ function importSave(){
 
 function loadGame(){
   try{
+    // CRITICAL FIX: Verify localStorage data belongs to current user
+    // Prevents data contamination when switching accounts
+    const savedUserId = localStorage.getItem('SOUND CHECK_USER_ID');
+    const currentUserId = currentUser?.id;
+
+    if(savedUserId && currentUserId && savedUserId !== currentUserId){
+      console.warn('⚠️ localStorage is for a different user ('+savedUserId+' vs '+currentUserId+'), clearing to prevent contamination');
+      localStorage.removeItem('SOUND CHECK_SAVE');
+      localStorage.removeItem('SOUND CHECK_CHARACTER');
+      localStorage.removeItem('SOUND CHECK_USER_ID');
+      return; // Don't load mismatched data
+    }
+
     const savedGame=localStorage.getItem('SOUND CHECK_SAVE');
     const savedChar=localStorage.getItem('SOUND CHECK_CHARACTER');
-    
-    
+
+
     if(savedGame){
       GAME=JSON.parse(savedGame);
-      
+
       // Initialize new fields for old saves
       if(!GAME.messages) GAME.messages = [];
       if(!GAME.pendingCollabs) GAME.pendingCollabs = [];
-      
+
       initStories(); // Clean up expired stories
       cleanupTours(); // Clean up completed/corrupted tours
       recalculateAllStreams(); // Fix stream count desync
