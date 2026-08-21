@@ -2654,12 +2654,12 @@ async function createAccountWithEmail(){
   const passEl  = document.getElementById('passwordInputCreate') || document.getElementById('passwordInput');
   const email    = (emailEl ? emailEl.value : '').trim();
   const password = passEl ? passEl.value : '';
-  
+
   if(!email || !password){
     alert('Please enter email and password');
     return;
   }
-  
+
   if(password.length < 6){
     alert('Password must be at least 6 characters');
     return;
@@ -2674,37 +2674,67 @@ async function createAccountWithEmail(){
   // ── CAPTCHA verification ─────────────────────────────────────
   if(!_verifyCaptcha()) return;
   // ────────────────────────────────────────────────────────────
-  
+
   try {
     const { data, error } = await supabase.auth.signUp({
       email: email,
       password: password
     });
-    
+
     if(error) throw error;
 
     // Supabase silently "succeeds" for existing emails when email confirmation
     // is disabled — detect this via empty identities array (duplicate signup marker)
     if(data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0){
-      alert('⚠️ This email is already registered.\n\nPlease go back to Sign In.');
-      showSignInPanel();
+      // Email exists but no player data (likely from a reset)
+      // Ask user if they want to use existing account or create fresh
+      const choice = confirm('⚠️ This email already exists.\n\nChoose:\n• OK = Sign in with this email\n• Cancel = Create a fresh account with this email');
+      if(choice){
+        // They want to sign in
+        showSignInPanel();
+      } else {
+        // They want a fresh account — update password and proceed
+        try {
+          await supabase.auth.updateUser({ password: password });
+          currentUser = data.user;
+          onAuthSuccess();
+        } catch(updateErr){
+          alert('Could not update account. Please sign in instead.');
+          showSignInPanel();
+        }
+      }
       return;
     }
-    
+
     currentUser = data.user;
-    
+
     if(data.user && !data.session) {
       alert('✅ Account created! Please check your email to confirm your account.');
     } else {
       onAuthSuccess();
     }
-    
+
   } catch(error) {
     console.error('Signup error:', error);
     if(error.message && error.message.toLowerCase().includes('already registered')){
-      // Just tell them — never auto sign-in from the create account form
-      alert('⚠️ This email is already registered.\n\nGo back to Sign In and use your password there.');
-      showSignInPanel();
+      // Email exists in auth — offer to sign in or recreate
+      const choice = confirm('⚠️ This email is already registered.\n\nChoose:\n• OK = Sign in with this email\n• Cancel = Create a fresh account with this email');
+      if(choice){
+        showSignInPanel();
+      } else {
+        // Try to update password for fresh start
+        try {
+          const { data: user } = await supabase.auth.signInWithPassword({ email, password: 'temp' });
+          if(user){
+            await supabase.auth.updateUser({ password });
+            currentUser = user.user;
+            onAuthSuccess();
+          }
+        } catch(freshErr){
+          alert('Could not create fresh account. Please sign in instead.');
+          showSignInPanel();
+        }
+      }
     } else {
       alert('Account creation failed: ' + error.message);
     }
@@ -4949,7 +4979,14 @@ THIS IS YOUR MOMENT! 🚀`;
 function checkAchievements(){
   // Safety check: make sure GAME and achievements exist
   if(!GAME || !GAME.achievements) return;
-  
+
+  // GUARD: Don't fire achievements on very first load (fresh game)
+  // These should only fire after a real game week has passed
+  if(!GAME.saveLoaded && !GAME._achievementsInitialized){
+    GAME._achievementsInitialized = true;
+    return; // Skip checks on first load of new game
+  }
+
   ACHIEVEMENTS.forEach(ach=>{
     if(GAME.achievements[ach.id])return;
     
@@ -13328,6 +13365,24 @@ async function confirmCreateLabel(){
     expiresWeek: Infinity,
     status: 'active'
   };
+
+  // Add founder to their own roster
+  label.roster.push({
+    id: GAME.playerId || null,
+    userId: currentUser?.id || null,
+    artistName: GAME.sn || GAME.artistName || 'You',
+    profilePic: (GAME.artistProfile && GAME.artistProfile.profilePic) || '🎤',
+    genre: GAME.genre || 'Pop',
+    cut: label.defaultCut,
+    dealType: 'standard',
+    weeklyAdvance: 0,
+    weeklyEarnings: 0,
+    totalStreams: getTotalStreams?.() || 0,
+    signedWeek: GAME.week || 1,
+    spotlight: false,
+    quotaWarning: false,
+    pendingReleases: []
+  });
 
   // Persist to Supabase
   if(GAME_MODE === 'multi' && typeof supabase !== 'undefined'){
