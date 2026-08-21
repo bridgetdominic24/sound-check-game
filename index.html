@@ -7587,7 +7587,8 @@ async function getAllChartsData(){
     weeksOnChart: s.weeksOnChart || 1,
     coverImage: s.coverImage || s.cover,
     chartPosition: s.chartPosition || null,
-    lastChartPosition: s.lastChartPosition || s.chartPosition || null
+    // CRITICAL FIX: Reset lastChartPosition for song debuts — should only exist if weeks > 1
+    lastChartPosition: (s.weeksOnChart || 1) === 1 ? null : (s.lastChartPosition || s.chartPosition || null)
   }));
   
   // MULTIPLAYER: Load real player songs from Supabase (FRESH DATA)
