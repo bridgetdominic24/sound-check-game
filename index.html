@@ -18187,12 +18187,55 @@ async function deleteAccountConfirm(){
   if(!confirm('Absolutely sure? All progress lost forever.')) return;
   (async function(){
     try{
+      console.log('🗑️ DELETE ACCOUNT START - User:', currentUser?.id, 'Mode:', GAME_MODE);
+
       if(GAME_MODE==='multi'&&currentUser&&supabase){
-        await supabase.from('players').delete().eq('user_id',currentUser.id);
+        // Delete player record from Supabase
+        console.log('🗑️ Deleting player row from Supabase for user:', currentUser.id);
+        const {data: deleteData, error: deleteError} = await supabase
+          .from('players')
+          .delete()
+          .eq('user_id', currentUser.id);
+
+        if(deleteError){
+          console.error('🗑️ DELETE ERROR - Attempting fallback:', deleteError);
+          // FALLBACK: If delete fails (RLS issue), at least clear the game_data
+          console.log('🗑️ Fallback: Clearing game_data instead...');
+          const {error: clearError} = await supabase
+            .from('players')
+            .update({game_data: null})
+            .eq('user_id', currentUser.id);
+
+          if(clearError){
+            console.error('🗑️ FALLBACK ALSO FAILED:', clearError);
+            alert('Deletion error: ' + deleteError.message + '\n\nPlease contact support to manually delete your account.');
+            return;
+          }
+          console.log('✅ Game data cleared (row preserved for RLS)');
+        } else {
+          console.log('✅ Player row deleted successfully');
+        }
+
+        // Sign out from auth
+        console.log('🗑️ Signing out...');
         await supabase.auth.signOut();
+        console.log('✅ Signed out');
       }
-      localStorage.clear(); location.reload();
-    }catch(e){alert('Error: '+e.message);}
+
+      // Clear all local data
+      console.log('🗑️ Clearing localStorage...');
+      localStorage.clear();
+      console.log('✅ localStorage cleared');
+
+      // Brief delay to ensure all data is flushed
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      console.log('🗑️ Reloading page...');
+      location.reload();
+    }catch(e){
+      console.error('🗑️ UNEXPECTED ERROR:', e);
+      alert('Error during account deletion: ' + e.message);
+    }
   })();
 }
 async function adminServerReset(){
