@@ -1177,20 +1177,37 @@ setTimeout(function() {
     // Listen for auth state changes
     supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔐 Auth state changed:', event, session?.user?.email);
-      
+
       currentUser = session?.user || null;
-      
+
       if(currentUser) {
-        
+
         // Check if this is a single player cloud save auth
         if(GAME_MODE === 'single' && localStorage.getItem('googleCloudSaveEnabled') === 'true'){
           console.log('☁️ Handling cloud save authentication...');
           setTimeout(() => handleCloudSaveAuth(), 1000);
         }
-        
+
         // Don't auto-start - user needs to choose Single Player or Multiplayer
         // The mode will be set when they click a mode button
       } else {
+        // User logged out or no session - show landing screen
+        console.log('🚪 No active session - showing landing screen');
+
+        // Hide all other screens
+        document.querySelectorAll('.screen').forEach(s => {
+          s.classList.remove('visible');
+          s.style.display = 'none';
+        });
+        document.getElementById('bottomNav').style.display = 'none';
+        document.getElementById('sleepSection').style.display = 'none';
+
+        // Show landing screen
+        const landing = document.getElementById('landingScreen');
+        if(landing) {
+          landing.style.display = 'flex';
+          landing.classList.add('visible');
+        }
       }
     });
   } else {
@@ -12998,6 +13015,31 @@ function showLabelOwnerDashboard(){
     };
     markDirty(); saveToCloud();
   }
+
+  // CRITICAL FIX: Ensure founder is always in the roster
+  if(!ol.roster) ol.roster = [];
+  const founderAlreadyInRoster = ol.roster.some(a => a.userId === currentUser?.id || a.id === GAME.playerId);
+  if(GAME.signedLabel && GAME.signedLabel.isOwner && !founderAlreadyInRoster){
+    console.log('🔧 Adding founder to roster (fix for missing founder)');
+    ol.roster.unshift({
+      id: GAME.playerId || null,
+      userId: currentUser?.id || null,
+      artistName: GAME.sn || GAME.artistName || 'You',
+      profilePic: (GAME.artistProfile && GAME.artistProfile.profilePic) || '🎤',
+      genre: GAME.genre || 'Pop',
+      cut: ol.defaultCut || 25,
+      dealType: 'standard',
+      weeklyAdvance: 0,
+      weeklyEarnings: 0,
+      totalStreams: getTotalStreams?.() || 0,
+      signedWeek: GAME.week || 1,
+      spotlight: false,
+      quotaWarning: false,
+      pendingReleases: []
+    });
+    markDirty(); saveToCloud();
+  }
+
   const tierDef = LABEL_TIERS[ol.tier] || LABEL_TIERS.indie;
   const roster = ol.roster || [];
   const staff = ol.staff || [];
