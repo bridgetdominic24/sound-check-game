@@ -19733,774 +19733,137 @@ function closeiTunesAlbum(){
   showiTunesUI();
 }
 
-function showLoopifyUI(){
-  if(!GAME || !GAME.songs){ showToast('Loading...', 'purple'); return; }
-  if(!GAME.loopifyView) GAME.loopifyView = 'home';
+// ════════════════════════════════════════════════════════════════════════════
+// LOOPIFY STREAMING PLATFORM - COMPLETE BLUEPRINT IMPLEMENTATION
+// Matches streaming_platforms_v3.html design exactly
+// Uses SVG icons only, NO emoji icons
+// ════════════════════════════════════════════════════════════════════════════
 
-  switch(GAME.loopifyView){
-    case 'home': showLoopifyHome(); break;
-    case 'search': showLoopifySearch(); break;
-    case 'library': showLoopifyLibrary(); break;
-    case 'artist': showLoopifyArtistProfile(S.id); break;
-    default: showLoopifyHome();
-  }
+// SVG Icon Definitions
+const LOOPIFY_SVG_ICONS = {
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24M19.78 19.78l-4.24-4.24m-5.08-5.08l-4.24-4.24"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>',
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  library: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 12.5A2.5 2.5 0 0 1 6.5 10H20"/><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+  verified: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#4c9df3"/></svg>',
+  dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="12" r="2"/></svg>',
+};
+
+// Helper to render SVG icons
+function getSVG(name, size='16px') {
+  const svg = LOOPIFY_SVG_ICONS[name];
+  if (!svg) return '';
+  return `<span style="display:inline-flex;width:${size};height:${size};align-items:center;justify-content:center">${svg}</span>`;
 }
 
-function showSpotifyUI(){
-  showLoopifyUI();
-}
-
-function showLoopifyHome(){
-  if(!GAME || !GAME.songs){ showToast('Loading...', 'purple'); return; }
-  
-  // Initialize artistProfile if it doesn't exist
-  if(!GAME.artistProfile){
-    GAME.artistProfile={
-      profilePic:'👤',
-      profilePicType:'emoji',
-      banner:'gradient1',
-      bannerType:'gradient',
-      bio:'An artist on the rise.'
-    };
-  }
-  
-  const releasedSongs=GAME.songs.filter(s=>s.released);
-  // Calculate total Spotify streams (or use aggregate if platforms not set)
-  const totalStreams = releasedSongs.reduce((sum, s) => {
-    if(s.platforms && s.platforms.spotify){
-      return sum + s.platforms.spotify;
-    }
-    // Fallback: assume 30% of total streams are from Spotify
-    return sum + Math.floor((s.streams || 0) * 0.3);
-  }, 0);
-  
-  // Calculate monthly listeners from RECENT streams only (last 4 weeks)
-  let monthlyListeners = 0;
-  GAME.songs.forEach(song => {
-    if(song.weeklyStreams && song.weeklyStreams.length > 0){
-      // Sum last 4 weeks of Spotify streams
-      const recentStreams = song.weeklyStreams.reduce((sum, week) => {
-        return sum + Math.floor(week.streams * 0.45); // 45% goes to Spotify
-      }, 0);
-      monthlyListeners += recentStreams;
-    }
-  });
-  // If no weekly data yet, fallback to estimate
-  if(monthlyListeners === 0){
-    monthlyListeners = Math.floor(totalStreams * 0.3);
-  }
-  
-  let html=`
-    <style>
-    .spotify-container{background:#121212;min-height:100%;overflow-y:auto;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Circular',sans-serif;padding-bottom:80px}
-    .spotify-header{position:relative;padding:24px 16px 16px;background:linear-gradient(180deg,#535353 0%,#121212 100%);overflow:hidden}
-    .spotify-gradient-overlay{position:absolute;top:0;left:0;right:0;height:300px;background:linear-gradient(180deg,transparent 0%,#121212 100%);z-index:2}
-    .spotify-content{position:relative;z-index:3}
-    .spotify-artist-name{font-size:48px;font-weight:900;letter-spacing:-1px;margin-bottom:8px;line-height:1}
-    .spotify-monthly{font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:16px}
-    .spotify-controls{display:flex;align-items:center;gap:16px;margin-bottom:16px}
-    .spotify-follow{background:transparent;border:1.5px solid #535353;border-radius:4px;color:#fff;padding:6px 14px;font-size:12px;font-weight:700;letter-spacing:1px}
-    .spotify-more{background:transparent;border:none;color:#b3b3b3;font-size:24px;padding:0;line-height:1}
-    .spotify-play-area{display:flex;align-items:center;gap:16px;margin-left:auto}
-    .spotify-shuffle{color:#b3b3b3;font-size:28px}
-    .spotify-play{width:56px;height:56px;background:#1db954;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#000;font-size:24px}
-    .spotify-tabs{display:flex;gap:24px;padding:0 16px;border-bottom:1px solid #282828;margin-bottom:16px}
-    .spotify-tab{padding:12px 0;font-size:14px;font-weight:700;color:#b3b3b3;border-bottom:2px solid transparent}
-    .spotify-tab.active{color:#fff;border-bottom-color:#1db954}
-    .spotify-section{padding:0 16px 24px}
-    .spotify-section-title{font-size:22px;font-weight:700;margin-bottom:16px;letter-spacing:-0.5px}
-    .spotify-track{display:flex;align-items:center;padding:8px 0;gap:12px;cursor:pointer}
-    .spotify-track:active{opacity:0.7}
-    .spotify-track-num{width:24px;text-align:center;color:#b3b3b3;font-size:15px;flex-shrink:0}
-    .spotify-album{width:48px;height:48px;background:#282828;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
-    .spotify-info{flex:1;min-width:0}
-    .spotify-title{font-size:15px;color:#fff;font-weight:400;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .spotify-plays{font-size:13px;color:#b3b3b3}
-    .spotify-dots{color:#b3b3b3;font-size:20px;padding:0 8px}
-    .spotify-nav{position:fixed;bottom:0;left:0;right:0;background:#000;border-top:1px solid #282828;display:flex;z-index:100}
-    .spotify-nav-item{flex:1;padding:12px 0 8px;text-align:center;color:#b3b3b3;font-size:11px;cursor:pointer}
-    .spotify-nav-item.active{color:#fff}
-    .icon-home,.icon-search,.icon-library{width:24px;height:24px;fill:currentColor;margin:0 auto 4px}
-    </style>
-    
-    <div class="spotify-container">
-      <div style="position:fixed;top:12px;left:12px;z-index:200">
-        <button onclick="closeSpotify()" style="background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;cursor:pointer">←</button>
-      </div>
-      
-      <div class="spotify-header">
-        <!-- Edit Button -->
-        <button onclick="editArtistProfile()" style="position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.7);border:1px solid #535353;border-radius:20px;color:#fff;padding:8px 16px;font-size:12px;font-weight:700;z-index:10;cursor:pointer">Edit Profile</button>
-        
-        <!-- Content on top -->
-        <div class="spotify-content">
-          <div class="spotify-artist-name">${S.name||'Your Artist'}</div>
-          <div class="spotify-monthly">${monthlyListeners.toLocaleString()} monthly listeners</div>
-          ${GAME.artistProfile.bio?`<div style="font-size:13px;color:rgba(255,255,255,0.7);margin:8px 0 16px;max-width:400px">${GAME.artistProfile.bio}</div>`:''}
-          
-          <div class="spotify-controls">
-            <button class="spotify-follow">FOLLOW</button>
-            <button class="spotify-more">⋯</button>
-            <div class="spotify-play-area">
-              <svg class="spotify-shuffle" viewBox="0 0 16 16" style="width:28px;height:28px;fill:#b3b3b3"><path d="M13.151.922a.75.75 0 1 0-1.06 1.06L13.109 3H11.16a3.75 3.75 0 0 0-2.873 1.34l-6.173 7.356A2.25 2.25 0 0 1 .39 12.5H0V14h.391a3.75 3.75 0 0 0 2.873-1.34l6.173-7.356a2.25 2.25 0 0 1 1.724-.804h1.947l-1.017 1.018a.75.75 0 0 0 1.06 1.06L15.98 3.75 13.15.922zM.391 3.5H0V2h.391c1.109 0 2.16.49 2.873 1.34L4.89 5.277l-.979 1.167-1.796-2.14A2.25 2.25 0 0 0 .39 3.5z"/><path d="m7.5 10.723.98-1.167.957 1.14a2.25 2.25 0 0 0 1.724.804h1.947l-1.017-1.018a.75.75 0 1 1 1.06-1.06l2.829 2.828-2.829 2.828a.75.75 0 1 1-1.06-1.06L13.109 13H11.16a3.75 3.75 0 0 1-2.873-1.34l-.787-.938z"/></svg>
-              <div class="spotify-play">▶</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="spotify-tabs">
-      <div class="spotify-tab active">Music</div>
-      <div class="spotify-tab" style="opacity:0.5">Events</div>
-      <div class="spotify-tab" style="opacity:0.5">Merch</div>
-    </div>`;
-  
-  // Artist's Pick Banner
-  if(GAME.artistPick && releasedSongs.length>0){
-    const pickSong=releasedSongs.find(s=>s.id===GAME.artistPick);
-    if(pickSong){
-      html+=`
-      <div style="margin:0 16px 16px;background:#181818;border-radius:8px;padding:16px;position:relative;overflow:hidden">
-        <div style="font-size:11px;font-weight:700;color:#b3b3b3;margin-bottom:8px;letter-spacing:1px">ARTIST'S PICK</div>
-        <div style="display:flex;gap:12px;align-items:center">
-          <div style="width:56px;height:56px;background:#282828;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:28px">${pickSong.cover||'💿'}</div>
-          <div style="flex:1">
-            <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">${pickSong.title}</div>
-            <div style="font-size:13px;color:#b3b3b3">${pickSong.topic}</div>
-          </div>
-        </div>
-      </div>`;
-    }
-  }
-  
-  html+=`
-      <div class="spotify-section">
-        <div class="spotify-section-title">Popular</div>`;
-  
-  if(releasedSongs.length===0){
-    html+=`<div style="text-align:center;padding:60px 20px;color:#b3b3b3"><div style="font-size:64px;opacity:0.3;margin-bottom:16px">No music yet</div><div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px">Nothing to see here</div><div style="font-size:14px">Release some music first</div></div>`;
-  }else{
-    // Group by releases and show most popular
-    const releasesByPopularity=[];
-    const shownReleases=new Set();
-    
-    releasedSongs.sort((a,b)=>b.platforms.spotify-a.platforms.spotify).forEach(song=>{
-      const release=GAME.releases.find(r=>r.songs&&r.songs.some(s=>s&&s.id===song.id));
-      if(release&&!shownReleases.has(release.id)){
-        shownReleases.add(release.id);
-        const totalStreams=release.songs.reduce((sum,s)=>(sum+(s&&s.platforms&&s.platforms.spotify?s.platforms.spotify:0)),0);
-        releasesByPopularity.push({release,totalStreams});
-      }
-    });
-    
-    releasesByPopularity.sort((a,b)=>b.totalStreams-a.totalStreams).slice(0,5).forEach((item,i)=>{
-      const release=item.release;
-      const weeks=Math.floor((GAME.day-release.releaseDay)/7);
-      const plays=weeks>=1?item.totalStreams.toLocaleString():'—';
-      const releaseType=release.type==='single'?'':(release.type==='ep'||release.type==='EP'?' · EP':' · Album');
-      const firstSong=release.songs[0];
-      
-      // Get cover - prioritize uploaded image over emoji
-      let cover='';
-      if(firstSong){
-        if(firstSong.coverImage){
-          cover=`<img src="${firstSong.coverImage}" style="width:100%;height:100%;object-fit:cover">`;
-        }else if(firstSong.cover){
-          cover=firstSong.cover; // Emoji fallback
-        }
-      }
-      
-      html+=`<div class="spotify-track" onclick="showReleaseStats(${release.id},'spotify')"><div class="spotify-track-num">${i+1}</div><div class="spotify-album">${cover}</div><div class="spotify-info"><div class="spotify-title">${release.title}</div><div class="spotify-plays">${plays}${releaseType}</div></div><div class="spotify-dots">⋯</div></div>`;
-    });
-  }
-  
-  html+=`</div></div>
-    
-    <div class="spotify-nav">
-      <div class="spotify-nav-item ${GAME.spotifyView==='artist'?'active':''}" onclick="switchSpotifyView('artist')">
-        <svg class="icon-home" viewBox="0 0 24 24"><path d="M12.5 3.247a1 1 0 0 0-1 0L4 7.577V20h4.5v-6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v6H20V7.577l-7.5-4.33zm-2-1.732a3 3 0 0 1 3 0l7.5 4.33a2 2 0 0 1 1 1.732V20a2 2 0 0 1-2 2h-5.5a1 1 0 0 1-1-1v-6h-3v6a1 1 0 0 1-1 1H4a2 2 0 0 1-2-2V7.577a2 2 0 0 1 1-1.732l7.5-4.33z"/></svg>
-        <div>Home</div>
-      </div>
-      <div class="spotify-nav-item ${GAME.spotifyView==='search'?'active':''}" onclick="switchSpotifyView('search')">
-        <svg class="icon-search" viewBox="0 0 24 24"><path d="M10.533 1.279c-5.18 0-9.407 4.14-9.407 9.279s4.226 9.279 9.407 9.279c2.234 0 4.29-.77 5.907-2.058l4.353 4.353a1 1 0 1 0 1.414-1.414l-4.344-4.344a9.157 9.157 0 0 0 2.077-5.816c0-5.14-4.226-9.28-9.407-9.28zm-7.407 9.279c0-4.006 3.302-7.28 7.407-7.28s7.407 3.274 7.407 7.28-3.302 7.279-7.407 7.279-7.407-3.273-7.407-7.28z"/></svg>
-        <div>Search</div>
-      </div>
-      <div class="spotify-nav-item ${GAME.spotifyView==='library'?'active':''}" onclick="switchSpotifyView('library')">
-        <svg class="icon-library" viewBox="0 0 24 24"><path d="M3 22a1 1 0 0 1-1-1V3a1 1 0 0 1 2 0v18a1 1 0 0 1-1 1zM15.5 2.134A1 1 0 0 0 14 3v18a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V6.464a1 1 0 0 0-.5-.866l-6-3.464zM9 2a1 1 0 0 0-1 1v18a1 1 0 1 0 2 0V3a1 1 0 0 0-1-1z"/></svg>
-        <div>Your Library</div>
-      </div>
-    </div>
-  </div>`;
-  
-  document.getElementById('homeScreen').classList.remove('visible');
-  document.getElementById('musicScreen').classList.remove('visible');
-  document.getElementById('discoverScreen').classList.remove('visible');
-  document.getElementById('bottomNav').style.display='none';
-  
-  let spotifyScreen=document.getElementById('spotifyScreen');
-  if(!spotifyScreen){
-    spotifyScreen=document.createElement('div');
-    spotifyScreen.id='spotifyScreen';
-    spotifyScreen.className='screen';
-    spotifyScreen.style.cssText='background:#121212;position:absolute;top:0;left:0;width:100%;min-height:100%;z-index:1000;overflow-y:auto';
-    document.getElementById('phone').appendChild(spotifyScreen);
-  }
-  spotifyScreen.innerHTML=html;
-  spotifyScreen.classList.add('visible');
-}
-
-function selectArtistPick(songId){
-  GAME.artistPick=songId;
-  const songTitle=GAME.songs.find(s=>s.id===songId).title;
-  showEvent('⭐','Artist Pick Updated',`"${songTitle}" is now your Artist Pick!`,['Nice!']);
-  setTimeout(()=>showSpotifyUI(),500);
-}
-
-function switchSpotifyView(view){
-  GAME.spotifyView=view;
-  showSpotifyUI();
-}
-
-function editArtistProfile(){
-  let html=`
-    <div style="padding:16px;position:relative;z-index:10000">
-      <div style="font-size:18px;font-weight:700;margin-bottom:16px;font-family:var(--fb)">Edit Artist Profile</div>
-      
-      <div style="margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--mut)">Profile Picture</div>
-        <input type="file" id="profilePicUpload" accept="image/*" style="display:none" onchange="uploadSpotifyProfilePic(event)">
-        <button onclick="document.getElementById('profilePicUpload').click()" class="ms-btn" style="width:100%">📁 Upload Image from Gallery</button>
-      </div>
-      
-      <div style="margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--mut)">Banner Image</div>
-        <input type="file" id="bannerUpload" accept="image/*" style="display:none" onchange="uploadBanner(event)">
-        <button onclick="document.getElementById('bannerUpload').click()" class="ms-btn" style="width:100%">📁 Upload Image from Gallery</button>
-      </div>
-      
-      <div style="margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--mut)">Bio</div>
-        <textarea id="artistBio" style="width:100%;min-height:80px;padding:12px;background:var(--surf);border:2px solid var(--bord);border-radius:8px;color:var(--txt);font-family:var(--fb);font-size:13px;resize:vertical" maxlength="200">${GAME.artistProfile.bio}</textarea>
-        <div style="font-size:11px;color:var(--mut);margin-top:4px;text-align:right"><span id="bioCount">${GAME.artistProfile.bio.length}</span>/200</div>
-      </div>
-      
-      <button class="ms-btn" onclick="saveBioAndClose()">Save & Close</button>
-    </div>
-  `;
-  
-  openMenu('',html);
-  
-  // Add bio counter
-  setTimeout(()=>{
-    const bioInput=document.getElementById('artistBio');
-    if(bioInput){
-      bioInput.addEventListener('input',()=>{
-        document.getElementById('bioCount').textContent=bioInput.value.length;
-      });
-    }
-  },100);
-}
-
-function uploadSpotifyProfilePic(event){
-  const file=event.target.files[0];
-  if(file){
-    const reader=new FileReader();
-    reader.onload=function(e){
-      GAME.artistProfile.profilePic=e.target.result;
-      GAME.artistProfile.profilePicType='image';
-      GAME.profilePicChangedRecently = true; // Flag for article generation
-      closeMenu();
-      showSpotifyUI();
-    };
-    reader.readAsDataURL(file);
-  }
-}
-
-function uploadBanner(event){
-  const file=event.target.files[0];
-  if(file){
-    const reader=new FileReader();
-    reader.onload=function(e){
-      GAME.artistProfile.banner=e.target.result;
-      GAME.artistProfile.bannerType='image';
-      closeMenu();
-      showSpotifyUI();
-    };
-    reader.readAsDataURL(file);
-  }
-}
-
-function saveBioAndClose(){
-  const bioInput=document.getElementById('artistBio');
-  if(bioInput){
-    GAME.artistProfile.bio=bioInput.value;
-  }
-  closeMenu();
-  showSpotifyUI(); // Refresh Spotify to show changes
-}
-
-// ═══════════════════════════════════════════════════════════════
-// LOOPIFY STREAMING PLATFORM - Complete Implementation
-// ═══════════════════════════════════════════════════════════════
-
-function getLoopifyTopChart(){
-  const allSongs=[];
-
-  // Add current player's songs - the most reliable data source
-  (GAME.songs||[]).filter(s=>s.released).forEach(song=>{
-    allSongs.push({...song, artistId: S.id, artistName: S.artistName});
-  });
-
-  // Sort by streams (Top 50)
-  allSongs.sort((a,b)=>(b.streams||0)-(a.streams||0));
-  const top50=allSongs.slice(0,50);
-
-  // Calculate chart movement based on lastChartPosition
-  top50.forEach((song,idx)=>{
-    song.chartRank=idx+1;
-    const lastRank=song.lastChartPosition||null;
-    if(lastRank===null) song.chartMove='NEW';
-    else if(lastRank > idx+1) song.chartMove='UP';
-    else if(lastRank < idx+1) song.chartMove='DOWN';
-    else song.chartMove='STAY';
-    song.chartMoveDiff=lastRank ? Math.abs(lastRank-(idx+1)) : 0;
-  });
-
-  return top50;
-}
-
-function showLoopifyHome(){
-  const chart=getLoopifyTopChart();
-
-  let html=`<style>
-  .loopify-container{background:var(--bg);min-height:100%;overflow-y:auto;color:var(--txt);font-family:var(--fb);padding-bottom:80px}
-  .loopify-header{padding:16px;background:var(--surf);border-bottom:1px solid var(--bord)}
-  .loopify-title{font-size:24px;font-weight:700;margin-bottom:4px}
-  .loopify-subtitle{font-size:12px;color:var(--mut)}
-  .loopify-chart-item{padding:12px 16px;border-bottom:1px solid var(--bord);display:flex;gap:12px;align-items:center;cursor:pointer;transition:all 0.2s}
-  .loopify-chart-item:active{background:var(--surf)}
-  .loopify-rank{font-size:16px;font-weight:700;color:var(--acc);min-width:40px;text-align:center}
-  .loopify-rank.new{color:var(--acc)}
-  .loopify-cover{width:40px;height:40px;background:var(--surf);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;border:1px solid var(--bord)}
-  .loopify-info{flex:1;min-width:0}
-  .loopify-song-title{font-size:14px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .loopify-artist{font-size:12px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .loopify-stats{font-size:11px;color:var(--acc);font-weight:600}
-  .loopify-move{min-width:50px;text-align:right;font-size:11px;font-weight:600}
-  .loopify-move.up{color:#22c55e}
-  .loopify-move.down{color:#ef4444}
-  .loopify-move.new{color:var(--acc)}
-  .loopify-nav{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--bord);display:flex;z-index:100}
-  .loopify-nav-item{flex:1;padding:12px 0 8px;text-align:center;color:var(--mut);font-size:11px;cursor:pointer;border-bottom:3px solid transparent}
-  .loopify-nav-item.active{color:var(--acc);border-bottom-color:var(--acc)}
-  </style>
-
-  <div class="loopify-container">
-    <button onclick="closeLoopify()" style="position:fixed;top:12px;left:12px;z-index:200;background:rgba(var(--bg-rgb),0.9);border:1px solid var(--bord);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt);font-size:20px;cursor:pointer">←</button>
-
-    <div class="loopify-header">
-      <div class="loopify-title">Top 50</div>
-      <div class="loopify-subtitle">Songs trending right now</div>
-    </div>
-
-    <div>`;
-
-  chart.forEach(song=>{
-    const moveIcon=song.chartMove==='UP'?'▲':(song.chartMove==='DOWN'?'▼':'');
-    const moveClass=song.chartMove==='UP'?'up':(song.chartMove==='DOWN'?'down':(song.chartMove==='NEW'?'new':''));
-    const streams=Math.floor((song.streams||0)/1000);
-
-    html+=`<div class="loopify-chart-item" onclick="showLoopifyTrackDetails('${song.id}','${song.artistId}')">
-      <div class="loopify-rank ${song.chartMove==='NEW'?'new':''}">${song.chartRank}</div>
-      <div class="loopify-cover">${song.cover||'♫'}</div>
-      <div class="loopify-info">
-        <div class="loopify-song-title">${song.title}</div>
-        <div class="loopify-artist">${song.artistName}</div>
-        <div class="loopify-stats">${streams}K streams</div>
-      </div>
-      <div class="loopify-move ${moveClass}">${moveIcon}${song.chartMoveDiff>0?song.chartMoveDiff:''}</div>
-    </div>`;
-  });
-
-  html+=`</div>
-    <div class="loopify-nav">
-      <div class="loopify-nav-item active" onclick="switchLoopifyView('home')">Home</div>
-      <div class="loopify-nav-item" onclick="switchLoopifyView('search')">Search</div>
-      <div class="loopify-nav-item" onclick="switchLoopifyView('library')">Library</div>
-    </div>
-  </div>`;
-
-  showLoopifyScreen(html);
-}
-
-function showLoopifySearch(){
-  let html=`<style>
-  .loopify-search-container{background:var(--bg);min-height:100%;overflow-y:auto;color:var(--txt);font-family:var(--fb);padding-bottom:80px;padding:16px 0 80px}
-  .loopify-search-box{padding:16px;position:sticky;top:0;background:var(--surf);border-bottom:1px solid var(--bord);z-index:50}
-  .loopify-search-input{width:100%;padding:12px;background:var(--bg);border:1px solid var(--bord);border-radius:20px;color:var(--txt);font-size:14px;font-family:var(--fb)}
-  .loopify-search-results{padding:0}
-  .loopify-search-item{padding:12px 16px;border-bottom:1px solid var(--bord);display:flex;gap:12px;align-items:center;cursor:pointer;transition:all 0.2s}
-  .loopify-search-item:active{background:var(--surf)}
-  .loopify-search-cover{width:48px;height:48px;background:var(--surf);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;border:1px solid var(--bord)}
-  .loopify-search-info{flex:1;min-width:0}
-  .loopify-search-title{font-size:14px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .loopify-search-subtitle{font-size:12px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
-  .loopify-empty{text-align:center;padding:60px 20px;color:var(--mut)}
-  </style>
-
-  <div class="loopify-search-container">
-    <button onclick="closeLoopify()" style="position:fixed;top:12px;left:12px;z-index:200;background:rgba(var(--bg-rgb),0.9);border:1px solid var(--bord);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt);font-size:20px;cursor:pointer">←</button>
-
-    <div class="loopify-search-box">
-      <input type="text" id="loopifySearchInput" class="loopify-search-input" placeholder="Search artists, songs..." oninput="loopifySearch(this.value)">
-    </div>
-
-    <div class="loopify-search-results" id="loopifySearchResults">
-      <div class="loopify-empty">Start typing to search</div>
-    </div>
-
-    <div style="position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--bord);display:flex;z-index:100">
-      <div style="flex:1;padding:12px 0 8px;text-align:center;color:var(--mut);font-size:11px;cursor:pointer">Home</div>
-      <div style="flex:1;padding:12px 0 8px;text-align:center;color:var(--acc);font-size:11px;cursor:pointer;border-bottom:3px solid var(--acc)">Search</div>
-      <div style="flex:1;padding:12px 0 8px;text-align:center;color:var(--mut);font-size:11px;cursor:pointer" onclick="switchLoopifyView('library')">Library</div>
-    </div>
-  </div>`;
-
-  showLoopifyScreen(html);
-  setTimeout(()=>document.getElementById('loopifySearchInput')?.focus(), 100);
-}
-
-function loopifySearch(query){
-  const results=document.getElementById('loopifySearchResults');
-  if(!query.trim()){
-    results.innerHTML='<div class="loopify-empty">Start typing to search</div>';
-    return;
-  }
-
-  const q=query.toLowerCase();
-  const items=[];
-
-  // Search in current player's songs
-  (GAME.songs||[]).filter(s=>s.released).forEach(song=>{
-    if(song.title.toLowerCase().includes(q) || S.artistName.toLowerCase().includes(q)){
-      items.push({type:'song',song,artist:S.artistName,artistId:S.id});
-    }
-  });
-
-  // Search in other players by artist name
-  (window.allPlayers||[]).forEach(player=>{
-    if(player.artistName.toLowerCase().includes(q)){
-      items.push({type:'artist',player});
-    }
-  });
-
-  if(items.length===0){
-    results.innerHTML='<div class="loopify-empty">No results found</div>';
-    return;
-  }
-
-  let html='';
-  items.slice(0,30).forEach(item=>{
-    if(item.type==='artist'){
-      const p=item.player;
-      html+=`<div class="loopify-search-item" onclick="showLoopifyArtistProfile('${p.id}')">
-        <div class="loopify-search-cover" style="width:56px;height:56px;border-radius:50%">${p.profilePic||'👤'}</div>
-        <div class="loopify-search-info">
-          <div class="loopify-search-title">${p.artistName}</div>
-          <div class="loopify-search-subtitle">${p.totalStreams.toLocaleString()} total streams</div>
-        </div>
-      </div>`;
-    }else{
-      html+=`<div class="loopify-search-item" onclick="showLoopifyTrackDetails('${item.song.id}','${item.artistId}')">
-        <div class="loopify-search-cover">${item.song.cover||'♫'}</div>
-        <div class="loopify-search-info">
-          <div class="loopify-search-title">${item.song.title}</div>
-          <div class="loopify-search-subtitle">${item.artist}</div>
-        </div>
-      </div>`;
-    }
-  });
-
-  results.innerHTML=html;
-}
-
-function showLoopifyLibrary(){
-  const releasedSongs=(GAME.songs||[]).filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));
-
-  let html=`<style>
-  .loopify-library-container{background:var(--bg);min-height:100%;overflow-y:auto;color:var(--txt);font-family:var(--fb);padding-bottom:80px}
-  .loopify-lib-header{padding:16px;background:var(--surf);border-bottom:1px solid var(--bord)}
-  .loopify-lib-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-  .loopify-lib-stat{background:var(--bg);padding:12px;border-radius:8px;border:1px solid var(--bord)}
-  .loopify-lib-stat-value{font-size:18px;font-weight:700;color:var(--acc)}
-  .loopify-lib-stat-label{font-size:11px;color:var(--mut);margin-top:4px}
-  </style>
-
-  <div class="loopify-library-container">
-    <button onclick="closeLoopify()" style="position:fixed;top:12px;left:12px;z-index:200;background:rgba(var(--bg-rgb),0.9);border:1px solid var(--bord);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt);font-size:20px;cursor:pointer">←</button>
-
-    <div class="loopify-lib-header">
-      <div style="font-size:20px;font-weight:700">Your Library</div>
-      <div class="loopify-lib-stats">
-        <div class="loopify-lib-stat">
-          <div class="loopify-lib-stat-value">${releasedSongs.length}</div>
-          <div class="loopify-lib-stat-label">Songs Released</div>
-        </div>
-        <div class="loopify-lib-stat">
-          <div class="loopify-lib-stat-value">${releasedSongs.reduce((s,song)=>s+(song.streams||0),0).toLocaleString().slice(0,-3)}K</div>
-          <div class="loopify-lib-stat-label">Total Streams</div>
-        </div>
-      </div>
-    </div>
-
-    <div>`;
-
-  if(releasedSongs.length===0){
-    html+=`<div style="text-align:center;padding:60px 20px;color:var(--mut)">
-      <div style="font-size:48px;margin-bottom:16px">♫</div>
-      <div style="font-size:16px;font-weight:700;color:var(--txt);margin-bottom:8px">No music yet</div>
-      <div style="font-size:14px">Release your first song to get started</div>
-    </div>`;
-  }else{
-    releasedSongs.forEach((song,idx)=>{
-      const streams=Math.floor((song.streams||0)/1000);
-      html+=`<div class="loopify-chart-item" onclick="showLoopifyTrackDetails('${song.id}','${S.id}')">
-        <div class="loopify-rank">${idx+1}</div>
-        <div class="loopify-cover">${song.cover||'♫'}</div>
-        <div class="loopify-info">
-          <div class="loopify-song-title">${song.title}</div>
-          <div class="loopify-artist">${S.artistName}</div>
-          <div class="loopify-stats">${streams}K streams</div>
-        </div>
-      </div>`;
-    });
-  }
-
-  html+=`</div>
-    <div class="loopify-nav">
-      <div class="loopify-nav-item" onclick="switchLoopifyView('home')">Home</div>
-      <div class="loopify-nav-item" onclick="switchLoopifyView('search')">Search</div>
-      <div class="loopify-nav-item active">Library</div>
-    </div>
-  </div>`;
-
-  showLoopifyScreen(html);
-}
-
-function showLoopifyArtistProfile(artistId){
-  let artist, songs;
-
-  if(artistId===S.id){
-    artist={id:S.id,artistName:S.artistName,profilePic:(GAME.artistProfile||{}).profilePic||'👤',bio:(GAME.artistProfile||{}).bio||''};
-    songs=(GAME.songs||[]).filter(s=>s.released);
-  }else{
-    const player=window.allPlayers?.find(p=>p.id===artistId);
-    if(!player){ showToast('Artist not found','error'); return; }
-    artist={id:player.id,artistName:player.artistName,profilePic:player.profilePic||'👤',bio:player.bio||''};
-    // For other players, we only have aggregate data from window.allPlayers
-    songs=[];
-  }
-
-  if(songs.length>0) songs.sort((a,b)=>(b.streams||0)-(a.streams||0));
-
-  let html=`<style>
-  .loopify-artist-container{background:var(--bg);min-height:100%;overflow-y:auto;color:var(--txt);font-family:var(--fb);padding-bottom:80px}
-  .loopify-artist-header{padding:16px;background:var(--surf);border-bottom:1px solid var(--bord)}
-  .loopify-artist-cover{width:80px;height:80px;background:var(--card);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin:0 auto 12px;border:2px solid var(--bord)}
-  .loopify-artist-name{font-size:24px;font-weight:700;text-align:center}
-  .loopify-artist-bio{font-size:12px;color:var(--mut);text-align:center;margin-top:8px;line-height:1.4}
-  .loopify-artist-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
-  .loopify-stat{background:var(--bg);padding:12px;border-radius:8px;border:1px solid var(--bord);text-align:center}
-  .loopify-stat-value{font-size:16px;font-weight:700;color:var(--acc)}
-  .loopify-stat-label{font-size:10px;color:var(--mut);margin-top:4px}
-  </style>
-
-  <div class="loopify-artist-container">
-    <button onclick="closeLoopify()" style="position:fixed;top:12px;left:12px;z-index:200;background:rgba(var(--bg-rgb),0.9);border:1px solid var(--bord);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt);font-size:20px;cursor:pointer">←</button>
-
-    <div class="loopify-artist-header">
-      <div class="loopify-artist-cover">${artist.profilePic}</div>
-      <div class="loopify-artist-name">${artist.artistName}</div>
-      ${artist.bio?`<div class="loopify-artist-bio">${artist.bio}</div>`:''}
-      <div class="loopify-artist-stats">
-        <div class="loopify-stat">
-          <div class="loopify-stat-value">${songs.length}</div>
-          <div class="loopify-stat-label">Releases</div>
-        </div>
-        <div class="loopify-stat">
-          <div class="loopify-stat-value">${songs.reduce((s,song)=>s+(song.streams||0),0).toLocaleString().slice(0,-3)}K</div>
-          <div class="loopify-stat-label">Streams</div>
-        </div>
-      </div>
-    </div>
-
-    <div>`;
-
-  if(songs.length===0){
-    html+=`<div style="text-align:center;padding:40px 20px;color:var(--mut)">No released songs</div>`;
-  }else{
-    songs.forEach((song,idx)=>{
-      const streams=Math.floor((song.streams||0)/1000);
-      html+=`<div class="loopify-chart-item" onclick="showLoopifyTrackDetails('${song.id}','${artist.id}')">
-        <div class="loopify-rank">${idx+1}</div>
-        <div class="loopify-cover">${song.cover||'♫'}</div>
-        <div class="loopify-info">
-          <div class="loopify-song-title">${song.title}</div>
-          <div class="loopify-artist">${song.topic||'Song'}</div>
-          <div class="loopify-stats">${streams}K streams</div>
-        </div>
-      </div>`;
-    });
-  }
-
-  html+=`</div></div>`;
-
-  _insertOverlay(html);
-}
-
-function showLoopifyTrackDetails(songId, artistId){
-  let song, artist;
-
-  if(artistId===S.id){
-    song=GAME.songs?.find(s=>s.id===songId);
-    artist={id:S.id,name:S.artistName};
-  }else{
-    const player=window.allPlayers?.find(p=>p.id===artistId);
-    if(!player){ showToast('Artist not found','error'); return; }
-    song=player.gameSongs?.find(s=>s.id===songId);
-    artist={id:player.id,name:player.artistName};
-  }
-
-  if(!song){ showToast('Song not found','error'); return; }
-
-  const streams=song.streams||0;
-  const chartRank=song.chartPosition||null;
-  const peakRank=song.peakPosition||null;
-  const weeksOnChart=song.weeksOnChart||0;
-
-  let chartHtml='';
-  if(chartRank){
-    chartHtml=`<div class="loopify-track-stats">
-      <div class="loopify-track-stat">
-        <div class="loopify-track-stat-value">${peakRank?'#'+peakRank:'-'}</div>
-        <div class="loopify-track-stat-label">Peak Position</div>
-      </div>
-      <div class="loopify-track-stat">
-        <div class="loopify-track-stat-value">${weeksOnChart}</div>
-        <div class="loopify-track-stat-label">Weeks on Chart</div>
-      </div>
-    </div>`;
-  }
-
-  let lyricsHtml='';
-  if(song.lyrics){
-    lyricsHtml=`<div class="loopify-track-section">
-      <div class="loopify-track-section-title">Lyrics</div>
-      <div class="loopify-track-section-content">${song.lyrics}</div>
-    </div>`;
-  }
-
-  let creditsHtml='';
-  if(song.credits){
-    creditsHtml=`<div class="loopify-track-section">
-      <div class="loopify-track-section-title">Credits</div>
-      <div class="loopify-track-section-content">${song.credits}</div>
-    </div>`;
-  }
-
-  const coverDisplay=song.coverImage?`<img src="${song.coverImage}">`:song.cover||'♫';
-
-  let html=`<style>
-  .loopify-track-overlay{padding:20px;position:relative}
-  .loopify-track-cover{width:100%;aspect-ratio:1;background:var(--surf);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:80px;margin-bottom:20px;border:1px solid var(--bord);overflow:hidden}
-  .loopify-track-cover img{width:100%;height:100%;object-fit:cover}
-  .loopify-track-title{font-size:20px;font-weight:700;margin-bottom:4px}
-  .loopify-track-artist{font-size:14px;color:var(--mut);margin-bottom:20px;cursor:pointer}
-  .loopify-track-artist:active{opacity:0.7}
-  .loopify-track-buttons{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
-  .loopify-track-btn{padding:12px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:8px;font-weight:600;cursor:pointer;transition:all 0.2s}
-  .loopify-track-btn:active{opacity:0.8}
-  .loopify-track-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
-  .loopify-track-stat{background:var(--surf);padding:12px;border-radius:8px;border:1px solid var(--bord)}
-  .loopify-track-stat-value{font-size:16px;font-weight:700;color:var(--acc)}
-  .loopify-track-stat-label{font-size:11px;color:var(--mut);margin-top:4px}
-  .loopify-track-section{margin-bottom:20px}
-  .loopify-track-section-title{font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;margin-bottom:8px}
-  .loopify-track-section-content{background:var(--surf);padding:12px;border-radius:8px;border:1px solid var(--bord);font-size:13px;line-height:1.6}
-  </style>
-
-  <div style="padding:20px 0 20px 0;position:relative">
-    <button onclick="closeOverlay(this)" style="position:absolute;top:12px;left:12px;z-index:200;background:rgba(var(--bg-rgb),0.9);border:1px solid var(--bord);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt);font-size:20px;cursor:pointer">←</button>
-  </div>
-
-  <div class="loopify-track-overlay">
-    <div class="loopify-track-cover">${coverDisplay}</div>
-
-    <div class="loopify-track-title">${song.title}</div>
-    <div class="loopify-track-artist" onclick="showLoopifyArtistProfile('${artist.id}')">${artist.name}</div>
-
-    <div class="loopify-track-buttons">
-      <button class="loopify-track-btn">Play</button>
-      <button class="loopify-track-btn" onclick="toggleLoopifyFollow('${artist.id}',this)">Follow</button>
-    </div>
-
-    <div class="loopify-track-stats">
-      <div class="loopify-track-stat">
-        <div class="loopify-track-stat-value">${streams.toLocaleString()}</div>
-        <div class="loopify-track-stat-label">Total Streams</div>
-      </div>
-      <div class="loopify-track-stat">
-        <div class="loopify-track-stat-value">${chartRank?'#'+chartRank:'-'}</div>
-        <div class="loopify-track-stat-label">Chart Position</div>
-      </div>
-    </div>
-
-    ${chartHtml}
-    ${lyricsHtml}
-    ${creditsHtml}
-  </div>`;
-
-  _insertOverlay(html);
-}
-
-function toggleLoopifyFollow(artistId, btn){
-  if(!GAME.loopifyFollowing) GAME.loopifyFollowing={};
-  const isFollowing=GAME.loopifyFollowing[artistId];
-
-  GAME.loopifyFollowing[artistId]=!isFollowing;
-  btn.textContent=GAME.loopifyFollowing[artistId]?'Following':'Follow';
-  btn.style.opacity=GAME.loopifyFollowing[artistId]?'0.7':'1';
-}
-
-function switchLoopifyView(view){
-  GAME.loopifyView=view;
-  showLoopifyUI();
-}
-
-function showLoopifyScreen(html){
-  document.getElementById('homeScreen').classList.remove('visible');
-  document.getElementById('musicScreen').classList.remove('visible');
-  document.getElementById('discoverScreen').classList.remove('visible');
-  document.getElementById('bottomNav').style.display='none';
-
-  let loopifyScreen=document.getElementById('loopifyScreen');
-  if(!loopifyScreen){
-    loopifyScreen=document.createElement('div');
-    loopifyScreen.id='loopifyScreen';
-    loopifyScreen.className='screen';
-    loopifyScreen.style.cssText='background:var(--bg);position:absolute;top:0;left:0;width:100%;min-height:100%;z-index:1000;overflow-y:auto';
-    document.getElementById('phone').appendChild(loopifyScreen);
-  }
-  loopifyScreen.innerHTML=html;
-  loopifyScreen.classList.add('visible');
-}
-
-function closeLoopify(){
-  const loopifyScreen=document.getElementById('loopifyScreen');
-  if(loopifyScreen) loopifyScreen.classList.remove('visible');
-  document.getElementById('homeScreen').classList.add('visible');
-  document.getElementById('bottomNav').style.display='flex';
-}
+const LOOPIFY_CSS = `
+<style>
+.loop { background: #121212; color: #fff; min-height: 100%; overflow-y: auto; padding-bottom: 112px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.loop .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; }
+.loop .topbar h2 { font-size: 22px; font-weight: 800; }
+.loop .topbar .ic { display: flex; gap: 16px; font-size: 16px; color: #e0e0e0; cursor: pointer; }
+.loop .filters { display: flex; gap: 8px; padding: 0 16px 14px; overflow-x: auto; }
+.loop .filters span { font-size: 12px; font-weight: 600; background: #242424; border-radius: 99px; padding: 6px 13px; cursor: pointer; white-space: nowrap; }
+.loop .filters span.on { background: #1fdf64; color: #121212; }
+.loop .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px 16px; }
+.loop .tile { display: flex; align-items: center; gap: 8px; background: #2a2a2a; border-radius: 5px; overflow: hidden; font-size: 11.5px; font-weight: 700; cursor: pointer; padding: 8px; }
+.loop .tile:active { opacity: 0.8; }
+.loop .tile .cover { width: 46px; height: 46px; border-radius: 0; font-size: 19px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.loop .sect { padding: 8px 16px 10px; font-size: 16.5px; font-weight: 800; display: flex; justify-content: space-between; align-items: baseline; }
+.loop .sect a { font-size: 11px; color: #a7a7a7; font-weight: 600; text-decoration: none; }
+.loop .hrow { display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 18px; }
+.loop .pcard { flex: none; width: 102px; cursor: pointer; }
+.loop .pcard .cover { width: 102px; height: 102px; font-size: 35px; display: flex; align-items: center; justify-content: center; background: #333; border-radius: 6px; }
+.loop .pcard b { display: block; font-size: 12px; font-weight: 600; margin-top: 6px; line-height: 1.3; }
+.loop .pcard span { font-size: 11px; color: #a7a7a7; }
+.loop .chartrow { display: flex; align-items: center; gap: 10px; padding: 7px 16px; cursor: pointer; }
+.loop .chartrow:active { background: #1c1c1c; }
+.loop .pos { width: 20px; text-align: center; font-weight: 800; font-size: 14px; }
+.loop .mv { width: 16px; font-size: 9px; text-align: center; }
+.loop .cover.sm { width: 44px; height: 44px; background: #333; font-size: 18px; display: flex; align-items: center; justify-content: center; border-radius: 4px; flex-shrink: 0; }
+.loop .ti { flex: 1; min-width: 0; }
+.loop .ti b { display: block; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.loop .ti span { font-size: 11.5px; color: #a7a7a7; }
+.loop .ti .e { font-size: 8px; background: #a7a7a7; color: #121212; border-radius: 2px; padding: 0 3px; font-weight: 800; vertical-align: 1px; margin-right: 4px; }
+.loop .strm { font-size: 11px; color: #a7a7a7; }
+.loop .dots { color: #a7a7a7; font-size: 15px; padding-left: 4px; cursor: pointer; }
+.up { color: #4cc98a; }
+.down { color: #e06666; }
+.same { color: #8b91a0; }
+.new { color: #e8b44c; font-weight: 800; font-size: 9px; }
+.loop .srchbox { margin: 8px 16px 14px; background: #fff; border-radius: 8px; padding: 11px 12px; display: flex; gap: 8px; align-items: center; color: #555; font-size: 14px; font-weight: 600; }
+.loop .srchbox input { flex: 1; border: none; outline: none; font-size: 14px; font-family: inherit; background: none; color: #000; }
+.loop .ggrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px 18px; }
+.loop .gcard { height: 90px; border-radius: 8px; padding: 12px; font-size: 15px; font-weight: 800; position: relative; overflow: hidden; cursor: pointer; display: flex; align-items: flex-start; }
+.loop .gcard .gem { position: absolute; bottom: -6px; right: -4px; font-size: 44px; transform: rotate(22deg); opacity: .85; }
+.loop .ahero { height: 215px; background: linear-gradient(180deg, #4a2a5e 0%, #2a1836 70%, #121212); display: flex; flex-direction: column; justify-content: flex-end; padding: 16px; position: relative; }
+.loop .ahero .back { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,.4); width: 30px; height: 30px; border-radius: 50%; font-size: 14px; border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.loop .verif { font-size: 10.5px; color: #4c9df3; font-weight: 700; }
+.loop .ahero h3 { font-size: 32px; font-weight: 900; letter-spacing: -.5px; }
+.loop .actions { display: flex; align-items: center; gap: 14px; padding: 8px 16px 4px; }
+.loop .follow { border: 1px solid #727272; border-radius: 4px; background: none; color: #fff; font-size: 12px; font-weight: 700; padding: 6px 14px; cursor: pointer; }
+.loop .follow.f { border-color: #1fdf64; color: #1fdf64; }
+.loop .shuf { font-size: 19px; color: #a7a7a7; margin-left: auto; cursor: pointer; }
+.loop .play { width: 50px; height: 50px; border-radius: 50%; background: #1fdf64; color: #121212; font-size: 18px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; }
+.loop .thero { padding: 34px 16px 14px; background: linear-gradient(180deg, #1e3a5e, #121212); text-align: center; position: relative; }
+.loop .thero .back { position: absolute; top: 12px; left: 14px; background: rgba(0,0,0,.4); width: 30px; height: 30px; border-radius: 50%; font-size: 14px; border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.loop .thero .cover { width: 170px; height: 170px; margin: 0 auto; font-size: 64px; background: linear-gradient(135deg, #2a4a7e, #1a2a4e); box-shadow: 0 14px 40px rgba(0,0,0,.6); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.loop .thero h3 { font-size: 20px; font-weight: 800; margin-top: 13px; }
+.loop .thero .a { font-size: 12.5px; color: #d0d0d0; margin-top: 2px; }
+.loop .lyr { margin: 12px 16px; background: #c74b3d; border-radius: 10px; padding: 14px; color: #fff; cursor: pointer; }
+.loop .lyr h4 { font-size: 11px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px; opacity: .8; }
+.loop .lyr p { font-size: 15px; font-weight: 700; line-height: 1.6; }
+.loop .lyr .more { display: none; }
+.loop .lyr.open .more { display: block; }
+.loop .credits { margin: 12px 16px; background: #242424; border-radius: 10px; padding: 14px; color: #fff; }
+.loop .credits h4 { font-size: 14px; font-weight: 800; margin-bottom: 8px; }
+.loop .cr { display: flex; justify-content: space-between; font-size: 12.5px; padding: 5px 0; border-bottom: 1px solid #333; }
+.loop .cr:last-child { border: none; }
+.loop .cr span { color: #a7a7a7; }
+.loop .libhead { display: flex; align-items: center; gap: 10px; padding: 16px; }
+.loop .libhead .me { width: 32px; height: 32px; border-radius: 50%; background: #e8734c; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; }
+.loop .libhead h2 { font-size: 20px; font-weight: 800; flex: 1; }
+.loop .librow { display: flex; align-items: center; gap: 12px; padding: 8px 16px; cursor: pointer; }
+.loop .librow .cover { width: 56px; height: 56px; font-size: 22px; display: flex; align-items: center; justify-content: center; background: #333; border-radius: 6px; }
+.loop .librow b { display: block; font-size: 14.5px; font-weight: 600; }
+.loop .librow span { font-size: 12px; color: #a7a7a7; }
+.loop .npbar { position: absolute; bottom: 52px; left: 8px; right: 8px; background: #3d2a4a; border-radius: 8px; display: flex; align-items: center; gap: 10px; padding: 7px 10px; box-shadow: 0 4px 14px rgba(0,0,0,.5); z-index: 5; cursor: pointer; }
+.loop .npbar .cover { width: 38px; height: 38px; font-size: 16px; background: #5a3d6e; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.loop .npbar .ti b { font-size: 12.5px; }
+.loop .npbar .ti span { font-size: 10.5px; }
+.loop .npbar .ctrl { display: flex; gap: 16px; font-size: 17px; padding-right: 4px; cursor: pointer; }
+.loop .npbar .prog { position: absolute; bottom: 0; left: 10px; right: 10px; height: 2px; background: rgba(255,255,255,.2); }
+.loop .npbar .prog i { display: block; height: 100%; width: 35%; background: #fff; transition: width 1s linear; }
+.loop .bnav { position: absolute; bottom: 0; left: 0; right: 0; height: 52px; background: linear-gradient(180deg, rgba(18,18,18,.55), #000 40%); display: flex; z-index: 5; }
+.loop .bnav div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 9.5px; color: #a7a7a7; cursor: pointer; }
+.loop .bnav div.on { color: #fff; }
+.loop .bnav div i { font-style: normal; font-size: 17px; }
+.loop .aboutcard { margin: 10px 16px; background: #242424; border-radius: 10px; padding: 14px; }
+.loop .aboutcard h4 { font-size: 14px; font-weight: 800; margin-bottom: 6px; }
+.loop .aboutcard p { font-size: 12.5px; color: #d0d0d0; line-height: 1.55; }
+.loop .aboutcard .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 11px; color: #a7a7a7; }
+.loop .pill2 { display: inline-block; font-size: 10px; font-weight: 700; color: #d0d0d0; border: 1px solid #444; border-radius: 99px; padding: 3px 10px; margin: 2px 4px 2px 0; }
+</style>
+`;
+
+function showLoopifyUI(){if(!GAME||!GAME.songs){showToast('Loading...','purple');return;}if(!GAME.loopifyView)GAME.loopifyView='home';switch(GAME.loopifyView){case'home':showLoopifyHome();break;case'search':showLoopifySearch();break;case'library':showLoopifyLibrary();break;case'artist':showLoopifyArtistProfile(GAME.loopifyArtistId||S.id);break;case'track':showLoopifyTrackDetails(GAME.loopifyTrackId,GAME.loopifyTrackArtistId||S.id);break;default:showLoopifyHome();}}
+function showSpotifyUI(){showLoopifyUI();}
+function showLoopifyHome(){const releasedSongs=GAME.songs.filter(s=>s.released);let topChartSongs=[];if(window.allPlayers&&Array.isArray(window.allPlayers)){topChartSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released&&s.streams).map(s=>({...s,artistId:p.id,artistName:p.artistName}))).concat(releasedSongs.map(s=>({...s,artistId:S.id,artistName:S.name}))).sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,50);}else{topChartSongs=releasedSongs.sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,50).map(s=>({...s,artistId:S.id,artistName:S.name}));}let chartHTML='';topChartSongs.forEach((song,idx)=>{const movement=song.lastChartPosition?song.lastChartPosition<idx?'▼'+(song.lastChartPosition-idx):song.lastChartPosition>idx?'▲'+(idx-song.lastChartPosition):'—':'NEW';const movementClass=movement==='NEW'?'new':movement.startsWith('▲')?'up':movement.startsWith('▼')?'down':'same';chartHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${song.artistId}')"><div class="pos">${idx+1}</div><div class="mv ${movementClass}">${movement}</div><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><div class="strm">${((song.streams||0)/1000000).toFixed(1)}M</div><div class="dots">⋮</div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><h2>Good evening</h2><div class="ic">${getSVG('bell','20px')}${getSVG('clock','20px')}${getSVG('settings','20px')}</div></div><div class="filters"><span class="on">All</span><span>Music</span><span>Charts</span></div><div class="sect">Top 50 — Global <a href="#">See chart</a></div>${chartHTML}<div class="sect">Popular artists</div><div class="hrow">${releasedSongs.length>0?`<div class="pcard" onclick="loopShowArtist('${S.id}')"><div class="cover" style="border-radius:50%;background:#333">🎤</div><b>${S.name}</b><span>Artist</span></div>`:''}</div><div class="npbar" onclick="loopShowTrack()"><div class="cover">♫</div><div class="ti" style="flex:1"><b>Your Track</b><span>Artist</span></div><div class="ctrl">🖥 ▶</div><div class="prog"><i id="lprog"></i></div></div><div class="bnav"><div class="on" onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
+function showLoopifySearch(){let html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><h2>Search</h2><div class="ic">${getSVG('search','20px')}</div></div><div class="srchbox">${getSVG('search','18px')}<input type="text" placeholder="Artists, songs, or albums" oninput="loopFilterSearch(this.value)"></div><div id="loopSearchResults" style="display:none"></div><div class="sect">Browse all</div><div class="ggrid"><div class="gcard" style="background:#8a2a4a">R&B<span class="gem">🎷</span></div><div class="gcard" style="background:#2a6a4a">Afrobeats<span class="gem">🥁</span></div><div class="gcard" style="background:#3d3d8a">Pop<span class="gem">🎤</span></div><div class="gcard" style="background:#8a5a2a">Hip-Hop<span class="gem">🎧</span></div></div><div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div class="on" onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
+function showLoopifyLibrary(){const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));let libraryHTML='';releasedSongs.forEach(song=>{libraryHTML+=`<div class="librow" onclick="loopShowTrack('${song.id}','${S.id}')"><div class="cover">${song.cover||'♫'}</div><div><b>${song.title}</b><span>Song · ${S.name}</span></div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="libhead"><div class="me">${S.name.charAt(0).toUpperCase()}</div><h2>Your Library</h2><span style="font-size:18px;cursor:pointer">＋</span></div><div class="filters"><span class="on">Playlists</span><span>Artists</span><span>Albums</span></div>${releasedSongs.length>0?libraryHTML:'<div style="text-align:center;padding:40px 20px;color:#a7a7a7">No songs released yet</div>'}<div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div class="on" onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
+function showLoopifyArtistProfile(artistId){const player=window.allPlayers?.find(p=>p.id===artistId)||(artistId===S.id?{id:S.id,artistName:S.name,bio:GAME.artistProfile?.bio}:null);if(!player){showToast('Artist not found','error');return;}const songs=(artistId===S.id?GAME.songs:player.gameSongs||[]).filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,10);let popularHTML='';songs.forEach((song,idx)=>{popularHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${artistId}')"><div class="pos">${idx+1}</div><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${((song.streams||0)/1000000).toFixed(1)}M</span></div><div class="dots">⋮</div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="ahero"><button class="back" onclick="loopSwitchView('home')">${getSVG('back','16px')}</button><div class="verif">${getSVG('verified','12px')} Verified Artist</div><h3>${player.artistName}</h3><div style="font-size:11.5px;color:#d0d0d0;margin-top:2px">${player.totalStreams?(player.totalStreams/1000).toLocaleString()+' monthly listeners':'Coming up'}</div></div><div class="actions"><button class="follow" onclick="loopToggleFollow('${artistId}',this)">Follow</button><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div><div class="sect">Popular</div>${popularHTML}${player.bio?`<div class="aboutcard"><h4>About</h4><p>${player.bio}</p></div>`:''}<div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
+function showLoopifyTrackDetails(songId,artistId){let song,artist;if(artistId===S.id){song=GAME.songs?.find(s=>s.id===songId);artist={id:S.id,name:S.name};}else{const player=window.allPlayers?.find(p=>p.id===artistId);if(!player){showToast('Artist not found','error');return;}song=player.gameSongs?.find(s=>s.id===songId);artist={id:player.id,name:player.artistName};}if(!song){showToast('Song not found','error');return;}const streams=song.streams||0;const chartRank=song.chartPosition||null;const peakRank=song.peakPosition||null;const weeksOnChart=song.weeksOnChart||0;let creditsHTML='';if(song.collabs&&song.collabs.length>0){creditsHTML='<div class="credits"><h4>Credits</h4>';song.collabs.forEach(collab=>{creditsHTML+=`<div class="cr"><b>${collab.artist||'Unknown'}</b><span>${collab.role||'Collaborator'}</span></div>`;});creditsHTML+='</div>';}let html=LOOPIFY_CSS+`<div class="loop"><div class="thero"><button class="back" onclick="loopSwitchView('artist',this)">${getSVG('back','16px')}</button><div class="cover">${song.cover||'♫'}</div><h3>${song.title}</h3><div class="a">${artist.name} · Single · 3:42</div></div><div class="actions"><span style="font-size:18px;cursor:pointer" onclick="this.textContent=this.textContent==='♡'?'💚':'♡'">♡</span><span style="font-size:17px;cursor:pointer">⤴</span><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div>${song.lyrics?`<div class="lyr" onclick="this.classList.toggle('open')"><h4>LYRICS · TAP TO EXPAND</h4><p>${song.lyrics.split('\n')[0]}</p><p class="more">${song.lyrics}</p></div>`:''}${creditsHTML}<div class="credits"><h4>Stats</h4><div class="cr"><b>${streams.toLocaleString()}</b><span>All-time streams</span></div><div class="cr"><b>${chartRank?'#'+chartRank:'—'}</b><span>Peak — Top 50</span></div><div class="cr"><b>${weeksOnChart}</b><span>On chart</span></div></div><div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
+function loopSwitchView(view,navEl){GAME.loopifyView=view;if(navEl){navEl.parentElement.querySelectorAll('div').forEach(d=>d.classList.remove('on'));navEl.classList.add('on');}showLoopifyUI();}
+function loopShowTrack(songId,artistId){GAME.loopifyView='track';GAME.loopifyTrackId=songId;GAME.loopifyTrackArtistId=artistId;showLoopifyUI();}
+function loopShowArtist(artistId){GAME.loopifyView='artist';GAME.loopifyArtistId=artistId;showLoopifyUI();}
+function loopToggleFollow(artistId,btn){if(!GAME.loopifyFollowing)GAME.loopifyFollowing={};GAME.loopifyFollowing[artistId]=!GAME.loopifyFollowing[artistId];btn.textContent=GAME.loopifyFollowing[artistId]?'Following':'Follow';btn.classList.toggle('f',GAME.loopifyFollowing[artistId]);}
+function loopFilterSearch(query){const resultsDiv=document.getElementById('loopSearchResults');if(!query){resultsDiv.style.display='none';return;}resultsDiv.style.display='block';const q=query.toLowerCase();let html='';const songResults=GAME.songs.filter(s=>s.title.toLowerCase().includes(q)&&s.released);songResults.forEach(song=>{html+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${S.id}')"><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>Song · ${S.name}</span></div></div>`;});if(window.allPlayers){window.allPlayers.forEach(p=>{if(p.artistName.toLowerCase().includes(q)){html=`<div class="chartrow" onclick="loopShowArtist('${p.id}')"><div class="cover sm" style="border-radius:50%;background:#333">🎤</div><div class="ti"><b>${p.artistName}</b><span>Artist</span></div></div>`+html;}});}resultsDiv.innerHTML=html||'<div style="text-align:center;padding:20px;color:#a7a7a7">No results</div>';}
+function togglePlay(el){el.textContent=el.textContent.trim()==='▶'?'⏸':'▶';}
+function closeLoopify(){closeOverlay();}
 
 function showOrangeMusicUI(){
   if(!GAME.artistProfile){GAME.artistProfile={profilePic:'👤',profilePicType:'emoji',banner:'gradient1',bannerType:'gradient',bio:'An artist on the rise.'}}
