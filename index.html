@@ -1177,20 +1177,37 @@ setTimeout(function() {
     // Listen for auth state changes
     supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔐 Auth state changed:', event, session?.user?.email);
-      
+
       currentUser = session?.user || null;
-      
+
       if(currentUser) {
-        
+
         // Check if this is a single player cloud save auth
         if(GAME_MODE === 'single' && localStorage.getItem('googleCloudSaveEnabled') === 'true'){
           console.log('☁️ Handling cloud save authentication...');
           setTimeout(() => handleCloudSaveAuth(), 1000);
         }
-        
+
         // Don't auto-start - user needs to choose Single Player or Multiplayer
         // The mode will be set when they click a mode button
       } else {
+        // User logged out or no session - show landing screen
+        console.log('🚪 No active session - showing landing screen');
+
+        // Hide all other screens
+        document.querySelectorAll('.screen').forEach(s => {
+          s.classList.remove('visible');
+          s.style.display = 'none';
+        });
+        document.getElementById('bottomNav').style.display = 'none';
+        document.getElementById('sleepSection').style.display = 'none';
+
+        // Show landing screen
+        const landing = document.getElementById('landingScreen');
+        if(landing) {
+          landing.style.display = 'flex';
+          landing.classList.add('visible');
+        }
       }
     });
   } else {
@@ -4300,13 +4317,27 @@ function showTutorial(){
         
         <div style="padding:24px">
           <div style="background:#f8f9fa;padding:16px;border-radius:12px;margin-bottom:16px">
-            <div style="font-weight:700;font-size:15px;margin-bottom:12px;color:#1a1d23">📊 Your Stats</div>
+            <div style="font-weight:700;font-size:15px;margin-bottom:12px;color:#1a1d23">📊 Core Resources</div>
             <div style="display:grid;gap:8px">
               <div style="display:flex;gap:8px"><span style="font-size:20px">💰</span><span style="font-size:13px;line-height:1.6"><b>Money</b> - Spend on music, housing, travel</span></div>
-              <div style="display:flex;gap:8px"><span style="font-size:20px">⚡</span><span style="font-size:13px;line-height:1.6"><b>Energy</b> - 120 per day, spend on activities</span></div>
-              <div style="display:flex;gap:8px"><span style="font-size:20px">💡</span><span style="font-size:13px;line-height:1.6"><b>Creativity</b> - Create music & songs (min 30 needed)</span></div>
+              <div style="display:flex;gap:8px"><span style="font-size:20px">⚡</span><span style="font-size:13px;line-height:1.6"><b>Energy</b> - 120 per day, resets daily for activities</span></div>
+              <div style="display:flex;gap:8px"><span style="font-size:20px">😰</span><span style="font-size:13px;line-height:1.6"><b>Stress</b> - Manage carefully, decays 2 points/day</span></div>
               <div style="display:flex;gap:8px"><span style="font-size:20px">🔥</span><span style="font-size:13px;line-height:1.6"><b>Hype</b> - Grows fanbase & unlocks opportunities</span></div>
             </div>
+          </div>
+
+          <div style="background:#f0f4c3;padding:16px;border-radius:12px;margin-bottom:16px;border-left:4px solid #9CCC65">
+            <div style="font-weight:700;font-size:15px;margin-bottom:12px;color:#558B2F">🎵 Your Skills (7 Total)</div>
+            <div style="font-size:12px;line-height:1.8;color:#558B2F">
+              <b>Writing</b> - Songwriting ability<br>
+              <b>Singing</b> - Vocal performance<br>
+              <b>Production</b> - Beat making & mixing<br>
+              <b>Stage Presence</b> - Live performance charisma<br>
+              <b>Dance</b> - Movement & choreography<br>
+              <b>Performance</b> - Overall showmanship<br>
+              <b>Negotiation</b> - Deal-making ability
+            </div>
+            <div style="font-size:11px;color:#558B2F;margin-top:8px;font-style:italic">Skills improve with practice and decay over 14 days without use</div>
           </div>
           
           <div style="background:#e3f2fd;padding:16px;border-radius:12px;margin-bottom:16px">
@@ -12998,6 +13029,31 @@ function showLabelOwnerDashboard(){
     };
     markDirty(); saveToCloud();
   }
+
+  // CRITICAL FIX: Ensure founder is always in the roster
+  if(!ol.roster) ol.roster = [];
+  const founderAlreadyInRoster = ol.roster.some(a => a.userId === currentUser?.id || a.id === GAME.playerId);
+  if(GAME.signedLabel && GAME.signedLabel.isOwner && !founderAlreadyInRoster){
+    console.log('🔧 Adding founder to roster (fix for missing founder)');
+    ol.roster.unshift({
+      id: GAME.playerId || null,
+      userId: currentUser?.id || null,
+      artistName: GAME.sn || GAME.artistName || 'You',
+      profilePic: (GAME.artistProfile && GAME.artistProfile.profilePic) || '🎤',
+      genre: GAME.genre || 'Pop',
+      cut: ol.defaultCut || 25,
+      dealType: 'standard',
+      weeklyAdvance: 0,
+      weeklyEarnings: 0,
+      totalStreams: getTotalStreams?.() || 0,
+      signedWeek: GAME.week || 1,
+      spotlight: false,
+      quotaWarning: false,
+      pendingReleases: []
+    });
+    markDirty(); saveToCloud();
+  }
+
   const tierDef = LABEL_TIERS[ol.tier] || LABEL_TIERS.indie;
   const roster = ol.roster || [];
   const staff = ol.staff || [];
@@ -14312,6 +14368,8 @@ function showLabelOwnerSettings(){
   window._settingsLabelGenres = (ol.genreFocus||[]).slice();
   window._settingsLabelRegion = ol.region || 'North America';
   window._settingsLabelCut = ol.defaultCut || 25;
+  window._settingsLabelBio = ol.bio || '';
+  window._settingsLabelFeatured = (ol.featuredArtists || []).slice();
 
   let html = `<div style="padding:16px;padding-bottom:100px">`;
 
@@ -14350,6 +14408,25 @@ function showLabelOwnerSettings(){
     ${[15,20,25,30,40].map(c=>`<div onclick="window._settingsLabelCut=${c};document.querySelectorAll('#stgCutChips > div').forEach(el=>{el.style.borderColor='var(--bord)';el.style.background='var(--surf)';el.style.color='var(--mut)'});this.style.borderColor='var(--acc)';this.style.background='var(--acc-bg)';this.style.color='var(--acc)'" style="padding:6px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid ${c===(ol.defaultCut||25)?'var(--acc)':'var(--bord)'};background:${c===(ol.defaultCut||25)?'var(--acc-bg)':'var(--surf)'};color:${c===(ol.defaultCut||25)?'var(--acc)':'var(--mut)'}">${c}%</div>`).join('')}
   </div>`;
 
+  // Label bio
+  window._settingsLabelBio = ol.bio || '';
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Label Bio</div>
+  <textarea id="settingsLabelBio" placeholder="Tell the world about your label..." style="background:var(--bg);border:1.5px solid var(--bord);border-radius:8px;padding:11px 14px;font-size:13px;color:var(--txt);width:100%;font-family:var(--fb);outline:none;resize:none;margin-bottom:16px;min-height:80px" maxlength="300" oninput="window._settingsLabelBio=this.value">${ol.bio||''}</textarea>`;
+
+  // Featured artists
+  const rosterArtists = (ol.roster || []).map(a => ({ id: a.id, userId: a.userId, name: a.artistName }));
+  const featured = ol.featuredArtists || [];
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Featured Artists (up to 3)</div>
+  <div id="stgFeaturedArtists" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px">
+    ${rosterArtists.length === 0
+      ? `<div style="padding:12px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;font-size:12px;color:var(--mut);text-align:center">Sign artists to feature them on your label page</div>`
+      : rosterArtists.map(a => {
+          const isFeatured = featured.includes(a.userId);
+          return `<div onclick="window._settingsLabelFeatured.includes('${a.userId}')?window._settingsLabelFeatured.splice(window._settingsLabelFeatured.indexOf('${a.userId}'),1):window._settingsLabelFeatured.length<3&&window._settingsLabelFeatured.push('${a.userId}');this.style.borderColor=window._settingsLabelFeatured.includes('${a.userId}')?'var(--acc)':'var(--bord)';this.style.background=window._settingsLabelFeatured.includes('${a.userId}')?'var(--acc-bg)':'var(--surf)'" style="padding:10px 12px;background:${isFeatured?'var(--acc-bg)':'var(--surf)'};border:1.5px solid ${isFeatured?'var(--acc)':'var(--bord)'};border-radius:8px;cursor:pointer;font-weight:${isFeatured?700:600};color:${isFeatured?'var(--acc)':'var(--txt)'}">⭐ ${a.name}</div>`;
+        }).join('')
+    }
+  </div>`;
+
   html += `<button onclick="saveLabelSettings()" style="background:var(--acc);color:white;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;width:100%;cursor:pointer;font-family:var(--fb);margin-bottom:24px;touch-action:manipulation">Save Changes</button>`;
 
   html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:#ef4444;letter-spacing:1.5px;text-transform:uppercase">Danger Zone</div>
@@ -14375,6 +14452,8 @@ function saveLabelSettings(){
   ol.genreFocus = window._settingsLabelGenres || ol.genreFocus;
   ol.region = window._settingsLabelRegion || ol.region;
   ol.defaultCut = window._settingsLabelCut || ol.defaultCut;
+  ol.bio = window._settingsLabelBio || '';
+  ol.featuredArtists = window._settingsLabelFeatured || [];
 
   if(GAME.signedLabel && GAME.signedLabel.isOwner){
     GAME.signedLabel.labelName = ol.name;
@@ -14865,29 +14944,44 @@ function showRecordLabel(){
       
       GAME.labelOffers.forEach((offer,idx)=>{
         const typeColor=offer.type.includes('Major Label')?'#FF1493':offer.type.includes('Indie')?'#4CAF50':offer.type.includes('Artist-Friendly')?'#9C27B0':'#FFA726';
-        
-        html+=`<div style="background:var(--surf);padding:18px;border-radius:12px;margin-bottom:16px;border-left:4px solid ${typeColor};box-shadow:0 2px 8px rgba(0,0,0,0.1)">
-          <!-- HEADER -->
-          <div style="margin-bottom:16px">
-            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">
-              <div style="font-size:18px;font-weight:700">${offer.name}</div>
-              <div style="background:${typeColor};color:white;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700">${offer.prestige||'Medium'}</div>
+
+        // Fairness scoring
+        const isFair = (offer.advance >= 10000 && offer.streamRoyalty >= 25 && !offer.recoupment && !offer.is360Deal) ? 'fair' :
+                      (offer.advance >= 5000 && offer.streamRoyalty >= 15 && offer.recoupment === false) ? 'moderate' : 'harsh';
+        const fairnessColor = isFair === 'fair' ? '#4CAF50' : isFair === 'moderate' ? '#FF9800' : '#f44336';
+        const fairnessLabel = isFair === 'fair' ? '✅ Fair Deal' : isFair === 'moderate' ? '⚠️ Standard Terms' : '❌ Artist Unfavorable';
+
+        html+=`<div style="background:var(--surf);border:2px solid ${fairnessColor};padding:0;border-radius:12px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);overflow:hidden">
+          <!-- CONTRACT HEADER -->
+          <div style="background:${fairnessColor}22;padding:14px 18px;border-bottom:2px solid ${fairnessColor};margin-bottom:0">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
+              <div>
+                <div style="font-size:16px;font-weight:900;color:var(--txt)">RECORDING AND ARTIST AGREEMENT</div>
+                <div style="font-size:11px;color:var(--mut);margin-top:2px;letter-spacing:0.5px">Label: ${offer.name} • ${offer.type}</div>
+              </div>
+              <div style="background:${fairnessColor};color:white;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;text-align:center">${fairnessLabel}</div>
             </div>
-            <div style="font-size:13px;color:var(--mut);margin-bottom:6px">${offer.type}</div>
-            ${offer.vibe?`<div style="font-size:12px;color:${typeColor};font-style:italic">• ${offer.vibe}</div>`:''}
-            ${offer.is360Deal?`<div style="font-size:12px;color:#f44336;font-weight:600;margin-top:4px">⚠️ 360 Deal - Label takes cut of EVERYTHING</div>`:''}
-            ${!offer.recoupment?`<div style="font-size:12px;color:#4CAF50;font-weight:600;margin-top:4px">✅ No Recoupment - Advance is yours!</div>`:''}
           </div>
           
-          <!-- MONEY SECTION -->
-          <div style="background:var(--bg);padding:12px;border-radius:8px;margin-bottom:12px">
-            <div style="font-size:14px;font-weight:700;margin-bottom:10px;color:${typeColor}">💰 Financial Terms</div>
-            
-            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-              <div style="font-size:12px;color:var(--mut)">Advance Payment</div>
-              <div style="font-weight:700;font-size:14px;color:#4CAF50">$${offer.advance.toLocaleString()}</div>
+          <!-- ARTICLE 1: ADVANCE & PAYMENT -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--bord)">
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;letter-spacing:0.5px">ARTICLE 1: ADVANCE PAYMENT</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px">Upfront cash payment you receive immediately upon signing</div>
+
+            <div style="background:var(--bg);padding:12px;border-radius:8px;margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <div style="font-size:12px;color:var(--mut)">Advance Payment</div>
+                <div style="font-weight:800;font-size:15px;color:#4CAF50">$${offer.advance.toLocaleString()}</div>
+              </div>
+              ${offer.recoupment?`<div style="font-size:10px;color:#FF9800;font-weight:600;padding:8px;background:rgba(255,152,0,0.1);border-radius:6px;border-left:2px solid #FF9800;margin-bottom:6px"><strong>⚠️ Recoupable:</strong> You must pay back this advance from your royalties before earning additional money.</div>`:'<div style="font-size:10px;color:#4CAF50;font-weight:600;padding:8px;background:rgba(76,175,80,0.1);border-radius:6px;border-left:2px solid #4CAF50"><strong>✅ Non-Recoupable:</strong> This is yours to keep regardless of sales.</div>'}
             </div>
-            
+          </div>
+
+          <!-- ARTICLE 2: ROYALTY RATES -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--bord)">
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;letter-spacing:0.5px">ARTICLE 2: ROYALTY RATES</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px">Your percentage of revenue from streams, sales, merch, and tours</div>
+
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
               <div style="background:var(--surf);padding:8px;border-radius:6px">
                 <div style="font-size:10px;color:var(--mut);margin-bottom:2px">Streaming</div>
@@ -14906,38 +15000,30 @@ function showRecordLabel(){
                 <div style="font-weight:700;font-size:13px">${offer.tourRoyalty}%</div>
               </div>
             </div>
-            
-            <!-- LOW ROYALTY WARNINGS -->
-            ${offer.streamRoyalty<30||offer.merchRoyalty<50||offer.tourRoyalty<70?`
-            <div style="margin-top:10px;padding:10px;background:rgba(244,67,54,0.15);border-radius:6px;border:1px solid rgba(244,67,54,0.4)">
-              <div style="font-size:11px;font-weight:700;color:#f44336;margin-bottom:6px">⚠️ Low Royalty Rates:</div>
-              <div style="font-size:10px;color:#f44336;line-height:1.6">
-                ${offer.streamRoyalty<30?`• They keep ${100-offer.streamRoyalty}% of streaming revenue<br>`:''}
-                ${offer.merchRoyalty<50?`• They keep ${100-offer.merchRoyalty}% of merch sales<br>`:''}
-                ${offer.tourRoyalty<70?`• They keep ${100-offer.tourRoyalty}% of tour income<br>`:''}
-              </div>
-            </div>
-            `:''}
-            
-            <!-- RECOUPMENT WARNING -->
-            ${offer.recoupment?`
-            <div style="margin-top:10px;padding:10px;background:rgba(255,152,0,0.15);border-radius:6px;border:1px solid rgba(255,152,0,0.4)">
-              <div style="font-size:11px;font-weight:700;color:#FF9800;margin-bottom:4px">💸 Recoupment Required</div>
-              <div style="font-size:10px;color:#FF9800">You must pay back the $${offer.advance.toLocaleString()} advance from your royalties before earning additional money.</div>
-            </div>
-            `:''}
-            
-            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bord)">
-              <div style="display:flex;justify-content:space-between;font-size:12px">
-                <div style="color:var(--mut)">Album Commitment</div>
-                <div style="font-weight:600">${offer.albums} album${offer.albums>1?'s':''}</div>
+
+            <!-- Royalty warnings inline -->
+            ${offer.streamRoyalty<25?`<div style="margin-top:8px;font-size:10px;color:#f44336;font-weight:600">❌ Low streaming rate (${100-offer.streamRoyalty}% goes to label)</div>`:'<div style="margin-top:8px;font-size:10px;color:#4CAF50;font-weight:600">✅ Fair streaming rate</div>'}
+            ${offer.merchRoyalty<50?`<div style="font-size:10px;color:#f44336;font-weight:600">❌ Low merch rate (${100-offer.merchRoyalty}% goes to label)</div>`:'<div style="font-size:10px;color:#4CAF50;font-weight:600">✅ Fair merch rate</div>'}
+          </div>
+
+          <!-- ARTICLE 3: ALBUM COMMITMENT -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--bord)">
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;letter-spacing:0.5px">ARTICLE 3: ALBUM COMMITMENT</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px">How many albums/projects you're required to release</div>
+            <div style="background:var(--bg);padding:12px;border-radius:8px">
+              <div style="display:flex;justify-content:space-between">
+                <div style="font-size:12px;color:var(--mut)">Albums Required</div>
+                <div style="font-weight:800;font-size:15px">${offer.albums} album${offer.albums>1?'s':''}</div>
               </div>
             </div>
           </div>
           
-          <!-- BENEFITS SECTION -->
-          <div style="background:var(--bg);padding:12px;border-radius:8px;margin-bottom:12px">
-            <div style="font-size:14px;font-weight:700;margin-bottom:10px;color:${typeColor}">🎯 Label Support</div>
+          <!-- ARTICLE 4: LABEL SUPPORT & BENEFITS -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--bord)">
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;letter-spacing:0.5px">ARTICLE 4: LABEL SUPPORT & BENEFITS</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px">What resources and support the label provides</div>
+
+            <div style="background:var(--bg);padding:12px;border-radius:8px">
             
             <div style="display:flex;justify-content:space-between;margin-bottom:6px">
               <div style="font-size:12px;color:var(--mut)">Marketing Budget</div>
@@ -14965,23 +15051,48 @@ function showRecordLabel(){
             </div>
           </div>
           
-          <!-- RESTRICTIONS SECTION -->
-          ${offer.restrictions.creativApproval||offer.restrictions.releaseSchedule||offer.restrictions.collaboration||offer.restrictions.imageControl?`
-          <div style="background:rgba(244,67,54,0.1);padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid rgba(244,67,54,0.3)">
-            <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#f44336">⚠️ Restrictions</div>
-            <div style="font-size:11px;color:var(--txt);line-height:1.6">
-              ${offer.restrictions.creativApproval?'• Label approves all creative decisions<br>':''}
-              ${offer.restrictions.releaseSchedule?'• Must follow their release timeline<br>':''}
-              ${offer.restrictions.collaboration?'• Need approval for features/collabs<br>':''}
-              ${offer.restrictions.imageControl?'• Label controls your public image':''}
+          <!-- ARTICLE 5: RESTRICTIONS & CREATIVE CONTROL -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--bord)">
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;letter-spacing:0.5px">ARTICLE 5: CREATIVE CONTROL</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px">What decisions you make independently vs. needing approval for</div>
+
+            ${offer.restrictions.creativApproval||offer.restrictions.releaseSchedule||offer.restrictions.collaboration||offer.restrictions.imageControl?`
+            <div style="display:flex;flex-direction:column;gap:6px">
+              ${offer.restrictions.creativApproval?`<div style="padding:8px;background:rgba(244,67,54,0.1);border-radius:6px;border-left:2px solid #f44336;font-size:11px"><strong>❌ Label approves:</strong> All creative decisions</div>`:'<div style="padding:8px;background:rgba(76,175,80,0.1);border-radius:6px;border-left:2px solid #4CAF50;font-size:11px"><strong>✅ You decide:</strong> All creative decisions</div>'}
+              ${offer.restrictions.releaseSchedule?`<div style="padding:8px;background:rgba(244,67,54,0.1);border-radius:6px;border-left:2px solid #f44336;font-size:11px"><strong>❌ Label controls:</strong> When you release music</div>`:'<div style="padding:8px;background:rgba(76,175,80,0.1);border-radius:6px;border-left:2px solid #4CAF50;font-size:11px"><strong>✅ You decide:</strong> When you release music</div>'}
+              ${offer.restrictions.collaboration?`<div style="padding:8px;background:rgba(244,67,54,0.1);border-radius:6px;border-left:2px solid #f44336;font-size:11px"><strong>❌ Label approves:</strong> Features and collaborations</div>`:'<div style="padding:8px;background:rgba(76,175,80,0.1);border-radius:6px;border-left:2px solid #4CAF50;font-size:11px"><strong>✅ You decide:</strong> Features and collaborations</div>'}
+              ${offer.restrictions.imageControl?`<div style="padding:8px;background:rgba(244,67,54,0.1);border-radius:6px;border-left:2px solid #f44336;font-size:11px"><strong>❌ Label controls:</strong> Your public image</div>`:'<div style="padding:8px;background:rgba(76,175,80,0.1);border-radius:6px;border-left:2px solid #4CAF50;font-size:11px"><strong>✅ You decide:</strong> Your public image</div>'}
+            </div>
+            `:`<div style="padding:10px;background:rgba(76,175,80,0.1);border-radius:6px;border:1px solid rgba(76,175,80,0.3)"><div style="font-size:12px;font-weight:700;color:#4CAF50">✅ FULL CREATIVE CONTROL</div><div style="font-size:10px;color:#4CAF50;margin-top:4px">You have complete freedom on all creative decisions</div></div>`}
+          </div>
+
+          <!-- SUMMARY -->
+          <div style="padding:14px 18px;background:${fairnessColor}15;border-top:2px solid ${fairnessColor};margin:0">
+            <div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:8px">QUICK SUMMARY</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px">
+              <div>
+                <div style="color:var(--mut);margin-bottom:2px">Upfront Money</div>
+                <div style="font-weight:700;font-size:13px;color:#4CAF50">$${offer.advance.toLocaleString()}</div>
+              </div>
+              <div>
+                <div style="color:var(--mut);margin-bottom:2px">Streaming Cut</div>
+                <div style="font-weight:700;font-size:13px;color:${offer.streamRoyalty>=25?'#4CAF50':'#f44336'}">${offer.streamRoyalty}%</div>
+              </div>
+              <div>
+                <div style="color:var(--mut);margin-bottom:2px">Contract Length</div>
+                <div style="font-weight:700;font-size:13px">${offer.contractTerms?.length||'2 years'}</div>
+              </div>
+              <div>
+                <div style="color:var(--mut);margin-bottom:2px">Early Exit Fee</div>
+                <div style="font-weight:700;font-size:13px;color:${offer.contractTerms?.exitFee?'#FF9800':'#4CAF50'}">${offer.contractTerms?.exitFee||'None'}</div>
+              </div>
             </div>
           </div>
-          `:'<div style="background:rgba(76,175,80,0.1);padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid rgba(76,175,80,0.3)"><div style="font-size:13px;font-weight:700;color:#4CAF50">✅ Full Creative Control</div></div>'}
-          
+
           <!-- ACTION BUTTONS -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
-            <button onclick="acceptLabelOffer(${idx})" class="ms-btn" style="background:#4CAF50;padding:12px;font-weight:700;font-size:14px">✅ Accept</button>
-            <button onclick="declineLabelOffer(${idx})" class="ms-btn" style="background:#f44336;padding:12px;font-weight:700;font-size:14px">❌ Decline</button>
+          <div style="padding:14px 18px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <button onclick="acceptLabelOffer(${idx})" class="ms-btn" style="background:#4CAF50;color:white;padding:12px;font-weight:700;font-size:14px;border-radius:8px;border:none;cursor:pointer">✅ Accept Deal</button>
+            <button onclick="declineLabelOffer(${idx})" class="ms-btn" style="background:#f44336;color:white;padding:12px;font-weight:700;font-size:14px;border-radius:8px;border:none;cursor:pointer">❌ Decline</button>
           </div>
         </div>`;
       });
@@ -17430,22 +17541,32 @@ async function submitCounter(requestId,currentRound){
 // ──────────────────────────────────────────────────────────
 
 function showFindPlayersOnly(){
-  var html='<div style="padding:12px 16px 80px">'
-    +'<input id="fpSearch" type="text" placeholder="🔍 Search by name or genre..." style="width:100%;padding:11px 14px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:14px;box-sizing:border-box;margin-bottom:12px;outline:none" oninput="_fpFilter()" onfocus="this.style.borderColor=\'var(--acc)\'" onblur="this.style.borderColor=\'var(--bord)\'">'
-    +'<div id="findPlayersList"><div style="text-align:center;padding:40px;color:var(--mut)">Loading...</div></div>'
+  var html='<div style="padding:0;display:flex;flex-direction:column;height:100%">'
+    // Tabs
+    +'<div style="display:flex;gap:0;padding:0;border-bottom:2px solid var(--bord);background:var(--surf);position:sticky;top:0;z-index:10">'
+    +'<button id="fpTabArtists" onclick="_switchFindTab(\'artists\')" style="flex:1;background:transparent;border:none;color:var(--acc);font-family:var(--fb);font-size:13px;font-weight:700;padding:12px;cursor:pointer;border-bottom:3px solid var(--acc);letter-spacing:0.5px">👥 Artists</button>'
+    +'<button id="fpTabLabels" onclick="_switchFindTab(\'labels\')" style="flex:1;background:transparent;border:none;color:var(--mut);font-family:var(--fb);font-size:13px;font-weight:700;padding:12px;cursor:pointer;border-bottom:3px solid transparent;letter-spacing:0.5px">🏷️ Labels</button>'
+    +'</div>'
+    // Search
+    +'<div style="padding:12px 16px">'
+    +'<input id="fpSearch" type="text" placeholder="🔍 Search..." style="width:100%;padding:11px 14px;background:var(--bg);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:14px;box-sizing:border-box;outline:none" oninput="_fpFilter()" onfocus="this.style.borderColor=\'var(--acc)\'" onblur="this.style.borderColor=\'var(--bord)\'">'
+    +'</div>'
+    // Filter pills for labels
+    +'<div id="fpFilterPills" style="padding:0 16px 12px;display:none;flex-wrap:wrap;gap:6px">'
+    +'</div>'
+    // Content
+    +'<div style="flex:1;overflow-y:auto;padding:0 12px 80px 12px">'
+    +'<div id="findPlayersList" style="padding:0 4px"><div style="text-align:center;padding:40px;color:var(--mut)">Loading...</div></div>'
+    +'</div>'
     +'</div>';
   openMenu('🎤 Find Artists',html);
+  window._fpCurrentTab='artists';
   if(GAME_MODE!=='multi'||!supabase||!currentUser){
     var el=document.getElementById('findPlayersList');
     if(el) el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Available in Live mode only.</div>';
     return;
   }
-  supabase.from('players').select('*').neq('user_id',currentUser.id).limit(50).then(function(res){
-    var el=document.getElementById('findPlayersList'); if(!el) return;
-    if(res.error||!res.data||!res.data.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No other artists yet.</div>';return;}
-    window._fpAll=res.data;
-    _fpRender(res.data);
-  });
+  _loadFindPlayersTab('artists');
 }
 function _fpRender(players){
   var el=document.getElementById('findPlayersList'); if(!el) return;
@@ -17476,15 +17597,244 @@ function _fpRender(players){
 }
 function _fpFilter(){
   var q=(document.getElementById('fpSearch')||{}).value||'';
-  if(!window._fpAll) return;
-  if(!q.trim()){_fpRender(window._fpAll);return;}
-  var lq=q.toLowerCase();
-  _fpRender(window._fpAll.filter(function(p){
-    var sd={};try{var raw=p.game_data||p.save_data;sd=typeof raw==='string'?JSON.parse(raw):(raw||{});}catch(e){}
-    var name=(sd.sn||sd.artistName||p.artist_name||'').toLowerCase();
-    var genre=(sd.genre||'').toLowerCase();
-    return name.includes(lq)||genre.includes(lq);
-  }));
+  if(window._fpCurrentTab==='artists'){
+    if(!window._fpAll) return;
+    if(!q.trim()){_fpRender(window._fpAll);return;}
+    var lq=q.toLowerCase();
+    _fpRender(window._fpAll.filter(function(p){
+      var sd={};try{var raw=p.game_data||p.save_data;sd=typeof raw==='string'?JSON.parse(raw):(raw||{});}catch(e){}
+      var name=(sd.sn||sd.artistName||p.artist_name||'').toLowerCase();
+      var genre=(sd.genre||'').toLowerCase();
+      return name.includes(lq)||genre.includes(lq);
+    }));
+  } else if(window._fpCurrentTab==='labels'){
+    if(!window._lblAll) return;
+    if(!q.trim()){_lblRender(window._lblAll);return;}
+    var lq=q.toLowerCase();
+    _lblRender(window._lblAll.filter(function(l){
+      var name=(l.name||'').toLowerCase();
+      var genres=((l.genre_focus||[]).join(' ')).toLowerCase();
+      var region=(l.region||'').toLowerCase();
+      return name.includes(lq)||genres.includes(lq)||region.includes(lq);
+    }));
+  }
+}
+
+function _switchFindTab(tab){
+  window._fpCurrentTab=tab;
+  var artistsBtn=document.getElementById('fpTabArtists');
+  var labelsBtn=document.getElementById('fpTabLabels');
+  var filterPills=document.getElementById('fpFilterPills');
+
+  if(tab==='artists'){
+    if(artistsBtn){artistsBtn.style.color='var(--acc)';artistsBtn.style.borderBottomColor='var(--acc)';}
+    if(labelsBtn){labelsBtn.style.color='var(--mut)';labelsBtn.style.borderBottomColor='transparent';}
+    if(filterPills) filterPills.style.display='none';
+    document.getElementById('fpSearch').placeholder='🔍 Search by name or genre...';
+    _fpRender(window._fpAll||[]);
+  } else if(tab==='labels'){
+    if(artistsBtn){artistsBtn.style.color='var(--mut)';artistsBtn.style.borderBottomColor='transparent';}
+    if(labelsBtn){labelsBtn.style.color='var(--acc)';labelsBtn.style.borderBottomColor='var(--acc)';}
+    if(filterPills) filterPills.style.display='flex';
+    document.getElementById('fpSearch').placeholder='🔍 Search labels...';
+    _lblRender(window._lblAll||[]);
+    _renderLblFilterPills();
+  }
+}
+
+function _loadFindPlayersTab(tab){
+  if(tab==='artists'){
+    supabase.from('players').select('*').neq('user_id',currentUser.id).limit(50).then(function(res){
+      var el=document.getElementById('findPlayersList'); if(!el) return;
+      if(res.error||!res.data||!res.data.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No other artists yet.</div>';return;}
+      window._fpAll=res.data;
+      _fpRender(res.data);
+    });
+  } else if(tab==='labels'){
+    supabase.from('labels').select('*').neq('owner_id',currentUser.id).limit(50).then(function(res){
+      var el=document.getElementById('findPlayersList'); if(!el) return;
+      if(res.error||!res.data||!res.data.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No labels yet — start one to appear in the directory!</div>';return;}
+      window._lblAll=res.data;
+      window._lblGenreFilter=null;
+      _lblRender(res.data);
+    });
+  }
+}
+
+function _renderLblFilterPills(){
+  var container=document.getElementById('fpFilterPills');
+  if(!container||!window._lblAll) return;
+
+  var allGenres=new Set();
+  var hasRecruiting=false;
+  window._lblAll.forEach(l=>{
+    if(l.genre_focus&&Array.isArray(l.genre_focus)){
+      l.genre_focus.forEach(g=>allGenres.add(g));
+    }
+    // Check if label has roster slots available (simple heuristic: tier-based)
+    if(!l.has_roster_full) hasRecruiting=true;
+  });
+
+  var html='<button onclick="_setLblGenreFilter(null)" style="background:var(--acc);color:var(--acc-txt);border:none;border-radius:12px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">All</button>';
+  if(hasRecruiting){
+    html+='<button onclick="_setLblGenreFilter(\'recruiting\')" style="background:var(--bg);color:var(--txt);border:1.5px solid var(--bord);border-radius:12px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">Recruiting</button>';
+  }
+  Array.from(allGenres).sort().forEach(g=>{
+    html+='<button onclick="_setLblGenreFilter(\''+g+'\')" style="background:var(--bg);color:var(--txt);border:1.5px solid var(--bord);border-radius:12px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">'+g+'</button>';
+  });
+  container.innerHTML=html;
+}
+
+function _setLblGenreFilter(genre){
+  window._lblGenreFilter=genre;
+  var filtered=window._lblAll;
+  if(genre==='recruiting'){
+    filtered=filtered.filter(l=>!l.has_roster_full);
+  } else if(genre){
+    filtered=filtered.filter(l=>(l.genre_focus||[]).includes(genre));
+  }
+  _lblRender(filtered);
+}
+
+function _lblRender(labels){
+  var el=document.getElementById('findPlayersList'); if(!el) return;
+  if(!labels||!labels.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--mut)">No labels match.</div>';return;}
+  var html='';
+  labels.forEach(function(l){
+    var name=l.name||'Unknown Label';
+    var tier=l.tier||'indie';
+    var tierDef={indie:'INDIE',mid:'MID-TIER',major:'MAJOR',global:'GLOBAL'}[tier]||'INDIE';
+    var tierColor={indie:'#667eea',mid:'#f59e0b',major:'#22c55e',global:'#3b82f6'}[tier]||'#667eea';
+    var genres=(l.genre_focus||[]).slice(0,2).join(', ')||'Mixed';
+    var region=l.region||'—';
+    var logo=l.logo_image?'<img src="'+l.logo_image+'" style="width:100%;height:100%;object-fit:cover">':'<span style="font-size:24px">'+(l.logo_emoji||'🏢')+'</span>';
+    var recruitingPill=!l.has_roster_full?'<span style="background:#dcfce7;color:#166534;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap">🟢 Recruiting</span>':'';
+
+    html+='<div data-lid="'+l.id+'" data-lname="'+(name.replace(/"/g,'')).replace(/'/g,'')+'" onclick="showLabelPublicPage(this.dataset.lid,this.dataset.lname)" style="display:flex;align-items:center;gap:12px;background:var(--surf);border:1.5px solid var(--bord);border-left:3px solid '+tierColor+';border-radius:10px;padding:12px 14px;cursor:pointer;margin-bottom:8px;touch-action:manipulation">'
+      +'<div style="width:46px;height:46px;border-radius:8px;background:var(--bg);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">'+logo+'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:14px;font-weight:800;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+name+'</div>'
+      +'<div style="font-size:11px;color:var(--mut);margin-top:3px">'+genres+' · '+region+'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
+      +'<span style="background:'+tierColor+'22;color:'+tierColor+';font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase">'+tierDef+'</span>'
+      +recruitingPill
+      +'</div>'
+      +'</div><div style="color:var(--mut);font-size:18px">›</div></div>';
+  });
+  el.innerHTML=html;
+}
+
+async function showLabelPublicPage(labelId, labelName){
+  showToast('Loading '+labelName+'...','gray');
+
+  if(GAME_MODE!=='multi' || typeof supabase==='undefined' || !currentUser){
+    showEvent('⚠️','Multiplayer Only','You can only view labels in multiplayer mode.',['OK']);
+    return;
+  }
+
+  try {
+    // Fetch label data from Supabase
+    const {data: label, error} = await supabase.from('labels').select('*').eq('id', labelId).single();
+    if(error || !label) throw new Error('Label not found');
+
+    // Get tier color
+    const tierColors = { Indie: '#3b82f6', 'Mid-Tier': '#f97316', Major: '#22c55e', Global: '#06b6d4' };
+    const tierColor = tierColors[label.tier] || '#3b82f6';
+
+    let html = `<div style="padding-bottom:80px">`;
+
+    // Hero section
+    html += `<div style="background:linear-gradient(135deg,${tierColor}22 0%,${tierColor}11 100%);border-bottom:1px solid var(--bord);padding:20px 16px">
+      <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:16px">
+        <div style="width:80px;height:80px;border-radius:12px;background:var(--bg);border:2px solid ${tierColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
+          ${label.logo_image?'<img src="'+label.logo_image+'" style="width:100%;height:100%;object-fit:cover">':'<span style="font-size:42px">'+(label.logo_emoji||'🏢')+'</span>'}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:24px;font-weight:900;color:var(--txt);margin-bottom:6px">${label.name}</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+            <span style="background:${tierColor};color:white;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${label.tier}</span>
+            <span style="font-size:11px;color:var(--mut)">${label.region||'—'}</span>
+          </div>
+          <div style="font-size:11px;color:var(--mut)">${(label.genre_focus||[]).join(', ')||'Mixed genres'}</div>
+        </div>
+      </div>
+      ${!label.has_roster_full?'<div style="background:#dcfce7;color:#166534;font-size:11px;font-weight:700;padding:8px 12px;border-radius:8px;text-align:center;width:100%">🟢 Currently Recruiting</div>':''}
+    </div>`;
+
+    // Bio section
+    if(label.bio){
+      html += `<div style="padding:16px;border-bottom:1px solid var(--bord)">
+        <div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">About</div>
+        <div style="font-size:13px;line-height:1.6;color:var(--txt)">${label.bio}</div>
+      </div>`;
+    }
+
+    // Featured artists section
+    if(label.featured_artists && label.featured_artists.length > 0){
+      html += `<div style="padding:16px;border-bottom:1px solid var(--bord)">
+        <div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">Featured Artists</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">`;
+
+      for(let aId of (label.featured_artists || [])){
+        // Fetch artist data
+        const {data: artist} = await supabase.from('players').select('*').eq('id', aId).single();
+        if(artist){
+          const gd = artist.game_data || {};
+          const photo = gd.photo || null;
+          html += `<div style="text-align:center;cursor:pointer" onclick="showArtistHub('${artist.id}','${(artist.display_name||'').replace(/"/g,'')}')" title="${artist.display_name}">
+            <div style="width:100%;aspect-ratio:1;border-radius:10px;background:var(--surf);border:1.5px solid var(--bord);margin-bottom:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background-size:cover;background-image:url('${photo||''}')" style="${photo?'background-size:cover':''}">
+              ${!photo?'<span style="font-size:28px">🎤</span>':''}
+            </div>
+            <div style="font-size:11px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${artist.display_name}</div>
+          </div>`;
+        }
+      }
+      html += `</div></div>`;
+    }
+
+    // Roster section
+    html += `<div style="padding:16px;border-bottom:1px solid var(--bord)">
+      <div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">Roster (${(label.roster||[]).length} artists)</div>
+      <div style="display:flex;flex-direction:column;gap:8px">`;
+
+    for(let member of (label.roster || [])){
+      html += `<div onclick="showArtistHub('${member.userId}','${(member.artistName||'').replace(/"/g,'')}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;cursor:pointer;transition:all 0.2s">
+        <div style="width:40px;height:40px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px">🎤</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--txt)">${member.artistName}</div>
+          <div style="font-size:10px;color:var(--mut)">Since week ${member.signedWeek || '—'}</div>
+        </div>
+      </div>`;
+    }
+
+    html += `</div></div>`;
+
+    // Apply button (for artists not signed to this label)
+    if(GAME.signedLabel && !GAME.signedLabel.isOwner && GAME.signedLabel.labelId !== labelId){
+      html += `<div style="padding:16px;text-align:center">
+        <button onclick="showApplyToLabel('${labelId}','${label.name}')" style="background:var(--acc);color:white;border:none;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:700;width:100%;cursor:pointer;font-family:var(--fb)">Apply to ${label.name}</button>
+      </div>`;
+    }
+
+    html += `</div>`;
+
+    _insertOverlay(`<div style="text-align:left;padding:0;border-radius:0;max-height:none">
+      <div style="background:var(--bg);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bord)">
+        <div style="font-size:14px;font-weight:800">🏷 ${label.name}</div>
+        <button onclick="document.getElementById('_overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0">✕</button>
+      </div>
+      ${html}
+    </div>`);
+    showToast(label.name + ' loaded','green');
+  } catch(err){
+    console.error('Label page error:', err);
+    showEvent('⚠️','Error','Could not load label details.',['OK']);
+  }
+}
+
+async function showApplyToLabel(labelId, labelName){
+  // Placeholder for application flow
+  showToast('Application feature coming soon','gray');
 }
 // ── Artist Hub renderer — used by viewer, preview, and Find Players ──────────
 function _renderArtistHubPage(gameData, viewerUserId, isPreview){
@@ -17556,6 +17906,9 @@ function _renderArtistHubPage(gameData, viewerUserId, isPreview){
     <div style="position:absolute;bottom:0;left:0;right:0;padding:20px 18px">
       <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-0.5px;line-height:1.1;text-shadow:0 2px 8px rgba(0,0,0,0.4)">${name.toUpperCase()}</div>
       <div style="font-size:11px;color:rgba(255,255,255,0.75);letter-spacing:2.5px;text-transform:uppercase;margin-top:5px">${genre}</div>
+      ${gameData.signedLabel?`<div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;background:rgba(255,255,255,0.2);color:#fff;font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,0.3)" onclick="showLabelPublicPage('${gameData.signedLabel.labelId}','${(gameData.signedLabel.labelName||'').replace(/"/g,'').replace(/'/g,'')}')" title="View label">🏷 ${gameData.signedLabel.labelName}</span>
+      </div>`:''}
       <div style="display:flex;align-items:center;gap:16px;margin-top:8px">
         <span style="font-size:13px;color:rgba(255,255,255,0.9);font-weight:600">${fmt(totalFans)} fans</span>
         <span style="font-size:13px;color:rgba(255,255,255,0.9);font-weight:600">${fmt(totalStreams)} streams</span>
