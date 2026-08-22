@@ -13493,7 +13493,7 @@ async function confirmCreateLabel(){
   if((GAME.money||0) < 25000){showEvent('💸','Not Enough Money','You need at least $25,000 to start a label.',['OK']);return;}
 
   const label = {
-    id: 'lbl_'+Date.now(),
+    id: crypto.randomUUID ? crypto.randomUUID() : 'lbl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
     ownerId: GAME.playerId || GAME.userId,
     name: name,
     logoEmoji: window._pendingLabelEmoji || '🏢',
@@ -14507,6 +14507,16 @@ function saveLabelSettings(){
   // Sync changes to Supabase
   if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && ol.id){
     try {
+      // Check if ID is valid UUID format (fix legacy "lbl_" IDs)
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ol.id);
+      if(!isValidUUID && ol.id.startsWith('lbl_')){
+        console.log('🔧 Fixing legacy label ID format: ' + ol.id);
+        // Generate new UUID
+        const newId = crypto.randomUUID ? crypto.randomUUID() : 'lbl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        ol.id = newId;
+        markDirty();
+      }
+
       console.log('🔄 Syncing label to Supabase:', {id: ol.id, name: ol.name, hasImage: !!ol.logoImage});
       supabase.from('labels').update({
         name: ol.name,
@@ -14520,9 +14530,34 @@ function saveLabelSettings(){
         if(r.error) {
           console.error('❌ Label sync error:', r.error);
           console.error('Error details:', JSON.stringify(r.error));
+          // If update fails and it's a UUID issue, try inserting as new
+          if(r.error.code === '22P02' && ol.id.startsWith('lbl_')){
+            console.log('🔄 UUID format fix: trying insert instead of update');
+            const newId = crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now();
+            ol.id = newId;
+            supabase.from('labels').insert([{
+              id: ol.id,
+              owner_id: ol.ownerId,
+              name: ol.name,
+              logo_emoji: ol.logoEmoji,
+              logo_image: ol.logoImage,
+              genre_focus: ol.genreFocus,
+              region: ol.region,
+              tier: ol.tier,
+              bio: ol.bio,
+              featured_artists: ol.featuredArtists || [],
+              hype: ol.hype || 0,
+              rep: ol.rep || 5.0,
+              debt: ol.debt || 0,
+              weekly_maintenance: ol.weeklyMaintenance || 5000,
+              roster: ol.roster || []
+            }]).then(ir => {
+              if(!ir.error) console.log('✅ Label inserted with new UUID');
+              markDirty();
+            });
+          }
         } else {
           console.log('✅ Label synced successfully');
-          console.log('Response:', r);
         }
       });
     } catch(e) {
@@ -17707,7 +17742,9 @@ function _switchFindTab(tab){
     if(labelsBtn){labelsBtn.style.color='var(--acc)';labelsBtn.style.borderBottomColor='var(--acc)';}
     if(filterPills) filterPills.style.display='flex';
     document.getElementById('fpSearch').placeholder='🔍 Search labels...';
-    _lblRender(window._lblAll||[]);
+    // Load labels from Supabase
+    _loadFindPlayersTab('labels');
+    // Note: _lblRender will be called after data loads
     _renderLblFilterPills();
   }
 }
