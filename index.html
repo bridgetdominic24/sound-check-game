@@ -14505,10 +14505,12 @@ function saveLabelSettings(){
   }
 
   // Sync changes to Supabase
+  console.log('DEBUG saveLabelSettings sync check:', {GAME_MODE, hasSupabase: typeof supabase !== 'undefined', olId: ol.id});
   if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && ol.id){
     try {
       const originalId = ol.id;
       console.log('🔄 Starting label sync, current ID:', originalId);
+      console.log('DEBUG ID details:', {id: ol.id, type: typeof ol.id, startsWithLbl: ol.id.startsWith('lbl_')});
 
       // Check if ID is valid UUID format (fix legacy "lbl_" IDs)
       const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ol.id);
