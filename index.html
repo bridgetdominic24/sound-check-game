@@ -17658,7 +17658,7 @@ function _loadFindPlayersTab(tab){
       _fpRender(res.data);
     });
   } else if(tab==='labels'){
-    supabase.from('labels').select('*').neq('owner_id',currentUser.id).limit(50).then(function(res){
+    supabase.from('labels').select('*').limit(50).then(function(res){
       var el=document.getElementById('findPlayersList'); if(!el) return;
       if(res.error||!res.data||!res.data.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No labels yet — start one to appear in the directory!</div>';return;}
       window._lblAll=res.data;
