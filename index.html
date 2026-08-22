@@ -13357,14 +13357,21 @@ async function handleLabelLogoUpload(event){
     try {
       const ext = file.name.split('.').pop();
       const path = currentUser.id+'/label_'+Date.now()+'.'+ext;
+      console.log('📸 Uploading label logo to Supabase storage:', {path, filename: file.name, size: file.size});
       const { data, error } = await supabase.storage.from('label-logos').upload(path, file, { upsert: false });
-      if(error) throw error;
+      if(error) {
+        console.error('❌ Upload error:', error);
+        throw error;
+      }
+      console.log('✅ File uploaded to storage');
       const { data: urlData } = supabase.storage.from('label-logos').getPublicUrl(path);
       const url = urlData.publicUrl;
+      console.log('✅ Public URL:', url);
       window._pendingLabelLogoImage = url;
-      showToast('Logo uploaded!','green');
+      showToast('✅ Logo uploaded!','green');
     } catch(err){
-      console.error('Label logo upload error:', err);
+      console.error('❌ Label logo upload error:', err);
+      console.error('Error details:', err.message, err.status, err.statusText);
       showToast('Upload failed: '+err.message,'red');
       window._pendingLabelLogoImage = null;
     }
@@ -13407,15 +13414,22 @@ async function handleSettingsLogoUpload(event){
     try {
       const ext = file.name.split('.').pop();
       const path = currentUser.id+'/label_'+Date.now()+'.'+ext;
+      console.log('📸 Settings: Uploading label logo to Supabase storage:', {path, filename: file.name, size: file.size});
       const { data, error } = await supabase.storage.from('label-logos').upload(path, file, { upsert: false });
-      if(error) throw error;
+      if(error) {
+        console.error('❌ Upload error:', error);
+        throw error;
+      }
+      console.log('✅ File uploaded to storage');
       const { data: urlData } = supabase.storage.from('label-logos').getPublicUrl(path);
       const url = urlData.publicUrl;
+      console.log('✅ Public URL:', url);
       window._settingsLabelLogoImage = url;
       updateSettingsLogoPreview();
-      showToast('Logo updated!','green');
+      showToast('✅ Logo updated!','green');
     } catch(err){
-      console.error('Settings logo upload error:', err);
+      console.error('❌ Settings logo upload error:', err);
+      console.error('Error details:', err.message, err.status, err.statusText);
       showToast('Upload failed: '+err.message,'red');
     }
   } else {
@@ -13544,8 +13558,8 @@ async function confirmCreateLabel(){
   // Persist to Supabase
   if(GAME_MODE === 'multi' && typeof supabase !== 'undefined'){
     try {
-      console.log('💾 Creating label in Supabase:', label.id, label.name);
-      const { data, error } = await supabase.from('labels').insert([{
+      console.log('💾 Creating label in Supabase:', {id: label.id, name: label.name, ownerId: label.ownerId});
+      const labelData = {
         id: label.id,
         owner_id: label.ownerId,
         name: label.name,
@@ -13559,16 +13573,21 @@ async function confirmCreateLabel(){
         hype: 0, rep: 5.0, debt: 0,
         weekly_maintenance: 5000,
         reset_version: window.CURRENT_RESET_VERSION || 1
-      }]);
+      };
+      console.log('📤 Inserting:', JSON.stringify(labelData));
+      const { data, error } = await supabase.from('labels').insert([labelData]);
       if(error) {
         console.error('❌ Label creation error:', error);
-        showToast('Warning: Label created locally but sync to Supabase may have failed. Try updating in settings.', 'yellow');
+        console.error('Error code:', error.code, 'Message:', error.message);
+        showToast('⚠️ Label created locally but may not sync properly. Error: ' + error.message, 'yellow');
       } else {
-        console.log('✅ Label created in Supabase');
+        console.log('✅ Label created in Supabase successfully');
+        console.log('✅ Data:', data);
       }
     } catch(e){
       console.error('❌ Label creation exception:', e);
-      showToast('Label saved locally but Supabase sync failed. Try updating in settings.', 'yellow');
+      console.error('Exception:', e.message, e.stack);
+      showToast('⚠️ Label sync error. Try updating in settings.', 'yellow');
     }
   }
 
@@ -14488,6 +14507,7 @@ function saveLabelSettings(){
   // Sync changes to Supabase
   if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && ol.id){
     try {
+      console.log('🔄 Syncing label to Supabase:', {id: ol.id, name: ol.name, hasImage: !!ol.logoImage});
       supabase.from('labels').update({
         name: ol.name,
         logo_emoji: ol.logoEmoji,
@@ -14497,9 +14517,18 @@ function saveLabelSettings(){
         bio: ol.bio,
         featured_artists: ol.featuredArtists
       }).eq('id', ol.id).then(r => {
-        if(r.error) console.warn('Label sync error:', r.error);
+        if(r.error) {
+          console.error('❌ Label sync error:', r.error);
+          console.error('Error details:', JSON.stringify(r.error));
+        } else {
+          console.log('✅ Label synced successfully');
+          console.log('Response:', r);
+        }
       });
-    } catch(e) { console.warn('Label sync error:', e); }
+    } catch(e) {
+      console.error('❌ Label sync exception:', e);
+      console.error('Exception:', e.message, e.stack);
+    }
   }
 
   markDirty(); saveToCloud(); updateStats();
@@ -17693,25 +17722,29 @@ function _loadFindPlayersTab(tab){
     });
   } else if(tab==='labels'){
     console.log('📂 Loading labels from Supabase...');
+    console.log('🔍 Query: supabase.from("labels").select("*").limit(50)');
     supabase.from('labels').select('*').limit(50).then(function(res){
       var el=document.getElementById('findPlayersList'); if(!el) return;
       if(res.error){
         console.error('❌ Labels query error:', res.error);
-        el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Error loading labels. Please refresh.</div>';
+        console.error('Error details:', JSON.stringify(res.error));
+        el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)"><div style="margin-bottom:12px">⚠️ Error loading labels</div><div style="font-size:11px;color:var(--mut);word-break:break-word">'+res.error.message+'</div><button onclick="_loadFindPlayersTab(\'labels\')" style="margin-top:12px;padding:8px 16px;background:var(--acc);color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px">Retry</button></div>';
         return;
       }
       console.log('✅ Labels found:', res.data ? res.data.length : 0);
       if(!res.data||!res.data.length){
-        el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No labels yet — start one to appear in the directory!</div>';
+        el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)"><div style="font-size:40px;margin-bottom:12px">🏷️</div><div>No labels yet — create one to appear in the directory!</div><div style="font-size:11px;color:var(--mut);margin-top:8px">Currently in multiplayer mode</div></div>';
         return;
       }
       window._lblAll=res.data;
       window._lblGenreFilter=null;
+      console.log('📊 Sample labels:', res.data.slice(0,2));
       _lblRender(res.data);
     }).catch(function(err){
       console.error('❌ Labels query exception:', err);
+      console.error('Exception details:', err.message, err.stack);
       var el=document.getElementById('findPlayersList');
-      if(el) el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Error loading labels.</div>';
+      if(el) el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)"><div style="margin-bottom:12px">⚠️ Connection error</div><div style="font-size:11px;color:var(--mut)">Unable to connect to label directory</div><button onclick="_loadFindPlayersTab(\'labels\')" style="margin-top:12px;padding:8px 16px;background:var(--acc);color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px">Retry</button></div>';
     });
   }
 }
@@ -17789,12 +17822,18 @@ async function showLabelPublicPage(labelId, labelName){
 
   try {
     // Fetch label data from Supabase
+    console.log('🔍 Fetching label:', labelId);
     const {data: label, error} = await supabase.from('labels').select('*').eq('id', labelId).single();
     if(error){
-      console.error('Label fetch error:', error);
-      throw error;
+      console.error('❌ Label fetch error:', error);
+      console.error('Error details:', JSON.stringify(error));
+      throw new Error(error.message || 'Could not load label details');
     }
-    if(!label) throw new Error('Label not found in database');
+    if(!label) {
+      console.error('❌ Label not found in database');
+      throw new Error('Label not found in database');
+    }
+    console.log('✅ Label loaded:', {id: label.id, name: label.name, ownerId: label.owner_id});
 
     // Get tier color
     const tierColors = { Indie: '#3b82f6', 'Mid-Tier': '#f97316', Major: '#22c55e', Global: '#06b6d4' };
@@ -17886,8 +17925,10 @@ async function showLabelPublicPage(labelId, labelName){
     </div>`);
     showToast(label.name + ' loaded','green');
   } catch(err){
-    console.error('Label page error:', err);
-    showEvent('⚠️','Error','Could not load label details.',['OK']);
+    console.error('❌ Label page error:', err);
+    console.error('Stack:', err.stack);
+    const errorMsg = err.message || 'Unknown error';
+    showEvent('⚠️','Label Not Found','Could not load label details.\n\n'+errorMsg+'\n\nThis label may not exist yet or may have been deleted.',['OK']);
   }
 }
 
