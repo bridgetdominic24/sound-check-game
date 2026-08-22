@@ -3170,11 +3170,17 @@ function backToLandingFromLogin(){
 }
 
 // CLOUD SAVE FUNCTIONS
+// Utility: Check if a string is a valid UUID
+function isValidUUID(id) {
+  if(typeof id !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 async function checkAndLoadSave(){
   const debugLog = document.getElementById('debugLog');
-  
+
   console.log('🔍 checkAndLoadSave START - GAME before load:', GAME ? {week: GAME.week, money: GAME.money} : 'null');
-  
+
   if(GAME_MODE !== 'multi' || !currentUser) {
     if(debugLog) debugLog.innerHTML += '⚠️ Skip load: not multi mode<br>';
     // Create fresh game for single player
@@ -3184,31 +3190,60 @@ async function checkAndLoadSave(){
     }
     return false;
   }
-  
+
   try {
     if(debugLog) debugLog.innerHTML += '📥 Loading from Supabase...<br>';
-    
+
     console.log('🔍 Checking Supabase for user:', currentUser.id);
-    
+
     // Query players table
     const { data, error } = await supabase
       .from('players')
       .select('*')
       .eq('user_id', currentUser.id)
       .single();
-    
+
     if(error && error.code !== 'PGRST116') { // PGRST116 = no rows found
       throw error;
     }
-    
+
     console.log('🔍 Supabase data exists:', !!data);
-    
+
     if(data && data.game_data){
       console.log('🔍 RAW SUPABASE DATA:', data);
-      
+
       // Load GAME from game_data JSON column
       GAME = JSON.parse(JSON.stringify(data.game_data));
       _sanitizeGameState(GAME);
+
+      // SELF-HEALING MIGRATION: Fix labels with invalid IDs
+      if(GAME.ownedLabel && !isValidUUID(GAME.ownedLabel.id)){
+        console.log('🔧 Detected legacy label ID format, attempting self-heal:', GAME.ownedLabel.id);
+        try {
+          // Look up label by owner_id instead
+          const { data: labelData, error: labelError } = await supabase
+            .from('labels')
+            .select('id')
+            .eq('owner_id', currentUser.id)
+            .single();
+
+          if(!labelError && labelData) {
+            console.log('✅ Found label in Supabase with UUID:', labelData.id);
+            GAME.ownedLabel.id = labelData.id;
+            // Also update signedLabel if it exists
+            if(GAME.signedLabel && GAME.signedLabel.isOwner) {
+              GAME.signedLabel.labelId = labelData.id;
+            }
+            // Persist the fix back to Supabase
+            await supabase.from('players').update({game_data: GAME}).eq('user_id', currentUser.id);
+            console.log('✅ Label ID auto-fixed and synced to Supabase');
+          } else {
+            console.warn('⚠️ Could not find label by owner_id in Supabase');
+          }
+        } catch(healErr) {
+          console.error('❌ Self-heal failed:', healErr);
+        }
+      }
 
       // Fix broken values only — don't restore spent creativity
       if(typeof GAME.creativity !== 'number' || isNaN(GAME.creativity) || GAME.creativity < 0) GAME.creativity = 100;
@@ -13357,14 +13392,21 @@ async function handleLabelLogoUpload(event){
     try {
       const ext = file.name.split('.').pop();
       const path = currentUser.id+'/label_'+Date.now()+'.'+ext;
+      console.log('📸 Uploading label logo to Supabase storage:', {path, filename: file.name, size: file.size});
       const { data, error } = await supabase.storage.from('label-logos').upload(path, file, { upsert: false });
-      if(error) throw error;
+      if(error) {
+        console.error('❌ Upload error:', error);
+        throw error;
+      }
+      console.log('✅ File uploaded to storage');
       const { data: urlData } = supabase.storage.from('label-logos').getPublicUrl(path);
       const url = urlData.publicUrl;
+      console.log('✅ Public URL:', url);
       window._pendingLabelLogoImage = url;
-      showToast('Logo uploaded!','green');
+      showToast('✅ Logo uploaded!','green');
     } catch(err){
-      console.error('Label logo upload error:', err);
+      console.error('❌ Label logo upload error:', err);
+      console.error('Error details:', err.message, err.status, err.statusText);
       showToast('Upload failed: '+err.message,'red');
       window._pendingLabelLogoImage = null;
     }
@@ -13407,15 +13449,22 @@ async function handleSettingsLogoUpload(event){
     try {
       const ext = file.name.split('.').pop();
       const path = currentUser.id+'/label_'+Date.now()+'.'+ext;
+      console.log('📸 Settings: Uploading label logo to Supabase storage:', {path, filename: file.name, size: file.size});
       const { data, error } = await supabase.storage.from('label-logos').upload(path, file, { upsert: false });
-      if(error) throw error;
+      if(error) {
+        console.error('❌ Upload error:', error);
+        throw error;
+      }
+      console.log('✅ File uploaded to storage');
       const { data: urlData } = supabase.storage.from('label-logos').getPublicUrl(path);
       const url = urlData.publicUrl;
+      console.log('✅ Public URL:', url);
       window._settingsLabelLogoImage = url;
       updateSettingsLogoPreview();
-      showToast('Logo updated!','green');
+      showToast('✅ Logo updated!','green');
     } catch(err){
-      console.error('Settings logo upload error:', err);
+      console.error('❌ Settings logo upload error:', err);
+      console.error('Error details:', err.message, err.status, err.statusText);
       showToast('Upload failed: '+err.message,'red');
     }
   } else {
@@ -13478,8 +13527,21 @@ async function confirmCreateLabel(){
   if(!name){showEvent('⚠️','Name Required','Please enter a name for your label.',['OK']);return;}
   if((GAME.money||0) < 25000){showEvent('💸','Not Enough Money','You need at least $25,000 to start a label.',['OK']);return;}
 
+  // Generate proper UUID (never fallback to string format)
+  let labelId;
+  if(crypto.randomUUID) {
+    labelId = crypto.randomUUID();
+  } else {
+    // Fallback for older browsers: create a valid UUID format
+    labelId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+  console.log('✨ Generated label UUID:', labelId);
+
   const label = {
-    id: 'lbl_'+Date.now(),
+    id: labelId,
     ownerId: GAME.playerId || GAME.userId,
     name: name,
     logoEmoji: window._pendingLabelEmoji || '🏢',
@@ -13544,8 +13606,8 @@ async function confirmCreateLabel(){
   // Persist to Supabase
   if(GAME_MODE === 'multi' && typeof supabase !== 'undefined'){
     try {
-      console.log('💾 Creating label in Supabase:', label.id, label.name);
-      const { data, error } = await supabase.from('labels').insert([{
+      console.log('💾 Creating label in Supabase:', {id: label.id, name: label.name, ownerId: label.ownerId});
+      const labelData = {
         id: label.id,
         owner_id: label.ownerId,
         name: label.name,
@@ -13559,16 +13621,21 @@ async function confirmCreateLabel(){
         hype: 0, rep: 5.0, debt: 0,
         weekly_maintenance: 5000,
         reset_version: window.CURRENT_RESET_VERSION || 1
-      }]);
+      };
+      console.log('📤 Inserting:', JSON.stringify(labelData));
+      const { data, error } = await supabase.from('labels').insert([labelData]);
       if(error) {
         console.error('❌ Label creation error:', error);
-        showToast('Warning: Label created locally but sync to Supabase may have failed. Try updating in settings.', 'yellow');
+        console.error('Error code:', error.code, 'Message:', error.message);
+        showToast('⚠️ Label created locally but may not sync properly. Error: ' + error.message, 'yellow');
       } else {
-        console.log('✅ Label created in Supabase');
+        console.log('✅ Label created in Supabase successfully');
+        console.log('✅ Data:', data);
       }
     } catch(e){
       console.error('❌ Label creation exception:', e);
-      showToast('Label saved locally but Supabase sync failed. Try updating in settings.', 'yellow');
+      console.error('Exception:', e.message, e.stack);
+      showToast('⚠️ Label sync error. Try updating in settings.', 'yellow');
     }
   }
 
@@ -14486,8 +14553,31 @@ function saveLabelSettings(){
   }
 
   // Sync changes to Supabase
-  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && ol.id){
+  console.log('DEBUG saveLabelSettings sync check:', {GAME_MODE, hasSupabase: typeof supabase !== 'undefined', olId: ol.id, isValidUUID: isValidUUID(ol.id)});
+
+  // GUARD: Only sync if ID is a valid UUID
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && ol.id && isValidUUID(ol.id)){
     try {
+      const originalId = ol.id;
+      console.log('🔄 Starting label sync, current ID:', originalId);
+      console.log('DEBUG ID details:', {id: ol.id, type: typeof ol.id, startsWithLbl: ol.id.startsWith('lbl_')});
+
+      // Check if ID is valid UUID format (fix legacy "lbl_" IDs)
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ol.id);
+      let idWasFixed = false;
+      if(!isValidUUID && ol.id.startsWith('lbl_')){
+        console.log('🔧 Fixing legacy label ID format: ' + ol.id);
+        // Generate new UUID
+        const newId = crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        console.log('🔧 New UUID generated:', newId);
+        ol.id = newId;
+        idWasFixed = true;
+        markDirty();
+      }
+
+      console.log('🔄 Syncing label to Supabase:', {id: ol.id, name: ol.name, hasImage: !!ol.logoImage, idWasFixed});
+
+      // Try to update first (in case label already exists in Supabase)
       supabase.from('labels').update({
         name: ol.name,
         logo_emoji: ol.logoEmoji,
@@ -14497,9 +14587,48 @@ function saveLabelSettings(){
         bio: ol.bio,
         featured_artists: ol.featuredArtists
       }).eq('id', ol.id).then(r => {
-        if(r.error) console.warn('Label sync error:', r.error);
+        if(r.error) {
+          console.error('❌ Update failed, error code:', r.error.code);
+          console.error('Error details:', JSON.stringify(r.error));
+          // If update fails (no matching record or UUID error), try inserting as new
+          if(r.error.code === 'PGRST116' || r.error.code === '22P02' || idWasFixed){
+            console.log('📤 No record found or ID was fixed, inserting new label...');
+            supabase.from('labels').insert([{
+              id: ol.id,
+              owner_id: ol.ownerId,
+              name: ol.name,
+              logo_emoji: ol.logoEmoji,
+              logo_image: ol.logoImage,
+              genre_focus: ol.genreFocus,
+              region: ol.region,
+              tier: ol.tier,
+              bio: ol.bio,
+              featured_artists: ol.featuredArtists || [],
+              hype: ol.hype || 0,
+              rep: ol.rep || 5.0,
+              debt: ol.debt || 0,
+              weekly_maintenance: ol.weeklyMaintenance || 5000,
+              roster: ol.roster || []
+            }]).then(ir => {
+              if(ir.error) {
+                console.error('❌ Insert also failed:', ir.error);
+              } else {
+                console.log('✅ Label inserted successfully with UUID:', ol.id);
+                markDirty();
+              }
+            });
+          }
+        } else {
+          console.log('✅ Label updated successfully');
+          if(idWasFixed) markDirty();
+        }
       });
-    } catch(e) { console.warn('Label sync error:', e); }
+    } catch(e) {
+      console.error('❌ Label sync exception:', e);
+      console.error('Exception:', e.message, e.stack);
+    }
+  } else {
+    console.log('⚠️ Sync skipped:', {isMulti: GAME_MODE === 'multi', hasSupabase: typeof supabase !== 'undefined', hasId: !!ol.id});
   }
 
   markDirty(); saveToCloud(); updateStats();
@@ -17678,7 +17807,9 @@ function _switchFindTab(tab){
     if(labelsBtn){labelsBtn.style.color='var(--acc)';labelsBtn.style.borderBottomColor='var(--acc)';}
     if(filterPills) filterPills.style.display='flex';
     document.getElementById('fpSearch').placeholder='🔍 Search labels...';
-    _lblRender(window._lblAll||[]);
+    // Load labels from Supabase
+    _loadFindPlayersTab('labels');
+    // Note: _lblRender will be called after data loads
     _renderLblFilterPills();
   }
 }
@@ -17693,25 +17824,29 @@ function _loadFindPlayersTab(tab){
     });
   } else if(tab==='labels'){
     console.log('📂 Loading labels from Supabase...');
+    console.log('🔍 Query: supabase.from("labels").select("*").limit(50)');
     supabase.from('labels').select('*').limit(50).then(function(res){
       var el=document.getElementById('findPlayersList'); if(!el) return;
       if(res.error){
         console.error('❌ Labels query error:', res.error);
-        el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Error loading labels. Please refresh.</div>';
+        console.error('Error details:', JSON.stringify(res.error));
+        el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)"><div style="margin-bottom:12px">⚠️ Error loading labels</div><div style="font-size:11px;color:var(--mut);word-break:break-word">'+res.error.message+'</div><button onclick="_loadFindPlayersTab(\'labels\')" style="margin-top:12px;padding:8px 16px;background:var(--acc);color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px">Retry</button></div>';
         return;
       }
       console.log('✅ Labels found:', res.data ? res.data.length : 0);
       if(!res.data||!res.data.length){
-        el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No labels yet — start one to appear in the directory!</div>';
+        el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)"><div style="font-size:40px;margin-bottom:12px">🏷️</div><div>No labels yet — create one to appear in the directory!</div><div style="font-size:11px;color:var(--mut);margin-top:8px">Currently in multiplayer mode</div></div>';
         return;
       }
       window._lblAll=res.data;
       window._lblGenreFilter=null;
+      console.log('📊 Sample labels:', res.data.slice(0,2));
       _lblRender(res.data);
     }).catch(function(err){
       console.error('❌ Labels query exception:', err);
+      console.error('Exception details:', err.message, err.stack);
       var el=document.getElementById('findPlayersList');
-      if(el) el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Error loading labels.</div>';
+      if(el) el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)"><div style="margin-bottom:12px">⚠️ Connection error</div><div style="font-size:11px;color:var(--mut)">Unable to connect to label directory</div><button onclick="_loadFindPlayersTab(\'labels\')" style="margin-top:12px;padding:8px 16px;background:var(--acc);color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px">Retry</button></div>';
     });
   }
 }
@@ -17787,14 +17922,27 @@ async function showLabelPublicPage(labelId, labelName){
     return;
   }
 
+  // GUARD: Validate UUID format before querying
+  if(!isValidUUID(labelId)){
+    console.error('❌ Invalid label ID format:', labelId);
+    showEvent('⚠️','Invalid Label','This label ID is in an invalid format. Please try again.',['OK']);
+    return;
+  }
+
   try {
     // Fetch label data from Supabase
+    console.log('🔍 Fetching label:', labelId);
     const {data: label, error} = await supabase.from('labels').select('*').eq('id', labelId).single();
     if(error){
-      console.error('Label fetch error:', error);
-      throw error;
+      console.error('❌ Label fetch error:', error);
+      console.error('Error details:', JSON.stringify(error));
+      throw new Error(error.message || 'Could not load label details');
     }
-    if(!label) throw new Error('Label not found in database');
+    if(!label) {
+      console.error('❌ Label not found in database');
+      throw new Error('Label not found in database');
+    }
+    console.log('✅ Label loaded:', {id: label.id, name: label.name, ownerId: label.owner_id});
 
     // Get tier color
     const tierColors = { Indie: '#3b82f6', 'Mid-Tier': '#f97316', Major: '#22c55e', Global: '#06b6d4' };
@@ -17886,8 +18034,10 @@ async function showLabelPublicPage(labelId, labelName){
     </div>`);
     showToast(label.name + ' loaded','green');
   } catch(err){
-    console.error('Label page error:', err);
-    showEvent('⚠️','Error','Could not load label details.',['OK']);
+    console.error('❌ Label page error:', err);
+    console.error('Stack:', err.stack);
+    const errorMsg = err.message || 'Unknown error';
+    showEvent('⚠️','Label Not Found','Could not load label details.\n\n'+errorMsg+'\n\nThis label may not exist yet or may have been deleted.',['OK']);
   }
 }
 
