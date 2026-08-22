@@ -8459,182 +8459,224 @@ function showPromoManager(songId){
   const html = `<div style="padding:20px 0 80px"><div style="max-width:500px;margin:0 auto;padding:0 16px"><div style="display:flex;align-items:center;gap:12px;margin-bottom:24px"><button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--acc);font-size:28px;cursor:pointer;padding:0">←</button><div><h2 style="font-size:18px;color:var(--txt);margin-bottom:4px">${song.title}</h2><p style="font-size:12px;color:var(--mut)">Released • ${(song.streams||0).toLocaleString()} streams</p></div></div><div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--bord)"><button onclick="switchPromoTab(event,'active',${songId})" data-tab="active" style="flex:1;padding:14px;background:none;border:none;color:var(--acc);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--acc);margin-bottom:-2px">Active ${song.campaigns.filter(c=>c.status==='active').length>0?'('+song.campaigns.filter(c=>c.status==='active').length+')':''}</button><button onclick="switchPromoTab(event,'history',${songId})" data-tab="history" style="flex:1;padding:14px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s">History ${completedCampaigns.length>0?'('+completedCampaigns.length+')':''}</button><button onclick="switchPromoTab(event,'new',${songId})" data-tab="new" style="flex:1;padding:14px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s">New</button></div><div data-promo-tab="active" style="display:block">${song.campaigns.filter(c=>c.status==='active').length>0?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px"><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px">Total Spent</div><div style="font-size:18px;font-weight:700;color:var(--acc)">$${totalSpent.toLocaleString()}</div></div><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px">New Listeners</div><div style="font-size:18px;font-weight:700;color:var(--acc)">${totalListeners.toLocaleString()}</div></div></div>`:''}${activeCampaignsHTML || '<div style="text-align:center;padding:40px 20px"><div style="font-size:40px;margin-bottom:12px">🎯</div><p style="color:var(--mut)">No active campaigns</p></div>'}</div><div data-promo-tab="history" style="display:none">${historyHTML}</div><div data-promo-tab="new" style="display:none"><div style="font-size:12px;color:var(--mut);margin-bottom:16px;padding:12px;background:var(--acc-bg);border-left:3px solid var(--acc);border-radius:6px">💡 Select a promo type below to start promoting. You can run multiple campaigns at once!</div>${promoOptionsHTML}<div id="budgetSection-${songId}" style="display:none;background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:20px"><div style="font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:600">Budget Setup</div><div style="margin-bottom:12px"><label style="display:block;font-size:12px;color:var(--mut);margin-bottom:6px">Weekly Budget ($)</label><div style="display:flex;gap:8px"><span style="color:var(--mut);padding:10px;font-weight:600">$</span><input type="number" id="budgetInput-${songId}" placeholder="5000" min="100" step="100" style="flex:1;padding:10px;background:var(--bg);border:1px solid var(--bord);border-radius:8px;color:var(--txt);font-size:14px" oninput="updatePromoEstimate(${songId})"></div></div><div style="margin-bottom:12px"><label style="display:block;font-size:12px;color:var(--mut);margin-bottom:6px">Duration</label><div style="display:flex;gap:6px;flex-wrap:wrap"><button onclick="selectDurationPill(event,1)" class="duration-pill" style="padding:8px 14px;background:var(--bord);border:none;color:var(--mut);border-radius:20px;font-size:12px;cursor:pointer;transition:all 0.2s">1 week</button><button onclick="selectDurationPill(event,2)" class="duration-pill" style="padding:8px 14px;background:var(--bord);border:none;color:var(--mut);border-radius:20px;font-size:12px;cursor:pointer;transition:all 0.2s">2 weeks</button><button onclick="selectDurationPill(event,4)" class="duration-pill" style="padding:8px 14px;background:var(--bord);border:none;color:var(--mut);border-radius:20px;font-size:12px;cursor:pointer;transition:all 0.2s">4 weeks</button><button onclick="selectDurationPill(event,8)" class="duration-pill" style="padding:8px 14px;background:var(--bord);border:none;color:var(--mut);border-radius:20px;font-size:12px;cursor:pointer;transition:all 0.2s">8 weeks</button></div></div><div style="background:var(--acc-bg);border:1px solid var(--bord);border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px"><div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)"><span>Cost per Listener:</span><span style="color:var(--acc);font-weight:600" id="costPer-${songId}">$0.15</span></div><div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)"><span>Listeners/Week:</span><span style="color:var(--acc);font-weight:600" id="listeners-${songId}">0</span></div><div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)"><span>Duration:</span><span style="color:var(--acc);font-weight:600" id="durationShow-${songId}">Select</span></div><div style="display:flex;justify-content:space-between;border-top:1px solid var(--bord);padding-top:8px;margin-top:8px;color:var(--mut)"><span>Total Cost:</span><span style="color:var(--acc);font-weight:600" id="totalShow-${songId}">$0</span></div></div><button id="launchBtn-${songId}" onclick="launchPromoCampaign(${songId})" style="width:100%;padding:12px;background:linear-gradient(135deg,var(--acc),#764ba2);color:var(--acc-txt);border:none;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;transition:all 0.2s" disabled>Start Campaign</button></div></div></div></div>`;
   
   _insertOverlay(html);
-  window.currentPromoSong = {id: songId, selectedPromo: null, selectedDuration: null};
+  window.currentPromoSong = {id: songId, selectedPromos: {}};
 }
 
 function selectPromoOption(element, promoKey, songId){
-  // Remove selection from all
-  document.querySelectorAll('[data-promo]').forEach(el => {
-    el.style.borderColor = 'var(--bord)';
-    el.style.background = 'var(--surf)';
-    el.style.boxShadow = 'none';
-  });
+  // Initialize selected promos storage if needed
+  if(!window.currentPromoSong.selectedPromos) {
+    window.currentPromoSong.selectedPromos = {};
+  }
 
-  // Remove any existing budget panels
-  document.querySelectorAll('[data-budget-panel]').forEach(el => el.remove());
+  // Toggle selection
+  const isSelected = window.currentPromoSong.selectedPromos[promoKey];
 
-  // Select this one
-  element.style.borderColor = 'var(--acc)';
-  element.style.background = 'rgba(102,126,234,0.1)';
-  element.style.boxShadow = '0 0 20px rgba(102,126,234,0.15)';
+  if(isSelected){
+    // Deselect
+    delete window.currentPromoSong.selectedPromos[promoKey];
+    element.style.borderColor = 'var(--bord)';
+    element.style.background = 'var(--surf)';
+    element.style.boxShadow = 'none';
+    // Remove budget panel for this promo
+    document.querySelector(`[data-budget-panel="${promoKey}"]`)?.remove();
+  } else {
+    // Select
+    window.currentPromoSong.selectedPromos[promoKey] = {
+      budget: PROMO_TYPES[promoKey].minBudget,
+      duration: 1
+    };
+    element.style.borderColor = 'var(--acc)';
+    element.style.background = 'rgba(102,126,234,0.1)';
+    element.style.boxShadow = '0 0 20px rgba(102,126,234,0.15)';
 
-  window.currentPromoSong.selectedPromo = promoKey;
+    const promo = PROMO_TYPES[promoKey];
 
-  const promo = PROMO_TYPES[promoKey];
+    // Create budget panel for this promo
+    const panelHTML = `<div data-budget-panel="${promoKey}" style="background:var(--bg);border:1.5px solid var(--acc);border-radius:12px;padding:16px;margin-bottom:12px;margin-left:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--acc);text-transform:uppercase;letter-spacing:1px;font-weight:700">${promo.icon} ${promo.name}</div>
+        <button onclick="selectPromoOption(document.querySelector('[data-promo=\"${promoKey}\"]'), '${promoKey}', ${songId})" style="background:none;border:none;color:var(--mut);font-size:16px;cursor:pointer;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center">✕</button>
+      </div>
 
-  // Create an inline budget panel right after the selected promo
-  const inlineBudgetHTML = `<div data-budget-panel="true" style="background:var(--bg);border:1.5px solid var(--acc);border-radius:12px;padding:16px;margin-bottom:12px;margin-left:0">
-    <div style="font-size:12px;color:var(--acc);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:700">⚙️ Campaign Setup</div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      <div>
-        <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Weekly Budget</label>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="color:var(--mut);font-weight:700">$</span>
-          <input type="number" id="budgetInput-${songId}" placeholder="${promo.minBudget}" min="${promo.minBudget}" max="${promo.maxBudget}" step="100" value="${promo.minBudget}" style="flex:1;padding:10px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--txt);font-size:13px;font-weight:600" oninput="updatePromoEstimate(${songId})">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Weekly Budget</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="color:var(--mut);font-weight:700">$</span>
+            <input type="number" class="promo-budget-input" data-promo="${promoKey}" placeholder="${promo.minBudget}" min="${promo.minBudget}" max="${promo.maxBudget}" step="100" value="${promo.minBudget}" style="flex:1;padding:10px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--txt);font-size:13px;font-weight:600" oninput="updatePromoMultiEstimate(${songId})">
+          </div>
+          <div style="font-size:9px;color:var(--mut);margin-top:4px">Min: $${promo.minBudget.toLocaleString()} - Max: $${promo.maxBudget.toLocaleString()}</div>
         </div>
-        <div style="font-size:9px;color:var(--mut);margin-top:4px">Min: $${promo.minBudget.toLocaleString()} - Max: $${promo.maxBudget.toLocaleString()}</div>
-      </div>
 
-      <div>
-        <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Duration</label>
-        <div style="display:flex;gap:4px;flex-wrap:wrap">
-          <button onclick="selectDurationPill(event,1)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">1w</button>
-          <button onclick="selectDurationPill(event,2)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">2w</button>
-          <button onclick="selectDurationPill(event,4)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">4w</button>
-          <button onclick="selectDurationPill(event,8)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">8w</button>
+        <div>
+          <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Duration</label>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button onclick="selectPromoMultiDuration(event,'${promoKey}',1,${songId})" class="multi-duration-pill" data-promo="${promoKey}" data-weeks="1" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">1w</button>
+            <button onclick="selectPromoMultiDuration(event,'${promoKey}',2,${songId})" class="multi-duration-pill" data-promo="${promoKey}" data-weeks="2" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">2w</button>
+            <button onclick="selectPromoMultiDuration(event,'${promoKey}',4,${songId})" class="multi-duration-pill" data-promo="${promoKey}" data-weeks="4" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">4w</button>
+            <button onclick="selectPromoMultiDuration(event,'${promoKey}',8,${songId})" class="multi-duration-pill" data-promo="${promoKey}" data-weeks="8" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">8w</button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;margin-bottom:12px;font-size:11px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
-        <span>Cost per Listener:</span>
-        <span style="color:var(--acc);font-weight:700" id="costPer-${songId}">$${promo.costPerListener.toFixed(2)}</span>
+      <div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;margin-bottom:12px;font-size:11px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
+          <span>Cost per Listener:</span>
+          <span style="color:var(--acc);font-weight:700">$${promo.costPerListener.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
+          <span>Expected Listeners/Week:</span>
+          <span style="color:var(--acc);font-weight:700" class="promo-listeners" data-promo="${promoKey}">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
+          <span>Campaign Duration:</span>
+          <span style="color:var(--acc);font-weight:700" class="promo-duration" data-promo="${promoKey}">1 week</span>
+        </div>
+        <div style="border-top:1px solid var(--bord);padding-top:8px;margin-top:8px;display:flex;justify-content:space-between;color:var(--txt);font-weight:700">
+          <span>💰 Campaign Cost:</span>
+          <span style="font-size:13px;color:var(--acc)" class="promo-total" data-promo="${promoKey}">$${promo.minBudget.toLocaleString()}</span>
+        </div>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
-        <span>Expected Listeners/Week:</span>
-        <span style="color:var(--acc);font-weight:700" id="listeners-${songId}">—</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
-        <span>Campaign Duration:</span>
-        <span style="color:var(--acc);font-weight:700" id="durationShow-${songId}">Select duration</span>
-      </div>
-      <div style="border-top:1px solid var(--bord);padding-top:8px;margin-top:8px;display:flex;justify-content:space-between;color:var(--txt);font-weight:700">
-        <span>💰 Total Campaign Cost:</span>
-        <span style="font-size:13px;color:var(--acc)" id="totalShow-${songId}">$0</span>
-      </div>
-    </div>
+    </div>`;
 
-    <button id="launchBtn-${songId}" onclick="launchPromoCampaign(${songId})" style="width:100%;padding:11px;background:linear-gradient(135deg,var(--acc),#764ba2);color:white;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;transition:all 0.2s" disabled>
-      🚀 Start Campaign
-    </button>
-  </div>`;
+    element.insertAdjacentHTML('afterend', panelHTML);
 
-  // Insert the inline budget panel right after the selected promo element
-  element.insertAdjacentHTML('afterend', inlineBudgetHTML);
+    // Focus on the budget input
+    setTimeout(() => {
+      document.querySelector(`[data-budget-panel="${promoKey}"] .promo-budget-input`)?.focus();
+    }, 100);
 
-  // Focus on the budget input for easier editing
-  setTimeout(() => {
-    const budgetInput = document.getElementById('budgetInput-'+songId);
-    if(budgetInput) budgetInput.focus();
-  }, 100);
-
-  updatePromoEstimate(songId);
+    updatePromoMultiEstimate(songId);
+  }
 }
 
-function selectDurationPill(event, weeks){
+function selectPromoMultiDuration(event, promoKey, weeks, songId){
   event.stopPropagation();
-  const container = event.target.parentElement;
-  container.querySelectorAll('.duration-pill').forEach(p => {
-    p.style.background = 'transparent';
-    p.style.borderColor = 'var(--bord)';
-    p.style.color = 'var(--mut)';
-  });
-  event.target.style.background = 'var(--acc)';
-  event.target.style.borderColor = 'var(--acc)';
-  event.target.style.color = 'var(--bg)';
-  
-  window.currentPromoSong.selectedDuration = weeks;
-  
-  const songId = window.currentPromoSong.id;
-  if(songId) updatePromoEstimate(songId);
+
+  // Update selected promos state
+  if(!window.currentPromoSong.selectedPromos) window.currentPromoSong.selectedPromos = {};
+  if(window.currentPromoSong.selectedPromos[promoKey]){
+    window.currentPromoSong.selectedPromos[promoKey].duration = weeks;
+  }
+
+  // Update visual state for this promo's duration pills
+  const panel = document.querySelector(`[data-budget-panel="${promoKey}"]`);
+  if(panel){
+    panel.querySelectorAll('.multi-duration-pill').forEach(p => {
+      p.style.background = 'transparent';
+      p.style.borderColor = 'var(--bord)';
+      p.style.color = 'var(--mut)';
+    });
+    event.target.style.background = 'var(--acc)';
+    event.target.style.borderColor = 'var(--acc)';
+    event.target.style.color = 'var(--bg)';
+  }
+
+  updatePromoMultiEstimate(songId);
 }
 
-function updatePromoEstimate(songId){
-  if(!window.currentPromoSong.selectedPromo || !window.currentPromoSong.selectedDuration) return;
-  
-  const promo = PROMO_TYPES[window.currentPromoSong.selectedPromo];
-  const budget = parseInt(document.getElementById('budgetInput-'+songId).value) || 0;
-  const listeners = Math.floor(budget / promo.costPerListener);
-  const totalCost = budget * window.currentPromoSong.selectedDuration;
-  
-  document.getElementById('listeners-'+songId).textContent = listeners.toLocaleString();
-  document.getElementById('durationShow-'+songId).textContent = window.currentPromoSong.selectedDuration + ' week' + (window.currentPromoSong.selectedDuration > 1 ? 's' : '');
-  document.getElementById('totalShow-'+songId).textContent = '$' + totalCost.toLocaleString();
-  
-  document.getElementById('launchBtn-'+songId).disabled = false;
+function updatePromoMultiEstimate(songId){
+  if(!window.currentPromoSong.selectedPromos) return;
+
+  // Update all selected promo panels
+  Object.keys(window.currentPromoSong.selectedPromos).forEach(promoKey => {
+    const panel = document.querySelector(`[data-budget-panel="${promoKey}"]`);
+    if(!panel) return;
+
+    const promo = PROMO_TYPES[promoKey];
+    const budgetInput = panel.querySelector('.promo-budget-input');
+    const budget = parseInt(budgetInput?.value) || promo.minBudget;
+    const duration = window.currentPromoSong.selectedPromos[promoKey].duration || 1;
+
+    // Update state
+    window.currentPromoSong.selectedPromos[promoKey].budget = budget;
+
+    // Update displays
+    const listeners = Math.floor(budget / promo.costPerListener);
+    const totalCost = budget * duration;
+
+    panel.querySelector('.promo-listeners').textContent = listeners.toLocaleString();
+    panel.querySelector('.promo-duration').textContent = duration + ' week' + (duration > 1 ? 's' : '');
+    panel.querySelector('.promo-total').textContent = '$' + totalCost.toLocaleString();
+  });
 }
 
 function launchPromoCampaign(songId){
   const song = GAME.songs.find(s => s.id === songId);
   if(!song) return;
-  
-  if(!window.currentPromoSong.selectedPromo || !window.currentPromoSong.selectedDuration){
-    showEvent('❌','Select Campaign','Pick a promo type and duration',['OK']);
-    return;
-  }
-  
-  const budget = parseInt(document.getElementById('budgetInput-'+songId).value) || 0;
-  const promoKey = window.currentPromoSong.selectedPromo;
-  const promo = PROMO_TYPES[promoKey];
 
-  if(budget <= 0){
-    showEvent('❌','No Budget Set','Enter a weekly budget amount to start the campaign.',['OK']);
+  if(!window.currentPromoSong.selectedPromos || Object.keys(window.currentPromoSong.selectedPromos).length === 0){
+    showEvent('❌','Select Campaign','Pick at least one promo type',['OK']);
     return;
   }
 
-  if(GAME.money < budget){
-    showEvent('💸','Not Enough Money',`You need $${budget.toLocaleString()} for the first week but only have $${Math.floor(GAME.money||0).toLocaleString()}.`,['OK']);
-    return;
-  }
-  
   if(!song.campaigns) song.campaigns = [];
-  
-  const campaign = {
-    id: Date.now(),
-    type: promoKey,
-    typeName: promo.name,
-    icon: promo.icon,
-    budget: budget,
-    costPerListener: promo.costPerListener,
-    duration: window.currentPromoSong.selectedDuration,
-    weeksRemaining: window.currentPromoSong.selectedDuration,
-    listenersPerWeek: Math.floor(budget / promo.costPerListener),
-    totalListenersEstimate: Math.floor((budget / promo.costPerListener) * window.currentPromoSong.selectedDuration),
-    totalCost: budget * window.currentPromoSong.selectedDuration,
-    listenersGained: 0,
-    status: 'active',
-    startedWeek: GAME.week,
-    stoppedWeek: null,
-    weeksCompleted: 0
-  };
-  
-  song.campaigns.push(campaign);
+
+  // Calculate total cost for first week
+  let totalFirstWeekCost = 0;
+  const campaignsToLaunch = [];
+
+  Object.keys(window.currentPromoSong.selectedPromos).forEach(promoKey => {
+    const config = window.currentPromoSong.selectedPromos[promoKey];
+    const budget = config.budget || 0;
+    const duration = config.duration || 1;
+
+    if(budget <= 0){
+      showEvent('❌','No Budget Set','Enter a weekly budget for all selected campaigns.',['OK']);
+      return;
+    }
+
+    totalFirstWeekCost += budget;
+    campaignsToLaunch.push({ promoKey, budget, duration });
+  });
+
+  // Check if player has enough money for all first week campaigns
+  if(GAME.money < totalFirstWeekCost){
+    showEvent('💸','Not Enough Money',`You need $${totalFirstWeekCost.toLocaleString()} for the first week but only have $${Math.floor(GAME.money||0).toLocaleString()}.`,['OK']);
+    return;
+  }
+
+  // Launch all campaigns
+  const launchedPromos = [];
+  campaignsToLaunch.forEach(({ promoKey, budget, duration }) => {
+    const promo = PROMO_TYPES[promoKey];
+    const campaign = {
+      id: Date.now() + Math.random(),
+      type: promoKey,
+      typeName: promo.name,
+      icon: promo.icon,
+      budget: budget,
+      costPerListener: promo.costPerListener,
+      duration: duration,
+      weeksRemaining: duration,
+      listenersPerWeek: Math.floor(budget / promo.costPerListener),
+      totalListenersEstimate: Math.floor((budget / promo.costPerListener) * duration),
+      totalCost: budget * duration,
+      listenersGained: 0,
+      status: 'active',
+      startedWeek: GAME.week,
+      stoppedWeek: null,
+      weeksCompleted: 0
+    };
+
+    song.campaigns.push(campaign);
+    launchedPromos.push(promo.name);
+  });
+
   GAME._dirty = true;
   saveToCloud();
-  
+
   _closeOverlay();
   setTimeout(()=>{
     showSongDetails(songId);
     var toast = document.createElement('div');
     toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--acc);color:var(--acc-txt);padding:12px 20px;border-radius:20px;font-size:13px;font-weight:700;z-index:300000;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
-    toast.textContent = promo.icon+' '+promo.name+' campaign started!';
+    toast.textContent = '🚀 '+launchedPromos.join(' + ')+' campaigns launched!';
     document.body.appendChild(toast);
     setTimeout(()=>toast.remove(), 3000);
   }, 300);
-  
-  window.currentPromoSong = {id: songId, selectedPromo: null, selectedDuration: null};
+
+  window.currentPromoSong = {id: songId, selectedPromos: {}};
 }
 
 function editPromoCampaign(songId, campaignType){
