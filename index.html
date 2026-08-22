@@ -14507,17 +14507,25 @@ function saveLabelSettings(){
   // Sync changes to Supabase
   if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && ol.id){
     try {
+      const originalId = ol.id;
+      console.log('🔄 Starting label sync, current ID:', originalId);
+
       // Check if ID is valid UUID format (fix legacy "lbl_" IDs)
       const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ol.id);
+      let idWasFixed = false;
       if(!isValidUUID && ol.id.startsWith('lbl_')){
         console.log('🔧 Fixing legacy label ID format: ' + ol.id);
         // Generate new UUID
-        const newId = crypto.randomUUID ? crypto.randomUUID() : 'lbl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const newId = crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        console.log('🔧 New UUID generated:', newId);
         ol.id = newId;
+        idWasFixed = true;
         markDirty();
       }
 
-      console.log('🔄 Syncing label to Supabase:', {id: ol.id, name: ol.name, hasImage: !!ol.logoImage});
+      console.log('🔄 Syncing label to Supabase:', {id: ol.id, name: ol.name, hasImage: !!ol.logoImage, idWasFixed});
+
+      // Try to update first (in case label already exists in Supabase)
       supabase.from('labels').update({
         name: ol.name,
         logo_emoji: ol.logoEmoji,
@@ -14528,13 +14536,11 @@ function saveLabelSettings(){
         featured_artists: ol.featuredArtists
       }).eq('id', ol.id).then(r => {
         if(r.error) {
-          console.error('❌ Label sync error:', r.error);
+          console.error('❌ Update failed, error code:', r.error.code);
           console.error('Error details:', JSON.stringify(r.error));
-          // If update fails and it's a UUID issue, try inserting as new
-          if(r.error.code === '22P02' && ol.id.startsWith('lbl_')){
-            console.log('🔄 UUID format fix: trying insert instead of update');
-            const newId = crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now();
-            ol.id = newId;
+          // If update fails (no matching record or UUID error), try inserting as new
+          if(r.error.code === 'PGRST116' || r.error.code === '22P02' || idWasFixed){
+            console.log('📤 No record found or ID was fixed, inserting new label...');
             supabase.from('labels').insert([{
               id: ol.id,
               owner_id: ol.ownerId,
@@ -14552,18 +14558,25 @@ function saveLabelSettings(){
               weekly_maintenance: ol.weeklyMaintenance || 5000,
               roster: ol.roster || []
             }]).then(ir => {
-              if(!ir.error) console.log('✅ Label inserted with new UUID');
-              markDirty();
+              if(ir.error) {
+                console.error('❌ Insert also failed:', ir.error);
+              } else {
+                console.log('✅ Label inserted successfully with UUID:', ol.id);
+                markDirty();
+              }
             });
           }
         } else {
-          console.log('✅ Label synced successfully');
+          console.log('✅ Label updated successfully');
+          if(idWasFixed) markDirty();
         }
       });
     } catch(e) {
       console.error('❌ Label sync exception:', e);
       console.error('Exception:', e.message, e.stack);
     }
+  } else {
+    console.log('⚠️ Sync skipped:', {isMulti: GAME_MODE === 'multi', hasSupabase: typeof supabase !== 'undefined', hasId: !!ol.id});
   }
 
   markDirty(); saveToCloud(); updateStats();
