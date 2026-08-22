@@ -14468,6 +14468,23 @@ function saveLabelSettings(){
     GAME.signedLabel.logoImage = ol.logoImage;
   }
 
+  // Sync changes to Supabase
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && ol.id){
+    try {
+      supabase.from('labels').update({
+        name: ol.name,
+        logo_emoji: ol.logoEmoji,
+        logo_image: ol.logoImage,
+        genre_focus: ol.genreFocus,
+        region: ol.region,
+        bio: ol.bio,
+        featured_artists: ol.featuredArtists
+      }).eq('id', ol.id).then(r => {
+        if(r.error) console.warn('Label sync error:', r.error);
+      });
+    } catch(e) { console.warn('Label sync error:', e); }
+  }
+
   markDirty(); saveToCloud(); updateStats();
   closeMenu();
   showEvent('✅','Settings Saved','Your label details have been updated.',['OK']);
@@ -17742,7 +17759,11 @@ async function showLabelPublicPage(labelId, labelName){
   try {
     // Fetch label data from Supabase
     const {data: label, error} = await supabase.from('labels').select('*').eq('id', labelId).single();
-    if(error || !label) throw new Error('Label not found');
+    if(error){
+      console.error('Label fetch error:', error);
+      throw error;
+    }
+    if(!label) throw new Error('Label not found in database');
 
     // Get tier color
     const tierColors = { Indie: '#3b82f6', 'Mid-Tier': '#f97316', Major: '#22c55e', Global: '#06b6d4' };
@@ -18692,6 +18713,11 @@ function openSettings(){
 
       </div>
       
+      <div style="margin-bottom:24px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:12px;font-family:var(--fb);color:var(--txt)">Help</div>
+        <button onclick="showTutorial();closeMenu()" style="width:100%;padding:14px;background:var(--surf);border:2px solid var(--bord);font-weight:700;display:flex;align-items:center;justify-content:space-between;border-radius:8px;cursor:pointer;touch-action:manipulation;font-family:var(--fb)"><span>📖 Quick Start Tutorial</span><span style="color:var(--mut)">→</span></button>
+      </div>
+
       <div style="margin-bottom:24px">
         <div style="font-size:14px;font-weight:700;margin-bottom:12px;font-family:var(--fb);color:var(--txt)">Community</div>
         <a href="https://discord.gg/WJAZS5Cdd" target="_blank" style="display:block;padding:12px;background:linear-gradient(135deg,#5865F2,#7289DA);color:white;text-decoration:none;border-radius:8px;margin-bottom:8px;text-align:center;font-weight:700">💬 Join Our Discord</a>
