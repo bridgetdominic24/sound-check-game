@@ -14354,6 +14354,8 @@ function showLabelOwnerSettings(){
   window._settingsLabelGenres = (ol.genreFocus||[]).slice();
   window._settingsLabelRegion = ol.region || 'North America';
   window._settingsLabelCut = ol.defaultCut || 25;
+  window._settingsLabelBio = ol.bio || '';
+  window._settingsLabelFeatured = (ol.featuredArtists || []).slice();
 
   let html = `<div style="padding:16px;padding-bottom:100px">`;
 
@@ -14392,6 +14394,25 @@ function showLabelOwnerSettings(){
     ${[15,20,25,30,40].map(c=>`<div onclick="window._settingsLabelCut=${c};document.querySelectorAll('#stgCutChips > div').forEach(el=>{el.style.borderColor='var(--bord)';el.style.background='var(--surf)';el.style.color='var(--mut)'});this.style.borderColor='var(--acc)';this.style.background='var(--acc-bg)';this.style.color='var(--acc)'" style="padding:6px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid ${c===(ol.defaultCut||25)?'var(--acc)':'var(--bord)'};background:${c===(ol.defaultCut||25)?'var(--acc-bg)':'var(--surf)'};color:${c===(ol.defaultCut||25)?'var(--acc)':'var(--mut)'}">${c}%</div>`).join('')}
   </div>`;
 
+  // Label bio
+  window._settingsLabelBio = ol.bio || '';
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Label Bio</div>
+  <textarea id="settingsLabelBio" placeholder="Tell the world about your label..." style="background:var(--bg);border:1.5px solid var(--bord);border-radius:8px;padding:11px 14px;font-size:13px;color:var(--txt);width:100%;font-family:var(--fb);outline:none;resize:none;margin-bottom:16px;min-height:80px" maxlength="300" oninput="window._settingsLabelBio=this.value">${ol.bio||''}</textarea>`;
+
+  // Featured artists
+  const rosterArtists = (ol.roster || []).map(a => ({ id: a.id, userId: a.userId, name: a.artistName }));
+  const featured = ol.featuredArtists || [];
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Featured Artists (up to 3)</div>
+  <div id="stgFeaturedArtists" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px">
+    ${rosterArtists.length === 0
+      ? `<div style="padding:12px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;font-size:12px;color:var(--mut);text-align:center">Sign artists to feature them on your label page</div>`
+      : rosterArtists.map(a => {
+          const isFeatured = featured.includes(a.userId);
+          return `<div onclick="window._settingsLabelFeatured.includes('${a.userId}')?window._settingsLabelFeatured.splice(window._settingsLabelFeatured.indexOf('${a.userId}'),1):window._settingsLabelFeatured.length<3&&window._settingsLabelFeatured.push('${a.userId}');this.style.borderColor=window._settingsLabelFeatured.includes('${a.userId}')?'var(--acc)':'var(--bord)';this.style.background=window._settingsLabelFeatured.includes('${a.userId}')?'var(--acc-bg)':'var(--surf)'" style="padding:10px 12px;background:${isFeatured?'var(--acc-bg)':'var(--surf)'};border:1.5px solid ${isFeatured?'var(--acc)':'var(--bord)'};border-radius:8px;cursor:pointer;font-weight:${isFeatured?700:600};color:${isFeatured?'var(--acc)':'var(--txt)'}">⭐ ${a.name}</div>`;
+        }).join('')
+    }
+  </div>`;
+
   html += `<button onclick="saveLabelSettings()" style="background:var(--acc);color:white;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;width:100%;cursor:pointer;font-family:var(--fb);margin-bottom:24px;touch-action:manipulation">Save Changes</button>`;
 
   html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:#ef4444;letter-spacing:1.5px;text-transform:uppercase">Danger Zone</div>
@@ -14417,6 +14438,8 @@ function saveLabelSettings(){
   ol.genreFocus = window._settingsLabelGenres || ol.genreFocus;
   ol.region = window._settingsLabelRegion || ol.region;
   ol.defaultCut = window._settingsLabelCut || ol.defaultCut;
+  ol.bio = window._settingsLabelBio || '';
+  ol.featuredArtists = window._settingsLabelFeatured || [];
 
   if(GAME.signedLabel && GAME.signedLabel.isOwner){
     GAME.signedLabel.labelName = ol.name;
@@ -17655,10 +17678,117 @@ function _lblRender(labels){
   el.innerHTML=html;
 }
 
-function showLabelPublicPage(labelId, labelName){
-  // Placeholder for Session 2 — opens label's public page
+async function showLabelPublicPage(labelId, labelName){
   showToast('Loading '+labelName+'...','gray');
-  console.log('📖 Opening label:', labelId, labelName);
+
+  if(GAME_MODE!=='multi' || typeof supabase==='undefined' || !currentUser){
+    showEvent('⚠️','Multiplayer Only','You can only view labels in multiplayer mode.',['OK']);
+    return;
+  }
+
+  try {
+    // Fetch label data from Supabase
+    const {data: label, error} = await supabase.from('labels').select('*').eq('id', labelId).single();
+    if(error || !label) throw new Error('Label not found');
+
+    // Get tier color
+    const tierColors = { Indie: '#3b82f6', 'Mid-Tier': '#f97316', Major: '#22c55e', Global: '#06b6d4' };
+    const tierColor = tierColors[label.tier] || '#3b82f6';
+
+    let html = `<div style="padding-bottom:80px">`;
+
+    // Hero section
+    html += `<div style="background:linear-gradient(135deg,${tierColor}22 0%,${tierColor}11 100%);border-bottom:1px solid var(--bord);padding:20px 16px">
+      <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:16px">
+        <div style="width:80px;height:80px;border-radius:12px;background:var(--bg);border:2px solid ${tierColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
+          ${label.logo_image?'<img src="'+label.logo_image+'" style="width:100%;height:100%;object-fit:cover">':'<span style="font-size:42px">'+(label.logo_emoji||'🏢')+'</span>'}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:24px;font-weight:900;color:var(--txt);margin-bottom:6px">${label.name}</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+            <span style="background:${tierColor};color:white;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${label.tier}</span>
+            <span style="font-size:11px;color:var(--mut)">${label.region||'—'}</span>
+          </div>
+          <div style="font-size:11px;color:var(--mut)">${(label.genre_focus||[]).join(', ')||'Mixed genres'}</div>
+        </div>
+      </div>
+      ${!label.has_roster_full?'<div style="background:#dcfce7;color:#166534;font-size:11px;font-weight:700;padding:8px 12px;border-radius:8px;text-align:center;width:100%">🟢 Currently Recruiting</div>':''}
+    </div>`;
+
+    // Bio section
+    if(label.bio){
+      html += `<div style="padding:16px;border-bottom:1px solid var(--bord)">
+        <div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">About</div>
+        <div style="font-size:13px;line-height:1.6;color:var(--txt)">${label.bio}</div>
+      </div>`;
+    }
+
+    // Featured artists section
+    if(label.featured_artists && label.featured_artists.length > 0){
+      html += `<div style="padding:16px;border-bottom:1px solid var(--bord)">
+        <div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">Featured Artists</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">`;
+
+      for(let aId of (label.featured_artists || [])){
+        // Fetch artist data
+        const {data: artist} = await supabase.from('players').select('*').eq('id', aId).single();
+        if(artist){
+          const gd = artist.game_data || {};
+          const photo = gd.photo || null;
+          html += `<div style="text-align:center;cursor:pointer" onclick="showArtistHub('${artist.id}','${(artist.display_name||'').replace(/"/g,'')}')" title="${artist.display_name}">
+            <div style="width:100%;aspect-ratio:1;border-radius:10px;background:var(--surf);border:1.5px solid var(--bord);margin-bottom:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background-size:cover;background-image:url('${photo||''}')" style="${photo?'background-size:cover':''}">
+              ${!photo?'<span style="font-size:28px">🎤</span>':''}
+            </div>
+            <div style="font-size:11px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${artist.display_name}</div>
+          </div>`;
+        }
+      }
+      html += `</div></div>`;
+    }
+
+    // Roster section
+    html += `<div style="padding:16px;border-bottom:1px solid var(--bord)">
+      <div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">Roster (${(label.roster||[]).length} artists)</div>
+      <div style="display:flex;flex-direction:column;gap:8px">`;
+
+    for(let member of (label.roster || [])){
+      html += `<div onclick="showArtistHub('${member.userId}','${(member.artistName||'').replace(/"/g,'')}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;cursor:pointer;transition:all 0.2s">
+        <div style="width:40px;height:40px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px">🎤</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--txt)">${member.artistName}</div>
+          <div style="font-size:10px;color:var(--mut)">Since week ${member.signedWeek || '—'}</div>
+        </div>
+      </div>`;
+    }
+
+    html += `</div></div>`;
+
+    // Apply button (for artists not signed to this label)
+    if(GAME.signedLabel && !GAME.signedLabel.isOwner && GAME.signedLabel.labelId !== labelId){
+      html += `<div style="padding:16px;text-align:center">
+        <button onclick="showApplyToLabel('${labelId}','${label.name}')" style="background:var(--acc);color:white;border:none;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:700;width:100%;cursor:pointer;font-family:var(--fb)">Apply to ${label.name}</button>
+      </div>`;
+    }
+
+    html += `</div>`;
+
+    _insertOverlay(`<div style="text-align:left;padding:0;border-radius:0;max-height:none">
+      <div style="background:var(--bg);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bord)">
+        <div style="font-size:14px;font-weight:800">🏷 ${label.name}</div>
+        <button onclick="document.getElementById('_overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0">✕</button>
+      </div>
+      ${html}
+    </div>`);
+    showToast(label.name + ' loaded','green');
+  } catch(err){
+    console.error('Label page error:', err);
+    showEvent('⚠️','Error','Could not load label details.',['OK']);
+  }
+}
+
+async function showApplyToLabel(labelId, labelName){
+  // Placeholder for application flow
+  showToast('Application feature coming soon','gray');
 }
 // ── Artist Hub renderer — used by viewer, preview, and Find Players ──────────
 function _renderArtistHubPage(gameData, viewerUserId, isPreview){
