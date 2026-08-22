@@ -8470,6 +8470,9 @@ function selectPromoOption(element, promoKey, songId){
     el.style.boxShadow = 'none';
   });
 
+  // Remove any existing budget panels
+  document.querySelectorAll('[data-budget-panel]').forEach(el => el.remove());
+
   // Select this one
   element.style.borderColor = 'var(--acc)';
   element.style.background = 'rgba(102,126,234,0.1)';
@@ -8477,19 +8480,65 @@ function selectPromoOption(element, promoKey, songId){
 
   window.currentPromoSong.selectedPromo = promoKey;
 
-  // Show budget section (both inline and via scroll)
-  const budgetSection = document.getElementById('budgetSection-'+songId);
-  if(budgetSection) {
-    budgetSection.style.display = 'block';
-    // Scroll to budget section so it's visible without user needing to scroll
-    budgetSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
   const promo = PROMO_TYPES[promoKey];
-  document.getElementById('costPer-'+songId).textContent = '$'+promo.costPerListener.toFixed(2);
-  document.getElementById('budgetInput-'+songId).value = promo.minBudget;
-  document.getElementById('budgetInput-'+songId).min = promo.minBudget;
-  document.getElementById('budgetInput-'+songId).max = promo.maxBudget;
+
+  // Create an inline budget panel right after the selected promo
+  const inlineBudgetHTML = `<div data-budget-panel="true" style="background:var(--bg);border:1.5px solid var(--acc);border-radius:12px;padding:16px;margin-bottom:12px;margin-left:0">
+    <div style="font-size:12px;color:var(--acc);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:700">⚙️ Campaign Setup</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div>
+        <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Weekly Budget</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="color:var(--mut);font-weight:700">$</span>
+          <input type="number" id="budgetInput-${songId}" placeholder="${promo.minBudget}" min="${promo.minBudget}" max="${promo.maxBudget}" step="100" value="${promo.minBudget}" style="flex:1;padding:10px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--txt);font-size:13px;font-weight:600" oninput="updatePromoEstimate(${songId})">
+        </div>
+        <div style="font-size:9px;color:var(--mut);margin-top:4px">Min: $${promo.minBudget.toLocaleString()} - Max: $${promo.maxBudget.toLocaleString()}</div>
+      </div>
+
+      <div>
+        <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Duration</label>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button onclick="selectDurationPill(event,1)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">1w</button>
+          <button onclick="selectDurationPill(event,2)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">2w</button>
+          <button onclick="selectDurationPill(event,4)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">4w</button>
+          <button onclick="selectDurationPill(event,8)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">8w</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;margin-bottom:12px;font-size:11px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
+        <span>Cost per Listener:</span>
+        <span style="color:var(--acc);font-weight:700" id="costPer-${songId}">$${promo.costPerListener.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
+        <span>Expected Listeners/Week:</span>
+        <span style="color:var(--acc);font-weight:700" id="listeners-${songId}">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
+        <span>Campaign Duration:</span>
+        <span style="color:var(--acc);font-weight:700" id="durationShow-${songId}">Select duration</span>
+      </div>
+      <div style="border-top:1px solid var(--bord);padding-top:8px;margin-top:8px;display:flex;justify-content:space-between;color:var(--txt);font-weight:700">
+        <span>💰 Total Campaign Cost:</span>
+        <span style="font-size:13px;color:var(--acc)" id="totalShow-${songId}">$0</span>
+      </div>
+    </div>
+
+    <button id="launchBtn-${songId}" onclick="launchPromoCampaign(${songId})" style="width:100%;padding:11px;background:linear-gradient(135deg,var(--acc),#764ba2);color:white;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;transition:all 0.2s" disabled>
+      🚀 Start Campaign
+    </button>
+  </div>`;
+
+  // Insert the inline budget panel right after the selected promo element
+  element.insertAdjacentHTML('afterend', inlineBudgetHTML);
+
+  // Focus on the budget input for easier editing
+  setTimeout(() => {
+    const budgetInput = document.getElementById('budgetInput-'+songId);
+    if(budgetInput) budgetInput.focus();
+  }, 100);
 
   updatePromoEstimate(songId);
 }
