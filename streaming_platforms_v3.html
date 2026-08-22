@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Sound Check — Streaming Blueprint v3 (Interactive)</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+button{font-family:inherit;cursor:pointer}
+body{background:#07080c;color:#eceef2;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:16px 0 40px}
+.note{max-width:390px;width:100%;padding:10px 16px;color:#8b91a0;font-size:12px;line-height:1.5}
+.note b{color:#e8b44c}
+#phone{width:390px;max-width:100vw;background:#0d0f14;border:1px solid #2a2f3c;border-radius:24px;overflow:hidden;height:800px;display:flex;flex-direction:column}
+.mocknav{display:flex;gap:6px;padding:12px;background:#151821;border-bottom:1px solid #2a2f3c;overflow-x:auto;flex:none}
+.mocknav button{flex:none;background:#1c2029;border:1px solid #2a2f3c;color:#8b91a0;font-size:11.5px;font-weight:600;padding:8px 12px;border-radius:99px}
+.mocknav button.on{background:#e8b44c;color:#0d0f14;border-color:#e8b44c}
+.plat{display:none;flex:1;position:relative;overflow:hidden}
+.plat.on{display:flex;flex-direction:column}
+.sub{display:none;flex:1;flex-direction:column;overflow:hidden;animation:fadein .22s ease}
+.sub.on{display:flex}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.scroll{flex:1;overflow-y:auto}
+.up{color:#4cc98a}.down{color:#e06666}.same{color:#8b91a0}
+.new{color:#e8b44c;font-weight:800;font-size:9px}
+.cover{border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center}
+.back{background:none;border:none;color:inherit;font-size:16px;padding:0}
+
+/* ═══ LOOPIFY ═══ */
+.loop{background:#121212;color:#fff}
+.loop .scroll{padding-bottom:112px}
+.loop .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px}
+.loop .topbar h2{font-size:22px;font-weight:800}
+.loop .topbar .ic{display:flex;gap:16px;font-size:16px;color:#e0e0e0}
+.loop .filters{display:flex;gap:8px;padding:0 16px 14px}
+.loop .filters span{font-size:12px;font-weight:600;background:#242424;border-radius:99px;padding:6px 13px;cursor:pointer}
+.loop .filters span.on{background:#1fdf64;color:#121212}
+.loop .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px 16px}
+.loop .tile{display:flex;align-items:center;gap:8px;background:#2a2a2a;border-radius:5px;overflow:hidden;font-size:11.5px;font-weight:700;cursor:pointer}
+.loop .tile .cover{width:46px;height:46px;border-radius:0;font-size:19px}
+.loop .sect{padding:8px 16px 10px;font-size:16.5px;font-weight:800;display:flex;justify-content:space-between;align-items:baseline}
+.loop .sect a{font-size:11px;color:#a7a7a7;font-weight:600;text-decoration:none}
+.loop .hrow{display:flex;gap:12px;overflow-x:auto;padding:0 16px 18px}
+.loop .pcard{flex:none;width:102px;cursor:pointer}
+.loop .pcard .cover{width:102px;height:102px;font-size:35px}
+.loop .pcard b{display:block;font-size:12px;font-weight:600;margin-top:6px;line-height:1.3}
+.loop .pcard span{font-size:11px;color:#a7a7a7}
+.loop .chartrow{display:flex;align-items:center;gap:10px;padding:7px 16px;cursor:pointer}
+.loop .chartrow:active{background:#1c1c1c}
+.loop .pos{width:20px;text-align:center;font-weight:800;font-size:14px}
+.loop .mv{width:16px;font-size:9px;text-align:center}
+.loop .cover.sm{width:44px;height:44px;background:#333;font-size:18px}
+.loop .ti{flex:1;min-width:0}
+.loop .ti b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loop .ti span{font-size:11.5px;color:#a7a7a7}
+.loop .ti .e{font-size:8px;background:#a7a7a7;color:#121212;border-radius:2px;padding:0 3px;font-weight:800;vertical-align:1px;margin-right:4px}
+.loop .strm{font-size:11px;color:#a7a7a7}
+.loop .dots{color:#a7a7a7;font-size:15px;padding-left:4px}
+.loop .npbar{position:absolute;bottom:52px;left:8px;right:8px;background:#3d2a4a;border-radius:8px;display:flex;align-items:center;gap:10px;padding:7px 10px;box-shadow:0 4px 14px rgba(0,0,0,.5);z-index:5;cursor:pointer}
+.loop .npbar .cover{width:38px;height:38px;font-size:16px;background:#5a3d6e}
+.loop .npbar .ti b{font-size:12.5px}.loop .npbar .ti span{font-size:10.5px}
+.loop .npbar .ctrl{display:flex;gap:16px;font-size:17px;padding-right:4px}
+.loop .npbar .prog{position:absolute;bottom:0;left:10px;right:10px;height:2px;background:rgba(255,255,255,.2)}
+.loop .npbar .prog i{display:block;height:100%;width:35%;background:#fff;transition:width 1s linear}
+.loop .bnav{position:absolute;bottom:0;left:0;right:0;height:52px;background:linear-gradient(180deg,rgba(18,18,18,.55),#000 40%);display:flex;z-index:5}
+.loop .bnav div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9.5px;color:#a7a7a7;cursor:pointer}
+.loop .bnav div.on{color:#fff}
+.loop .bnav div i{font-style:normal;font-size:17px}
+.loop .ahero{height:215px;background:linear-gradient(180deg,#4a2a5e 0%,#2a1836 70%,#121212);display:flex;flex-direction:column;justify-content:flex-end;padding:16px;position:relative}
+.loop .ahero .back{position:absolute;top:14px;left:14px;background:rgba(0,0,0,.4);width:30px;height:30px;border-radius:50%;font-size:14px}
+.loop .verif{font-size:10.5px;color:#4c9df3;font-weight:700}
+.loop .ahero h3{font-size:32px;font-weight:900;letter-spacing:-.5px}
+.loop .actions{display:flex;align-items:center;gap:14px;padding:8px 16px 4px}
+.loop .follow{border:1px solid #727272;border-radius:4px;background:none;color:#fff;font-size:12px;font-weight:700;padding:6px 14px}
+.loop .follow.f{border-color:#1fdf64;color:#1fdf64}
+.loop .shuf{font-size:19px;color:#a7a7a7;margin-left:auto;cursor:pointer}
+.loop .play{width:50px;height:50px;border-radius:50%;background:#1fdf64;color:#121212;font-size:18px;display:flex;align-items:center;justify-content:center;border:none}
+.loop .pill2{display:inline-block;font-size:10px;font-weight:700;color:#d0d0d0;border:1px solid #444;border-radius:99px;padding:3px 10px;margin:2px 4px 2px 0}
+.loop .aboutcard{margin:10px 16px;background:#242424;border-radius:10px;padding:14px}
+.loop .aboutcard h4{font-size:14px;font-weight:800;margin-bottom:6px}
+.loop .aboutcard p{font-size:12.5px;color:#d0d0d0;line-height:1.55}
+.loop .aboutcard .row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;color:#a7a7a7}
+.loop .thero{padding:34px 16px 14px;background:linear-gradient(180deg,#1e3a5e,#121212);text-align:center;position:relative}
+.loop .thero .back{position:absolute;top:12px;left:14px;background:rgba(0,0,0,.4);width:30px;height:30px;border-radius:50%;font-size:14px}
+.loop .thero .cover{width:170px;height:170px;margin:0 auto;font-size:64px;background:linear-gradient(135deg,#2a4a7e,#1a2a4e);box-shadow:0 14px 40px rgba(0,0,0,.6)}
+.loop .thero h3{font-size:20px;font-weight:800;margin-top:13px}
+.loop .thero .a{font-size:12.5px;color:#d0d0d0;margin-top:2px}
+.loop .credits{margin:12px 16px;background:#242424;border-radius:10px;padding:14px}
+.loop .credits h4{font-size:14px;font-weight:800;margin-bottom:8px}
+.loop .cr{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px solid #333}
+.loop .cr:last-child{border:none}
+.loop .cr span{color:#a7a7a7}
+.loop .lyr{margin:0 16px 14px;background:#c74b3d;border-radius:10px;padding:14px;color:#fff;cursor:pointer}
+.loop .lyr h4{font-size:11px;font-weight:800;letter-spacing:1px;margin-bottom:8px;opacity:.8}
+.loop .lyr p{font-size:15px;font-weight:700;line-height:1.6}
+.loop .lyr .more{display:none}
+.loop .lyr.open .more{display:block}
+.loop .srchbox{margin:8px 16px 14px;background:#fff;border-radius:8px;padding:11px 12px;display:flex;gap:8px;align-items:center;color:#555;font-size:14px;font-weight:600}
+.loop .srchbox input{flex:1;border:none;outline:none;font-size:14px;font-family:inherit;background:none}
+.loop .ggrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px 18px}
+.loop .gcard{height:90px;border-radius:8px;padding:12px;font-size:15px;font-weight:800;position:relative;overflow:hidden;cursor:pointer}
+.loop .gcard .gem{position:absolute;bottom:-6px;right:-4px;font-size:44px;transform:rotate(22deg);opacity:.85}
+.loop .libhead{display:flex;align-items:center;gap:10px;padding:16px}
+.loop .libhead .me{width:32px;height:32px;border-radius:50%;background:#e8734c;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px}
+.loop .libhead h2{font-size:20px;font-weight:800;flex:1}
+.loop .librow{display:flex;align-items:center;gap:12px;padding:8px 16px;cursor:pointer}
+.loop .librow .cover{width:56px;height:56px;font-size:22px}
+.loop .librow b{display:block;font-size:14.5px;font-weight:600}
+.loop .librow span{font-size:12px;color:#a7a7a7}
+
+/* ═══ ORANGE ═══ */
+.org{background:#fff;color:#1d1d1f}
+.org .scroll{padding-bottom:110px}
+.org .head{padding:16px 16px 4px;display:flex;justify-content:space-between;align-items:center}
+.org .head h2{font-size:29px;font-weight:800;letter-spacing:-.6px}
+.org .head .me{width:30px;height:30px;border-radius:50%;background:#fa4b2a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px}
+.org .card2{margin:12px 16px;border-radius:16px;background:linear-gradient(135deg,#fa4b2a,#ff8a3d);color:#fff;padding:18px;position:relative;overflow:hidden}
+.org .card2 .tag{font-size:10px;font-weight:800;letter-spacing:1px;opacity:.85}
+.org .card2 h3{font-size:20px;font-weight:800;margin-top:4px}
+.org .card2 p{font-size:12px;opacity:.92;margin-top:3px;max-width:75%}
+.org .card2 .pl{position:absolute;right:14px;bottom:14px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:15px;border:none;color:#fff}
+.org .sect{padding:14px 16px 8px;font-size:17px;font-weight:800;display:flex;justify-content:space-between;align-items:baseline}
+.org .sect a{font-size:12px;color:#fa4b2a;font-weight:600;text-decoration:none}
+.org .hrow{display:flex;gap:12px;overflow-x:auto;padding:0 16px 8px}
+.org .alb{flex:none;width:124px;cursor:pointer}
+.org .alb .cover{width:124px;height:124px;border-radius:10px;font-size:42px;box-shadow:0 3px 12px rgba(0,0,0,.16);color:#fff}
+.org .alb b{display:block;font-size:12.5px;margin-top:7px;font-weight:600}
+.org .alb span{font-size:11.5px;color:#86868b}
+.org .chartrow{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f0f0f2;cursor:pointer}
+.org .pos{width:20px;font-weight:800;font-size:15px}
+.org .cover.sm{width:46px;height:46px;font-size:19px;color:#fff}
+.org .ti{flex:1}.org .ti b{display:block;font-size:14px;font-weight:600}.org .ti span{font-size:12px;color:#86868b}
+.org .add{background:none;border:none;font-size:15px;color:#fa4b2a}
+.org .bnav{position:absolute;bottom:0;left:0;right:0;height:54px;background:rgba(250,250,250,.96);border-top:1px solid #e5e5ea;display:flex;z-index:5}
+.org .bnav div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9px;color:#86868b;cursor:pointer}
+.org .bnav div.on{color:#fa4b2a}
+.org .bnav div i{font-style:normal;font-size:16px}
+.org .npbar{position:absolute;bottom:54px;left:0;right:0;background:rgba(255,255,255,.97);border-top:1px solid #e5e5ea;display:flex;align-items:center;gap:10px;padding:8px 14px;z-index:5}
+.org .npbar .cover{width:36px;height:36px;font-size:15px;background:linear-gradient(135deg,#5a3d8a,#2a1d4a);color:#fff}
+.org .npbar b{flex:1;font-size:13px;font-weight:600}
+.org .npbar .ctrl{display:flex;gap:18px;font-size:16px}
+.org .npbar .ctrl span{cursor:pointer}
+.org .radiohero{margin:12px 16px;border-radius:16px;background:linear-gradient(135deg,#1d1d1f,#4a4a52);color:#fff;padding:20px}
+.org .radiohero .live{font-size:9px;font-weight:800;background:#fa4b2a;border-radius:3px;padding:2px 6px;letter-spacing:1px}
+.org .radiohero h3{font-size:19px;font-weight:800;margin-top:8px}
+.org .radiohero p{font-size:12px;opacity:.8;margin-top:3px}
+.org .lib .librow2{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f2;font-size:15px;font-weight:600;cursor:pointer}
+.org .lib .librow2 i{font-style:normal;color:#fa4b2a;width:22px;text-align:center}
+.org .lib .librow2 s{margin-left:auto;color:#c7c7cc;text-decoration:none}
+
+/* ═══ YOURTUBE ═══ */
+.yt{background:#0f0f0f;color:#f1f1f1}
+.yt .scroll{padding-bottom:52px}
+.yt .head{display:flex;align-items:center;gap:8px;padding:12px 16px}
+.yt .head .logo{width:30px;height:21px;background:#ff0033;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff}
+.yt .head h2{font-size:18px;font-weight:700;flex:1}
+.yt .head .ic{display:flex;gap:16px;font-size:16px}
+.yt .chiprow{display:flex;gap:8px;padding:0 16px 12px;overflow-x:auto}
+.yt .chiprow span{flex:none;background:#272727;border-radius:8px;font-size:12px;padding:6px 11px;cursor:pointer}
+.yt .chiprow span.on{background:#f1f1f1;color:#0f0f0f;font-weight:600}
+.yt .thumb{height:196px;background:linear-gradient(120deg,#3a2a4d,#1c2a3d);display:flex;align-items:center;justify-content:center;font-size:52px;position:relative;cursor:pointer}
+.yt .dur{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.8);font-size:11px;font-weight:600;padding:2px 5px;border-radius:4px}
+.yt .vmeta{display:flex;gap:10px;padding:10px 12px 6px}
+.yt .vav{width:36px;height:36px;border-radius:50%;background:#333;flex:none;display:flex;align-items:center;justify-content:center;font-size:17px}
+.yt .vt b{display:block;font-size:14.5px;font-weight:600;line-height:1.35}
+.yt .vt span{font-size:12px;color:#aaa}
+.yt .acts{display:flex;gap:8px;padding:6px 12px 12px;overflow-x:auto}
+.yt .acts span{flex:none;background:#272727;border-radius:99px;font-size:12px;font-weight:600;padding:7px 13px;cursor:pointer}
+.yt .acts span.sub{background:#f1f1f1;color:#0f0f0f}
+.yt .comm{margin:0 12px 16px;background:#272727;border-radius:12px;padding:11px 13px}
+.yt .comm .ch{font-size:12px;font-weight:600;margin-bottom:6px}
+.yt .comm .ch span{color:#aaa;font-weight:400}
+.yt .comm p{font-size:12.5px;line-height:1.45;color:#e0e0e0}
+.yt .comm .likes{font-size:11px;color:#aaa;margin-top:6px}
+.yt .comm .likes span{cursor:pointer}
+.yt .bnav{position:absolute;bottom:0;left:0;right:0;height:50px;background:#0f0f0f;border-top:1px solid #272727;display:flex;z-index:5}
+.yt .bnav div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:9px;color:#aaa;cursor:pointer}
+.yt .bnav div.on{color:#fff}
+.yt .bnav div i{font-style:normal;font-size:17px}
+.yt .shorts .sthumb{height:100%;min-height:520px;background:linear-gradient(160deg,#3d1c2a,#1c0e14);display:flex;align-items:center;justify-content:center;font-size:80px;position:relative}
+.yt .shorts .sside{position:absolute;right:12px;bottom:80px;display:flex;flex-direction:column;gap:18px;text-align:center;font-size:11px}
+.yt .shorts .sside div{cursor:pointer}
+.yt .shorts .sside i{font-style:normal;display:block;font-size:24px}
+.yt .shorts .sinfo{position:absolute;left:12px;bottom:20px;right:70px}
+.yt .shorts .sinfo b{font-size:13.5px}
+.yt .shorts .sinfo p{font-size:12px;color:#ddd;margin-top:4px}
+
+/* ═══ iMUSIC ═══ */
+.im{background:#f5f5f7;color:#1d1d1f}
+.im .scroll{padding-bottom:16px}
+.im .head{padding:16px;background:#fff;border-bottom:1px solid #e5e5ea;display:flex;justify-content:space-between;align-items:center}
+.im .head h2{font-size:23px;font-weight:800}
+.im .head span{font-size:11px;color:#86868b}
+.im .seg{display:flex;background:#e9e9ec;border-radius:9px;margin:12px 16px;padding:2px}
+.im .seg span{flex:1;text-align:center;font-size:12.5px;font-weight:600;padding:6px 0;border-radius:7px;color:#6e6e73;cursor:pointer}
+.im .seg span.on{background:#fff;color:#1d1d1f;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.im .banner{margin:2px 16px 12px;background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;gap:13px;align-items:center}
+.im .banner .cover{width:66px;height:66px;font-size:28px;background:linear-gradient(135deg,#1e3a5e,#0e1a2e);color:#fff;border-radius:12px}
+.im .banner .tag{color:#0071e3;font-size:10px;font-weight:800;letter-spacing:1px}
+.im .banner h3{font-size:15px;font-weight:800;margin-top:2px}
+.im .banner p{font-size:11.5px;color:#86868b;margin-top:2px}
+.im .banner .pre{margin-left:auto;flex:none;border:none;background:#0071e3;color:#fff;font-size:12px;font-weight:700;border-radius:99px;padding:7px 13px}
+.im .buyrow{display:flex;align-items:center;gap:10px;padding:9px 16px;background:#fff;border-bottom:1px solid #f0f0f2}
+.im .pos{width:20px;font-weight:800;color:#86868b;font-size:13px}
+.im .cover.sm{width:46px;height:46px;font-size:19px;color:#fff}
+.im .ti{flex:1}.im .ti b{display:block;font-size:13.5px;font-weight:600}.im .ti span{font-size:11.5px;color:#86868b}
+.im .price{border:1.5px solid #0071e3;color:#0071e3;font-size:12px;font-weight:700;border-radius:99px;padding:4px 12px;background:none;min-width:64px}
+.im .price.owned{border-color:#4cc98a;color:#4cc98a}
+.im .albsect{padding:12px 16px 6px;font-size:16px;font-weight:800}
+.im .albrow{display:flex;gap:12px;overflow-x:auto;padding:0 16px 14px}
+.im .alb2{flex:none;width:110px;cursor:pointer}
+.im .alb2 .cover{width:110px;height:110px;border-radius:9px;font-size:38px;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.im .alb2 b{display:block;font-size:11.5px;font-weight:600;margin-top:5px}
+.im .alb2 span{font-size:10.5px;color:#86868b;display:block}
+.im .alb2 .pr{font-size:11px;color:#0071e3;font-weight:700}
+.im .toast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:#1d1d1f;color:#fff;font-size:12.5px;font-weight:600;border-radius:99px;padding:10px 18px;transition:transform .3s ease;z-index:9;white-space:nowrap}
+.im .toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ═══ SAHARA ═══ */
+.sa{background:#101820;color:#f2f4f6}
+.sa .scroll{padding-bottom:96px}
+.sa .head{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,#101820,#1a2836)}
+.sa .head h2{font-size:20px;font-weight:800}
+.sa .head h2 i{color:#2dd4bf;font-style:normal}
+.sa .head span{font-size:10.5px;color:#7c8a99}
+.sa .search2{margin:0 16px 6px;background:#1c2836;border-radius:10px;padding:10px 12px;font-size:13px;color:#7c8a99;display:flex;gap:8px}
+.sa .search2 input{flex:1;background:none;border:none;outline:none;color:#f2f4f6;font-size:13px;font-family:inherit}
+.sa .rowchips{display:flex;gap:7px;padding:8px 16px 12px;overflow-x:auto}
+.sa .rowchips span{flex:none;font-size:11.5px;font-weight:600;border:1px solid #2a3a4c;border-radius:99px;padding:5px 12px;color:#a8b4c0;cursor:pointer}
+.sa .rowchips span.on{background:#2dd4bf;color:#101820;border-color:#2dd4bf}
+.sa .feature{margin:0 16px 14px;border-radius:14px;background:linear-gradient(135deg,#134e48,#1a2836);padding:16px}
+.sa .feature .tag{font-size:9.5px;font-weight:800;letter-spacing:1.2px;color:#2dd4bf}
+.sa .feature h3{font-size:18px;font-weight:800;margin-top:4px}
+.sa .feature p{font-size:12px;color:#a8b4c0;margin-top:3px}
+.sa .sect{padding:8px 16px;font-size:15px;font-weight:800}
+.sa .chartrow{display:flex;align-items:center;gap:11px;padding:8px 16px;cursor:pointer}
+.sa .pos{width:20px;font-weight:800;font-size:13px;color:#7c8a99}
+.sa .cover.sm{width:44px;height:44px;background:#243447;font-size:18px}
+.sa .ti{flex:1}.sa .ti b{display:block;font-size:13.5px;font-weight:600}.sa .ti span{font-size:11.5px;color:#7c8a99}
+.sa .x{font-size:9.5px;color:#2dd4bf;font-weight:700;border:1px solid #2dd4bf;border-radius:4px;padding:1px 5px}
+.sa .npbar{position:absolute;bottom:0;left:0;right:0;background:#0a1016;border-top:1px solid #1c2836;display:flex;align-items:center;gap:10px;padding:9px 14px;z-index:5}
+.sa .npbar .cover{width:38px;height:38px;font-size:16px;background:#134e48}
+.sa .npbar .ti b{font-size:12.5px}.sa .npbar .ti span{font-size:10.5px}
+.sa .npbar .ctrl{display:flex;gap:16px;font-size:16px;margin-left:auto}
+.sa .npbar .ctrl span{cursor:pointer}
+
+/* ═══ SOUNDPUFF ═══ */
+.sp{background:#f2f2f2;color:#111}
+.sp .scroll{padding-bottom:16px}
+.sp .head{background:#333;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:8px}
+.sp .head .cloud{color:#ff5500;font-size:20px}
+.sp .head h2{font-size:16px;font-weight:700;flex:1}
+.sp .head .up2{font-size:11px;font-weight:700;background:#ff5500;border-radius:4px;padding:5px 10px;border:none;color:#fff}
+.sp .stab{display:flex;background:#fff;border-bottom:1px solid #e5e5e5}
+.sp .stab span{flex:1;text-align:center;font-size:12.5px;font-weight:600;padding:11px 0;color:#999;border-bottom:2px solid transparent;cursor:pointer}
+.sp .stab span.on{color:#ff5500;border-color:#ff5500}
+.sp .track{background:#fff;margin:10px 12px;border:1px solid #e5e5e5;padding:12px}
+.sp .trow{display:flex;gap:10px}
+.sp .cover{width:54px;height:54px;background:linear-gradient(135deg,#ff5500,#ff8800);color:#fff;font-size:22px}
+.sp .ti{flex:1;min-width:0}
+.sp .ti .a{font-size:11px;color:#999}
+.sp .ti b{display:block;font-size:14px;font-weight:600}
+.sp .tg{display:inline-block;font-size:9.5px;background:#e8e8e8;color:#777;border-radius:3px;padding:1px 6px;margin-top:3px;margin-right:4px}
+.sp .pl2{width:34px;height:34px;border-radius:50%;background:#ff5500;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none;align-self:center;border:none}
+.sp .wave{display:flex;align-items:flex-end;gap:2px;height:38px;margin-top:10px;position:relative;cursor:pointer}
+.sp .wave i{flex:1;background:#ccc;border-radius:1px}
+.sp .wave i.p{background:#ff5500}
+.sp .cm{position:absolute;bottom:-7px;font-size:9px;background:#333;color:#fff;border-radius:3px;padding:1px 4px;white-space:nowrap}
+.sp .sstats{display:flex;gap:14px;margin-top:14px;font-size:11.5px;color:#999}
+.sp .sstats span{cursor:pointer}
+.sp .sstats .rep{margin-left:auto;color:#ff5500;font-weight:700}
+.sp .sstats .rep.done{color:#4cc98a}
+.sp .cbox{display:flex;gap:8px;margin-top:10px;border-top:1px solid #f0f0f0;padding-top:9px}
+.sp .cbox .cav{width:24px;height:24px;border-radius:50%;background:#ddd;flex:none;display:flex;align-items:center;justify-content:center;font-size:11px}
+.sp .cbox p{font-size:11.5px;color:#555;line-height:1.4}
+.sp .cbox p b{color:#111}
+.sp .cin{display:flex;gap:8px;margin-top:9px}
+.sp .cin input{flex:1;border:1px solid #e5e5e5;border-radius:99px;padding:7px 12px;font-size:11.5px;font-family:inherit;outline:none}
+.sp .cin button{border:none;background:#ff5500;color:#fff;border-radius:99px;font-size:11px;font-weight:700;padding:0 13px}
+.sp .prof .phero{background:linear-gradient(135deg,#333,#555);color:#fff;padding:20px 16px;display:flex;gap:14px;align-items:center}
+.sp .prof .pav{width:64px;height:64px;border-radius:50%;background:#ff5500;display:flex;align-items:center;justify-content:center;font-size:28px}
+.sp .prof .pstats{display:flex;background:#fff;border-bottom:1px solid #e5e5e5}
+.sp .prof .pstats div{flex:1;text-align:center;padding:11px 0}
+.sp .prof .pstats b{display:block;font-size:15px}
+.sp .prof .pstats span{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.5px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="note"><b>BLUEPRINT v3 — INTERACTIVE.</b> Bottom navs navigate. Play buttons toggle. Follow/like/buy/repost respond. Charts open track pages, artists open artist pages. Comments post. Tap everything.</div>
+
+<div id="phone">
+  <div class="mocknav">
+    <button class="on" onclick="plat(0,this)">Loopify</button>
+    <button onclick="plat(1,this)">Orange</button>
+    <button onclick="plat(2,this)">Yourtube</button>
+    <button onclick="plat(3,this)">iMusic</button>
+    <button onclick="plat(4,this)">Sahara</button>
+    <button onclick="plat(5,this)">SoundPuff</button>
+  </div>
+
+  <!-- ════════ LOOPIFY ════════ -->
+  <div class="plat on loop" id="pl-loop">
+    <!-- HOME -->
+    <div class="sub on" data-s="home">
+      <div class="scroll">
+        <div class="topbar"><h2>Good evening</h2><div class="ic"><span>🔔</span><span>🕘</span><span>⚙️</span></div></div>
+        <div class="filters"><span class="on">All</span><span>Music</span><span>Charts</span></div>
+        <div class="grid2">
+          <div class="tile" onclick="lp('track')"><div class="cover" style="background:linear-gradient(135deg,#5a3d8a,#2a1d4a)">💜</div>Liked Songs</div>
+          <div class="tile" onclick="lp('track')"><div class="cover" style="background:linear-gradient(135deg,#2a4a7e,#1a2a4e)">🌊</div>Midnight Tide</div>
+          <div class="tile" onclick="lp('track')"><div class="cover" style="background:linear-gradient(135deg,#7e2a2a,#4e1a1a)">🔥</div>Slow Gold</div>
+          <div class="tile" onclick="lp('track')"><div class="cover" style="background:linear-gradient(135deg,#1d6a5a,#0d3a30)">🌴</div>Daily Mix 1</div>
+        </div>
+        <div class="sect">Top 50 — Global <a href="#">See chart</a></div>
+        <div class="chartrow" onclick="lp('track')"><div class="pos">1</div><div class="mv same">—</div><div class="cover sm" style="background:linear-gradient(135deg,#2a4a7e,#1a2a4e)">🌊</div><div class="ti"><b>Midnight Tide</b><span><i class="e">E</i>Bootswidafur</span></div><div class="strm">2.1M</div><div class="dots">⋮</div></div>
+        <div class="chartrow"><div class="pos">2</div><div class="mv up">▲3</div><div class="cover sm" style="background:linear-gradient(135deg,#7e2a2a,#4e1a1a)">🔥</div><div class="ti"><b>Slow Gold</b><span>Velvet Ray</span></div><div class="strm">1.8M</div><div class="dots">⋮</div></div>
+        <div class="chartrow"><div class="pos">3</div><div class="mv down">▼1</div><div class="cover sm" style="background:linear-gradient(135deg,#1d6a5a,#0d3a30)">🌴</div><div class="ti"><b>Palm Lines</b><span>Kiko Duma</span></div><div class="strm">1.6M</div><div class="dots">⋮</div></div>
+        <div class="chartrow" onclick="lp('track')"><div class="pos">4</div><div class="mv new">NEW</div><div class="cover sm" style="background:linear-gradient(135deg,#5a3d8a,#2a1d4a)">💜</div><div class="ti"><b>All The Things</b><span>Bootswidafur</span></div><div class="strm">1.2M</div><div class="dots">⋮</div></div>
+        <div class="chartrow"><div class="pos">5</div><div class="mv same">—</div><div class="cover sm" style="background:linear-gradient(135deg,#8a7e2a,#4e4a1a)">⚡</div><div class="ti"><b>Static Love</b><span>Nova Reine</span></div><div class="strm">986K</div><div class="dots">⋮</div></div>
+        <div class="sect">Popular artists</div>
+        <div class="hrow">
+          <div class="pcard" onclick="lp('artist')"><div class="cover" style="border-radius:50%;background:#333">🎤</div><b>Bootswidafur</b><span>Artist</span></div>
+          <div class="pcard"><div class="cover" style="border-radius:50%;background:#333">🎹</div><b>Velvet Ray</b><span>Artist</span></div>
+          <div class="pcard"><div class="cover" style="border-radius:50%;background:#333">🥁</div><b>Kiko Duma</b><span>Artist</span></div>
+        </div>
+      </div>
+    </div>
+    <!-- SEARCH -->
+    <div class="sub" data-s="search">
+      <div class="scroll">
+        <div class="topbar"><h2>Search</h2><div class="ic"><span>📷</span></div></div>
+        <div class="srchbox">🔎 <input placeholder="Artists, songs, or albums" oninput="this.closest('.sub').querySelector('.sres').style.display=this.value?'block':'none'"></div>
+        <div class="sres" style="display:none">
+          <div class="chartrow" onclick="lp('artist')"><div class="cover sm" style="border-radius:50%">🎤</div><div class="ti"><b>Bootswidafur</b><span>Artist</span></div></div>
+          <div class="chartrow" onclick="lp('track')"><div class="cover sm" style="background:linear-gradient(135deg,#2a4a7e,#1a2a4e)">🌊</div><div class="ti"><b>Midnight Tide</b><span>Song · Bootswidafur</span></div></div>
+        </div>
+        <div class="sect">Browse all</div>
+        <div class="ggrid">
+          <div class="gcard" style="background:#8a2a4a">R&amp;B<span class="gem">🎷</span></div>
+          <div class="gcard" style="background:#2a6a4a">Afrobeats<span class="gem">🥁</span></div>
+          <div class="gcard" style="background:#3d3d8a">Pop<span class="gem">🎤</span></div>
+          <div class="gcard" style="background:#8a5a2a">Hip-Hop<span class="gem">🎧</span></div>
+          <div class="gcard" style="background:#2a5a7e">Charts<span class="gem">📈</span></div>
+          <div class="gcard" style="background:#6a2a7e">New Releases<span class="gem">✨</span></div>
+        </div>
+      </div>
+    </div>
+    <!-- LIBRARY -->
+    <div class="sub" data-s="lib">
+      <div class="scroll">
+        <div class="libhead"><div class="me">B</div><h2>Your Library</h2><span style="font-size:18px">＋</span></div>
+        <div class="filters"><span class="on">Playlists</span><span>Artists</span><span>Albums</span></div>
+        <div class="librow" onclick="lp('track')"><div class="cover" style="background:linear-gradient(135deg,#5a3d8a,#2a1d4a)">💜</div><div><b>Liked Songs</b><span>Playlist · 34 songs</span></div></div>
+        <div class="librow" onclick="lp('artist')"><div class="cover" style="border-radius:50%;background:#333">🎤</div><div><b>Bootswidafur</b><span>Artist</span></div></div>
+        <div class="librow"><div class="cover" style="border-radius:50%;background:#333">🎹</div><div><b>Velvet Ray</b><span>Artist</span></div></div>
+        <div class="librow" onclick="lp('track')"><div class="cover" style="background:linear-gradient(135deg,#2a4a7e,#1a2a4e)">🌊</div><div><b>Midnight Tide — EP</b><span>Album · Bootswidafur</span></div></div>
+      </div>
+    </div>
+    <!-- ARTIST -->
+    <div class="sub" data-s="artist">
+      <div class="scroll">
+        <div class="ahero"><button class="back" onclick="lp('home')">‹</button><div class="verif">✔ Verified Artist</div><h3>Bootswidafur</h3><div style="font-size:11.5px;color:#d0d0d0;margin-top:2px">412,882 monthly listeners</div></div>
+        <div class="actions"><button class="follow" onclick="this.classList.toggle('f');this.textContent=this.classList.contains('f')?'Following':'Follow'">Follow</button><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div>
+        <div class="sect">Popular</div>
+        <div class="chartrow" onclick="lp('track')"><div class="pos">1</div><div class="cover sm" style="background:linear-gradient(135deg,#2a4a7e,#1a2a4e)">🌊</div><div class="ti"><b>Midnight Tide</b><span>2,104,331</span></div><div class="dots">⋮</div></div>
+        <div class="chartrow"><div class="pos">2</div><div class="cover sm" style="background:linear-gradient(135deg,#5a3d8a,#2a1d4a)">💜</div><div class="ti"><b>All The Things</b><span>1,206,882</span></div><div class="dots">⋮</div></div>
+        <div class="chartrow"><div class="pos">3</div><div class="cover sm" style="background:linear-gradient(135deg,#1a2a3e,#0e1826)">🌙</div><div class="ti"><b>Lagos After Dark</b><span>640,207</span></div><div class="dots">⋮</div></div>
+        <div class="aboutcard">
+          <h4>About</h4>
+          <p>R&amp;B / Afrobeats artist out of Lagos. Signed to OnyxWave Records. Groove-driven — like good palm oil.</p>
+          <div class="row"><span>128K fans</span><span>·</span><span>7 chart entries</span><span>·</span><span>🏷 OnyxWave Records</span></div>
+        </div>
+        <div style="padding:4px 16px 20px"><span class="pill2">R&amp;B</span><span class="pill2">Afrobeats</span><span class="pill2">Lagos</span></div>
+      </div>
+    </div>
+    <!-- TRACK -->
+    <div class="sub" data-s="track">
+      <div class="scroll">
+        <div class="thero"><button class="back" onclick="lp('home')">‹</button><div class="cover">🌊</div><h3>Midnight Tide</h3><div class="a">Bootswidafur · Single · 2026 · 3:42</div></div>
+        <div class="actions" style="padding-top:2px"><span style="font-size:18px;cursor:pointer" onclick="this.textContent=this.textContent==='♡'?'💚':'♡'">♡</span><span style="font-size:17px">⤴</span><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div>
+        <div class="lyr" onclick="this.classList.toggle('open')"><h4>LYRICS · TAP TO EXPAND</h4><p>Tide pulls me under, I don't fight it no more…<br>You're the moon, I'm the water on the shore…</p><p class="more"><br>Currents keep changing but I stay the same…<br>Every wave that hits me got your name…</p></div>
+        <div class="credits">
+          <h4>Credits</h4>
+          <div class="cr"><b>Bootswidafur</b><span>Main Artist, Writer</span></div>
+          <div class="cr"><b>Velvet Ray</b><span>Featured, Producer</span></div>
+          <div class="cr"><b>OnyxWave Records</b><span>℗ 2026</span></div>
+        </div>
+        <div class="credits">
+          <h4>Stats</h4>
+          <div class="cr"><b>2,104,331</b><span>All-time streams</span></div>
+          <div class="cr"><b>#1</b><span>Peak — Top 50 Global</span></div>
+          <div class="cr"><b>9 weeks</b><span>On chart</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="npbar" onclick="lp('track')"><div class="cover">💜</div><div class="ti" style="flex:1"><b>All The Things</b><span>Bootswidafur</span></div><div class="ctrl"><span>🖥</span><span onclick="event.stopPropagation();togglePlay(this)">▶</span></div><div class="prog"><i id="lprog"></i></div></div>
+    <div class="bnav">
+      <div class="on" onclick="lp('home',this)"><i>⌂</i>Home</div>
+      <div onclick="lp('search',this)"><i>🔎</i>Search</div>
+      <div onclick="lp('lib',this)"><i>▤</i>Your Library</div>
+    </div>
+  </div>
+
+  <!-- ════════ ORANGE ════════ -->
+  <div class="plat org" id="pl-org">
+    <div class="sub on" data-s="browse">
+      <div class="scroll">
+        <div class="head"><h2>Browse</h2><div class="me">B</div></div>
+        <div class="card2"><div class="tag">FEATURED PLAYLIST</div><h3>Afrobeats Now</h3><p>The hottest player releases, refreshed every game week.</p><button class="pl" onclick="togglePlay(this)">▶</button></div>
+        <div class="sect">New Releases <a href="#">See All</a></div>
+        <div class="hrow">
+          <div class="alb"><div class="cover" style="background:linear-gradient(135deg,#5a3d8a,#2a1d4a)">💜</div><b>All The Things</b><span>Bootswidafur</span></div>
+          <div class="alb"><div class="cover" style="background:linear-gradient(135deg,#c2452d,#7a2418)">🔥</div><b>Slow Gold</b><span>Velvet Ray</span></div>
+          <div class="alb"><div class="cover" style="background:linear-gradient(135deg,#1d6a5a,#0d3a30)">🌴</div><b>Palm Lines</b><span>Kiko Duma</span></div>
+        </div>
+        <div class="sect">Top Songs</div>
+        <div class="chartrow"><div class="pos">1</div><div class="cover sm" style="background:linear-gradient(135deg,#2a4a7e,#1a2a4e)">🌊</div><div class="ti"><b>Midnight Tide</b><span>Bootswidafur</span></div><button class="add" onclick="this.textContent='✓';this.style.color='#4cc98a'">＋</button></div>
+        <div class="chartrow"><div class="pos">2</div><div class="cover sm" style="background:linear-gradient(135deg,#c2452d,#7a2418)">🔥</div><div class="ti"><b>Slow Gold</b><span>Velvet Ray</span></div><button class="add" onclick="this.textContent='✓';this.style.color='#4cc98a'">＋</button></div>
+        <div class="chartrow"><div class="pos">3</div><div class="cover sm" style="background:linear-gradient(135deg,#8a7e2a,#4e4a1a)">⚡</div><div class="ti"><b>Static Love</b><span>Nova Reine</span></div><button class="add" onclick="this.textContent='✓';this.style.color='#4cc98a'">＋</button></div>
+      </div>
+    </div>
+    <div class="sub" data-s="radio">
+      <div class="scroll">
+        <div class="head"><h2>Radio</h2><div class="me">B</div></div>
+        <div class="radiohero"><span class="live">● LIVE</span><h3>Orange Radio 1</h3><p>Now: the Afrobeats takeover — player releases all hour.</p></div>
+        <div class="radiohero" style="background:linear-gradient(135deg,#5a1d3a,#2a0e1c)"><span class="live" style="background:#0071e3">SHOW</span><h3>Chart Show Weekly</h3><p>Counting down the game's official Top 10, every game Sunday.</p></div>
+      </div>
+    </div>
+    <div class="sub lib" data-s="library">
+      <div class="scroll">
+        <div class="head"><h2>Library</h2><div class="me">B</div></div>
+        <div class="librow2"><i>♪</i>Songs<s>›</s></div>
+        <div class="librow2"><i>▦</i>Albums<s>›</s></div>
+        <div class="librow2"><i>👤</i>Artists<s>›</s></div>
+        <div class="librow2"><i>▤</i>Playlists<s>›</s></div>
+        <div class="librow2"><i>⬇</i>Downloaded<s>›</s></div>
+        <div class="sect">Recently Added</div>
+        <div class="hrow" style="padding-bottom:16px">
+          <div class="alb"><div class="cover" style="background:linear-gradient(135deg,#5a3d8a,#2a1d4a)">💜</div><b>All The Things</b><span>Bootswidafur</span></div>
+          <div class="alb"><div class="cover" style="background:linear-gradient(135deg,#3d2a4a,#241830)">🕯️</div><b>Candlewax</b><span>Mara June</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="npbar"><div class="cover">💜</div><b>All The Things</b><div class="ctrl"><span onclick="togglePlay(this)">▶</span><span>⏭</span></div></div>
+    <div class="bnav">
+      <div onclick="org('radio',this)"><i>📻</i>Radio</div>
+      <div class="on" onclick="org('browse',this)"><i>▦</i>Browse</div>
+      <div onclick="org('library',this)"><i>▤</i>Library</div>
+    </div>
+  </div>
+
+  <!-- ════════ YOURTUBE ════════ -->
+  <div class="plat yt" id="pl-yt">
+    <div class="sub on" data-s="home">
+      <div class="scroll">
+        <div class="head"><div class="logo">▶</div><h2>Yourtube</h2><div class="ic"><span>📡</span><span>🔔</span><span>🔎</span></div></div>
+        <div class="chiprow"><span class="on">All</span><span>Music</span><span>Music Videos</span><span>Live</span><span>New</span></div>
+        <div class="thumb">🌊<div class="dur">3:42</div></div>
+        <div class="vmeta"><div class="vav">🎤</div><div class="vt"><b>Bootswidafur — Midnight Tide (Official Video)</b><span>Bootswidafur · 1.4M views · 3 weeks ago</span></div></div>
+        <div class="acts"><span class="sub2" onclick="this.textContent=this.textContent.startsWith('Subscribed')?'Subscribe 412K':'Subscribed 412K';this.classList.toggle('sub')">Subscribe 412K</span><span onclick="ytLike(this)">👍 89K</span><span>👎</span><span>⤴ Share</span><span>💬 4.2K</span></div>
+        <div class="comm">
+          <div class="ch">@wavegirl_lena <span>· 2d</span></div>
+          <p>the way the beat drops at 1:14... this man does NOT miss 🌊🌊</p>
+          <div class="likes"><span onclick="ytLike(this)">👍 2.1K</span> · Reply</div>
+        </div>
+        <div class="thumb" style="background:linear-gradient(120deg,#4d2a2a,#3d1c2a)">🔥<div class="dur">4:01</div></div>
+        <div class="vmeta"><div class="vav">🎹</div><div class="vt"><b>Velvet Ray — Slow Gold (Visualizer)</b><span>Velvet Ray · 512K views · 1 week ago</span></div></div>
+        <div class="acts"><span onclick="this.classList.toggle('sub');this.textContent=this.classList.contains('sub')?'Subscribed 98K':'Subscribe 98K'">Subscribe 98K</span><span onclick="ytLike(this)">👍 31K</span><span>👎</span><span>⤴ Share</span><span>💬 890</span></div>
+      </div>
+    </div>
+    <div class="sub shorts" data-s="shorts">
+      <div class="scroll" style="padding:0">
+        <div class="sthumb">💃
+          <div class="sside">
+            <div onclick="ytLike(this)"><i>👍</i>212K</div>
+            <div><i>💬</i>3.1K</div>
+            <div><i>⤴</i>Share</div>
+            <div><i>♪</i></div>
+          </div>
+          <div class="sinfo"><b>@bootswidafur</b><p>All The Things dance challenge 💜 #AllTheThingsChallenge</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="sub" data-s="subs">
+      <div class="scroll">
+        <div class="head"><h2 style="font-size:16px">Subscriptions</h2></div>
+        <div class="chiprow"><span class="on">All</span><span>Today</span><span>Continue</span></div>
+        <div class="thumb" style="background:linear-gradient(120deg,#1a2a3e,#0e1826)">🌙<div class="dur">2:58</div></div>
+        <div class="vmeta"><div class="vav">🎤</div><div class="vt"><b>Lagos After Dark — Behind The Scenes</b><span>Bootswidafur · 89K views · 1 day ago</span></div></div>
+      </div>
+    </div>
+    <div class="bnav">
+      <div class="on" onclick="yt('home',this)"><i>⌂</i>Home</div>
+      <div onclick="yt('shorts',this)"><i>▶</i>Shorts</div>
+      <div onclick="yt('subs',this)"><i>▤</i>Subscriptions</div>
+      <div><i>👤</i>You</div>
+    </div>
+  </div>
+
+  <!-- ════════ iMUSIC ════════ -->
+  <div class="plat im" id="pl-im">
+    <div class="sub on" data-s="store">
+      <div class="scroll">
+        <div class="head"><h2>iMusic Store</h2><span>Balance: $<b id="imbal">42.18</b></span></div>
+        <div class="seg"><span class="on">Songs</span><span>Albums</span><span>Music Videos</span></div>
+        <div class="banner"><div class="cover">🌊</div><div><div class="tag">PRE-ORDER</div><h3>Midnight Tide (Deluxe)</h3><p>Bootswidafur · Out Week 246</p></div><button class="pre" onclick="buy(this,9.99,'Pre-ordered ✓')">$9.99</button></div>
+        <div class="buyrow"><div class="pos">1</div><div class="cover sm" style="background:linear-gradient(135deg,#2a4a7e,#1a2a4e)">🌊</div><div class="ti"><b>Midnight Tide</b><span>Bootswidafur · 41K sold</span></div><button class="price" onclick="buy(this,1.29)">$1.29</button></div>
+        <div class="buyrow"><div class="pos">2</div><div class="cover sm" style="background:linear-gradient(135deg,#c2452d,#7a2418)">🔥</div><div class="ti"><b>Slow Gold</b><span>Velvet Ray · 28K sold</span></div><button class="price" onclick="buy(this,1.29)">$1.29</button></div>
+        <div class="buyrow"><div class="pos">3</div><div class="cover sm" style="background:linear-gradient(135deg,#5a3d8a,#2a1d4a)">💜</div><div class="ti"><b>All The Things</b><span>Bootswidafur · 19K sold</span></div><button class="price owned">Owned ✓</button></div>
+        <div class="buyrow"><div class="pos">4</div><div class="cover sm" style="background:linear-gradient(135deg,#1d6a5a,#0d3a30)">🌴</div><div class="ti"><b>Palm Lines</b><span>Kiko Duma · 15K sold</span></div><button class="price" onclick="buy(this,0.99)">$0.99</button></div>
+        <div class="albsect">Top Albums &amp; EPs</div>
+        <div class="albrow">
+          <div class="alb2"><div class="cover" style="background:linear-gradient(135deg,#2a4a7e,#1a2a4e)">🌊</div><b>Midnight Tide — EP</b><span>Bootswidafur</span><div class="pr">$5.99</div></div>
+          <div class="alb2"><div class="cover" style="background:linear-gradient(135deg,#4a2a2a,#301818)">🥀</div><b>Wilt</b><span>Nova Reine</span><div class="pr">$7.99</div></div>
+          <div class="alb2"><div class="cover" style="background:linear-gradient(135deg,#3d2a4a,#241830)">🕯️</div><b>Candlewax</b><span>Mara June</span><div class="pr">$4.99</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="toast" id="imtoast">Purchased ✓ — added to your library</div>
+  </div>
+
+  <!-- ════════ SAHARA ════════ -->
+  <div class="plat sa" id="pl-sa">
+    <div class="sub on" data-s="home">
+      <div class="scroll">
+        <div class="head"><h2>sahara <i>music</i></h2><span>Prime included ✓</span></div>
+        <div class="search2">🔎 <input placeholder="Search artists, songs, albums…"></div>
+        <div class="rowchips"><span class="on" onclick="saChip(this,'home')">Home</span><span onclick="saChip(this,'charts')">Charts</span><span>New</span><span>Genres</span></div>
+        <div class="feature"><div class="tag">SAHARA ORIGINAL SESSION</div><h3>Bootswidafur: Live from Lagos</h3><p>An exclusive stripped session — Midnight Tide like you've never heard it.</p></div>
+        <div class="sect">Trending on Sahara</div>
+        <div class="chartrow"><div class="pos">1</div><div class="cover sm">🌊</div><div class="ti"><b>Midnight Tide</b><span>Bootswidafur</span></div><div class="x">HD</div></div>
+        <div class="chartrow"><div class="pos">2</div><div class="cover sm">⚡</div><div class="ti"><b>Static Love</b><span>Nova Reine</span></div><div class="x">HD</div></div>
+        <div class="sect">Because you listened to Afrobeats</div>
+        <div class="chartrow"><div class="cover sm">🌙</div><div class="ti"><b>Lagos After Dark</b><span>Bootswidafur</span></div><div class="x">HD</div></div>
+        <div class="chartrow"><div class="cover sm">🌴</div><div class="ti"><b>Palm Lines</b><span>Kiko Duma</span></div><div class="x">HD</div></div>
+      </div>
+    </div>
+    <div class="sub" data-s="charts">
+      <div class="scroll">
+        <div class="head"><h2>sahara <i>charts</i></h2><span>Updated weekly</span></div>
+        <div class="rowchips" style="padding-top:12px"><span onclick="saChip(this,'home')">Home</span><span class="on" onclick="saChip(this,'charts')">Charts</span><span>New</span><span>Genres</span></div>
+        <div class="sect">Top 20 — All Genres</div>
+        <div class="chartrow"><div class="pos">1</div><div class="cover sm">🌊</div><div class="ti"><b>Midnight Tide</b><span>Bootswidafur · <i class="up" style="font-style:normal">▲2 this week</i></span></div><div class="x">HD</div></div>
+        <div class="chartrow"><div class="pos">2</div><div class="cover sm">🔥</div><div class="ti"><b>Slow Gold</b><span>Velvet Ray · <i class="same" style="font-style:normal">— steady</i></span></div><div class="x">HD</div></div>
+        <div class="chartrow"><div class="pos">3</div><div class="cover sm">💜</div><div class="ti"><b>All The Things</b><span>Bootswidafur · <i class="new" style="font-style:normal">NEW ENTRY</i></span></div><div class="x">HD</div></div>
+      </div>
+    </div>
+    <div class="npbar"><div class="cover">🌊</div><div class="ti"><b>Midnight Tide</b><span>Bootswidafur</span></div><div class="ctrl"><span>⏮</span><span onclick="togglePlay(this)">▶</span><span>⏭</span></div></div>
+  </div>
+
+  <!-- ════════ SOUNDPUFF ════════ -->
+  <div class="plat sp" id="pl-sp">
+    <div class="sub on" data-s="stream">
+      <div class="head"><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
+      <div class="stab"><span class="on" onclick="sp('stream',this)">Stream</span><span onclick="sp('trend',this)">Trending</span><span onclick="sp('you',this)">You</span></div>
+      <div class="scroll">
+        <div class="track">
+          <div class="trow"><div class="cover">🎤</div><div class="ti"><div class="a">DTL Quincy reposted · 2 days ago</div><b>Rain Check (demo)</b><span class="tg"># rnb</span><span class="tg"># demo</span></div><button class="pl2" onclick="togglePlay(this)">▶</button></div>
+          <div class="wave"><i style="height:40%" class="p"></i><i style="height:70%" class="p"></i><i style="height:55%" class="p"></i><i style="height:90%" class="p"></i><i style="height:35%"></i><i style="height:65%"></i><i style="height:80%"></i><i style="height:45%"></i><i style="height:75%"></i><i style="height:30%"></i><i style="height:60%"></i><i style="height:85%"></i><i style="height:50%"></i><i style="height:70%"></i><i style="height:40%"></i><div class="cm" style="left:22%">🔥🔥</div></div>
+          <div class="sstats"><span>▶ 18.2K</span><span onclick="spLike(this)">♥ 412</span><span>💬 36</span><span class="rep" onclick="this.classList.add('done');this.textContent='↻ Reposted'">↻ Repost</span></div>
+          <div class="cbox"><div class="cav">🕯️</div><p><b>Mara June</b> at 1:04 — that bridge is criminal. collab?</p></div>
+          <div class="cin"><input placeholder="Write a comment…" onkeydown="if(event.key==='Enter'&&this.value){spComment(this)}"><button onclick="const i=this.previousElementSibling;if(i.value)spComment(i)">Post</button></div>
+        </div>
+        <div class="track">
+          <div class="trow"><div class="cover" style="background:linear-gradient(135deg,#8800ff,#ff0088)">🕯️</div><div class="ti"><div class="a">Mara June · 5 days ago</div><b>Candlewax (unmastered)</b><span class="tg"># lofi</span><span class="tg"># unsigned</span></div><button class="pl2" onclick="togglePlay(this)">▶</button></div>
+          <div class="wave"><i style="height:60%" class="p"></i><i style="height:35%" class="p"></i><i style="height:80%"></i><i style="height:50%"></i><i style="height:90%"></i><i style="height:40%"></i><i style="height:70%"></i><i style="height:55%"></i><i style="height:65%"></i><i style="height:30%"></i><i style="height:75%"></i><i style="height:45%"></i><i style="height:85%"></i><i style="height:60%"></i><i style="height:50%"></i></div>
+          <div class="sstats"><span>▶ 41.7K</span><span onclick="spLike(this)">♥ 1.1K</span><span>💬 204</span><span class="rep" onclick="this.classList.add('done');this.textContent='↻ Reposted'">↻ Repost</span></div>
+          <div class="cbox"><div class="cav">🎤</div><p><b>Bootswidafur</b> — this is why the majors are scared of the unsigned scene</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="sub" data-s="trend">
+      <div class="head"><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
+      <div class="stab"><span onclick="sp('stream',this)">Stream</span><span class="on" onclick="sp('trend',this)">Trending</span><span onclick="sp('you',this)">You</span></div>
+      <div class="scroll">
+        <div class="track">
+          <div class="trow"><div class="cover" style="background:linear-gradient(135deg,#8800ff,#ff0088)">🕯️</div><div class="ti"><div class="a">#1 Trending · Mara June</div><b>Candlewax (unmastered)</b></div><button class="pl2" onclick="togglePlay(this)">▶</button></div>
+          <div class="sstats"><span>▶ 41.7K this week</span><span>♥ 1.1K</span><span class="rep">↑ 312 reposts</span></div>
+        </div>
+        <div class="track">
+          <div class="trow"><div class="cover">🎤</div><div class="ti"><div class="a">#2 Trending · DTL Quincy</div><b>Rain Check (demo)</b></div><button class="pl2" onclick="togglePlay(this)">▶</button></div>
+          <div class="sstats"><span>▶ 18.2K this week</span><span>♥ 412</span><span class="rep">↑ 89 reposts</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="sub prof" data-s="you">
+      <div class="head"><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
+      <div class="stab"><span onclick="sp('stream',this)">Stream</span><span onclick="sp('trend',this)">Trending</span><span class="on" onclick="sp('you',this)">You</span></div>
+      <div class="scroll">
+        <div class="phero"><div class="pav">🎤</div><div><b style="font-size:17px">Bootswidafur</b><div style="font-size:11.5px;opacity:.8">soundpuff.com/bootswidafur</div></div></div>
+        <div class="pstats"><div><b>12</b><span>Tracks</span></div><div><b>4.2K</b><span>Followers</span></div><div><b>318</b><span>Following</span></div></div>
+        <div class="track">
+          <div class="trow"><div class="cover" style="background:linear-gradient(135deg,#1a2a3e,#0e1826)">🌙</div><div class="ti"><div class="a">You · 2 weeks ago</div><b>Lagos After Dark (early demo)</b><span class="tg"># demo</span></div><button class="pl2" onclick="togglePlay(this)">▶</button></div>
+          <div class="sstats"><span>▶ 8.9K</span><span>♥ 240</span><span>💬 41</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function plat(i,btn){
+  document.querySelectorAll('.plat').forEach((p,x)=>p.classList.toggle('on',x===i));
+  document.querySelectorAll('.mocknav button').forEach((b,x)=>b.classList.toggle('on',x===i));
+}
+function showSub(platId,name,navEl){
+  const p=document.getElementById(platId);
+  p.querySelectorAll(':scope > .sub').forEach(s=>s.classList.toggle('on',s.dataset.s===name));
+  if(navEl){navEl.parentElement.querySelectorAll('div').forEach(d=>d.classList.remove('on'));navEl.classList.add('on');}
+}
+function lp(name,navEl){
+  showSub('pl-loop',name,navEl);
+  if(!navEl){ // opening artist/track pages keeps whatever nav tab lit
+    const nav=document.querySelector('#pl-loop .bnav');
+    if(name==='home'){nav.querySelectorAll('div').forEach((d,x)=>d.classList.toggle('on',x===0));}
+  }
+}
+function org(name,navEl){showSub('pl-org',name,navEl)}
+function yt(name,navEl){showSub('pl-yt',name,navEl)}
+function sp(name,tabEl){
+  const p=document.getElementById('pl-sp');
+  p.querySelectorAll(':scope > .sub').forEach(s=>s.classList.toggle('on',s.dataset.s===name));
+}
+function togglePlay(el){
+  el.textContent = el.textContent.trim()==='▶' ? '⏸' : '▶';
+  const prog=document.getElementById('lprog');
+  if(prog) prog.style.width=(30+Math.random()*50)+'%';
+}
+function ytLike(el){
+  if(el.dataset.l)return;
+  el.dataset.l=1;
+  el.textContent=el.textContent.replace(/👍 ([\d.]+)K/, (m,n)=>'👍 '+(parseFloat(n)+0.1).toFixed(1)+'K');
+  el.style.color='#4c9df3';
+}
+function spLike(el){
+  if(el.dataset.l)return;
+  el.dataset.l=1;
+  el.style.color='#ff5500';
+  const m=el.textContent.match(/([\d.]+)(K?)/);
+  if(m){el.textContent='♥ '+(m[2]?(parseFloat(m[1])+0.1).toFixed(1)+'K':(parseInt(m[1])+1));}
+}
+function spComment(input){
+  const box=document.createElement('div');
+  box.className='cbox';
+  box.innerHTML='<div class="cav">🎤</div><p><b>Bootswidafur</b> — '+input.value.replace(/</g,'&lt;')+'</p>';
+  input.closest('.track').insertBefore(box,input.closest('.cin'));
+  input.value='';
+}
+function buy(btn,amt,label){
+  if(btn.classList.contains('owned'))return;
+  const bal=document.getElementById('imbal');
+  const cur=parseFloat(bal.textContent);
+  if(cur<amt){btn.textContent='Low funds';setTimeout(()=>btn.textContent='$'+amt.toFixed(2),1200);return;}
+  bal.textContent=(cur-amt).toFixed(2);
+  btn.classList.add('owned');
+  btn.textContent=label||'Owned ✓';
+  const t=document.getElementById('imtoast');
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1800);
+}
+function saChip(el,name){
+  showSub('pl-sa',name);
+}
+</script>
+</body>
+</html>
