@@ -8414,11 +8414,11 @@ function showPromoManager(songId){
   let activeCampaignsHTML = '';
   let totalSpent = 0, totalListeners = 0;
   if(!song.released && song.campaigns && song.campaigns.filter(c=>c.status==='active').length > 0){
-    activeCampaignsHTML = '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#92400e">📅 Pre-release campaign — fans are building now. Streams will count after release.</div>';
+    activeCampaignsHTML = '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#92400e">Pre-release campaign — fans are building now. Streams will count after release.</div>';
   }
   song.campaigns.filter(c => c.status === 'active').forEach(campaign => {
     const pct = campaign.weeksCompleted / campaign.duration * 100;
-    activeCampaignsHTML += `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:12px"><div style="font-weight:600;color:var(--acc)">${campaign.icon} ${campaign.typeName}</div><div style="font-size:11px;padding:4px 8px;background:rgba(74,222,128,0.2);color:#4ade80;border-radius:4px">ACTIVE</div></div><div style="font-size:12px;color:var(--mut);margin-bottom:12px"><strong style="color:var(--txt)">Budget:</strong> $${campaign.budget.toLocaleString()}/week<br><strong style="color:var(--txt)">Remaining:</strong> ${campaign.weeksRemaining} weeks<br><strong style="color:var(--txt)">Gained:</strong> ${campaign.listenersGained.toLocaleString()} listeners</div><div style="width:100%;height:6px;background:var(--bord);border-radius:3px;overflow:hidden;margin-bottom:12px"><div style="height:100%;background:var(--acc);width:${pct}%"></div></div><button onclick="stopPromonicCampaign(${songId},${campaign.id})" style="width:100%;padding:8px;background:transparent;border:1px solid rgba(255,107,107,0.3);color:#ff6b6b;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Stop Campaign</button></div>`;
+    activeCampaignsHTML += `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:12px"><div style="font-weight:600;color:var(--acc)">${campaign.typeName}</div><div style="font-size:11px;padding:4px 8px;background:rgba(74,222,128,0.2);color:#4ade80;border-radius:4px">ACTIVE</div></div><div style="font-size:12px;color:var(--mut);margin-bottom:12px"><strong style="color:var(--txt)">Budget:</strong> $${campaign.budget.toLocaleString()}/week<br><strong style="color:var(--txt)">Remaining:</strong> ${campaign.weeksRemaining} weeks<br><strong style="color:var(--txt)">Gained:</strong> ${campaign.listenersGained.toLocaleString()} listeners</div><div style="width:100%;height:6px;background:var(--bord);border-radius:3px;overflow:hidden;margin-bottom:12px"><div style="height:100%;background:var(--acc);width:${pct}%"></div></div><button onclick="stopPromonicCampaign(${songId},${campaign.id})" style="width:100%;padding:8px;background:transparent;border:1px solid rgba(255,107,107,0.3);color:#ff6b6b;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Stop Campaign</button></div>`;
     totalSpent += campaign.totalCost;
     totalListeners += campaign.listenersGained;
   });
@@ -8439,63 +8439,59 @@ function showPromoManager(songId){
     if(selectedRegion !== 'All' && promo.region !== selectedRegion) return;
     const alreadyActive = song.campaigns && song.campaigns.find(c => c.status === 'active' && c.type === key);
     if(alreadyActive){
-      promoOptionsHTML += `<div onclick="editPromoCampaign(${songId},'${key}')" style="background:var(--acc-bg);border:1.5px solid var(--acc);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all 0.2s" data-promo="${key}"><div style="font-weight:600;font-size:14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;color:var(--acc)"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">${promo.icon}</span>${promo.name}</div><span style="font-size:11px;background:var(--acc);color:white;padding:2px 8px;border-radius:10px">ACTIVE — EDIT</span></div><div style="font-size:12px;color:var(--mut);margin-bottom:6px">${promo.desc}</div><div style="font-size:12px;color:var(--acc);font-weight:600">$${alreadyActive.budget.toLocaleString()}/week · ${alreadyActive.weeksRemaining} wks left · Tap to edit</div></div>`;
+      promoOptionsHTML += `<div onclick="editPromoCampaign(${songId},'${key}')" style="background:var(--acc-bg);border:1.5px solid var(--acc);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all 0.2s" data-promo="${key}"><div style="font-weight:600;font-size:14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;color:var(--acc)"><div>${promo.name}</div><span style="font-size:11px;background:var(--acc);color:white;padding:2px 8px;border-radius:10px">ACTIVE — EDIT</span></div><div style="font-size:12px;color:var(--mut);margin-bottom:6px">${promo.desc}</div><div style="font-size:12px;color:var(--acc);font-weight:600">$${alreadyActive.budget.toLocaleString()}/week · ${alreadyActive.weeksRemaining} wks left · Tap to edit</div></div>`;
     } else {
-      promoOptionsHTML += `<div onclick="selectPromoOption(this,'${key}',${songId})" style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all 0.2s" data-promo="${key}"><div style="font-weight:600;font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:8px;color:var(--txt)"><span style="font-size:20px">${promo.icon}</span>${promo.name}</div><div style="font-size:12px;color:var(--mut);margin-bottom:10px">${promo.desc}</div><div style="font-size:12px;color:var(--acc);font-weight:600">Recommended Budget: $${promo.minBudget.toLocaleString()} - $${promo.maxBudget.toLocaleString()}/week</div></div>`;
+      promoOptionsHTML += `<div onclick="selectPromoOption(this,'${key}',${songId})" style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all 0.2s" data-promo="${key}"><div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--txt)">${promo.name}</div><div style="font-size:12px;color:var(--mut);margin-bottom:10px">${promo.desc}</div><div style="font-size:12px;color:var(--acc);font-weight:600">Recommended Budget: $${promo.minBudget.toLocaleString()} - $${promo.maxBudget.toLocaleString()}/week</div></div>`;
     }
   });
 
   const completedCampaigns = song.campaigns.filter(c => c.status === 'completed');
   let historyHTML = '';
   if(completedCampaigns.length === 0){
-    historyHTML = '<div style="text-align:center;padding:40px 20px"><div style="font-size:40px;margin-bottom:12px">📋</div><p style="color:var(--mut)">No completed campaigns yet</p></div>';
+    historyHTML = '<div style="text-align:center;padding:40px 20px"><p style="color:var(--mut)">No completed campaigns yet</p></div>';
   } else {
     let histSpent = 0, histListeners = 0;
     completedCampaigns.forEach(c => { histSpent += c.totalCost||0; histListeners += c.listenersGained||0; });
     historyHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Total Spent</div><div style="font-size:18px;font-weight:700;color:var(--acc)">$${histSpent.toLocaleString()}</div></div><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Listeners</div><div style="font-size:18px;font-weight:700;color:var(--acc)">${histListeners.toLocaleString()}</div></div></div>`;
-    historyHTML += completedCampaigns.map(c => `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-weight:600;color:var(--txt)">${c.icon||'🎯'} ${c.typeName||c.type}</span><span style="font-size:11px;padding:2px 8px;background:var(--bg);color:var(--mut);border:1px solid var(--bord);border-radius:10px">DONE</span></div><div style="font-size:12px;color:var(--mut)">$${(c.budget||0).toLocaleString()}/wk · ${c.duration} weeks · ${(c.listenersGained||0).toLocaleString()} listeners</div></div>`).join('');
+    historyHTML += completedCampaigns.map(c => `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-weight:600;color:var(--txt)">${c.typeName||c.type}</span><span style="font-size:11px;padding:2px 8px;background:var(--bg);color:var(--mut);border:1px solid var(--bord);border-radius:10px">DONE</span></div><div style="font-size:12px;color:var(--mut)">$${(c.budget||0).toLocaleString()}/wk · ${c.duration} weeks · ${(c.listenersGained||0).toLocaleString()} listeners</div></div>`).join('');
   }
 
-  const html = `<div style="padding:20px 0 80px"><div style="max-width:500px;margin:0 auto;padding:0 16px"><div style="display:flex;align-items:center;gap:12px;margin-bottom:24px"><button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--acc);font-size:28px;cursor:pointer;padding:0">←</button><div><h2 style="font-size:18px;color:var(--txt);margin-bottom:4px">${song.title}</h2><p style="font-size:12px;color:var(--mut)">Released • ${(song.streams||0).toLocaleString()} streams</p></div></div><div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--bord)"><button onclick="switchPromoTab(event,'active',${songId})" data-tab="active" style="flex:1;padding:14px;background:none;border:none;color:var(--acc);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--acc);margin-bottom:-2px">Active ${song.campaigns.filter(c=>c.status==='active').length>0?'('+song.campaigns.filter(c=>c.status==='active').length+')':''}</button><button onclick="switchPromoTab(event,'history',${songId})" data-tab="history" style="flex:1;padding:14px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s">History ${completedCampaigns.length>0?'('+completedCampaigns.length+')':''}</button><button onclick="switchPromoTab(event,'new',${songId})" data-tab="new" style="flex:1;padding:14px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s">New</button></div><div data-promo-tab="active" style="display:block">${song.campaigns.filter(c=>c.status==='active').length>0?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px"><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px">Total Spent</div><div style="font-size:18px;font-weight:700;color:var(--acc)">$${totalSpent.toLocaleString()}</div></div><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px">New Listeners</div><div style="font-size:18px;font-weight:700;color:var(--acc)">${totalListeners.toLocaleString()}</div></div></div>`:''}${activeCampaignsHTML || '<div style="text-align:center;padding:40px 20px"><div style="font-size:40px;margin-bottom:12px">🎯</div><p style="color:var(--mut)">No active campaigns</p></div>'}</div><div data-promo-tab="history" style="display:none">${historyHTML}</div><div data-promo-tab="new" style="display:none"><div style="font-size:12px;color:var(--mut);margin-bottom:16px;padding:12px;background:var(--acc-bg);border-left:3px solid var(--acc);border-radius:6px">💡 Click promo types below to select them. Budget controls appear inline under each selected option. Click the budget buttons to adjust. Then click 🚀 Start Campaign to launch all selected campaigns at once!</div>${promoOptionsHTML}<button id="launchBtn-${songId}" onclick="launchPromoCampaign(${songId})" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:calc(100% - 40px);max-width:500px;padding:14px;background:linear-gradient(135deg,var(--acc),#764ba2);color:white;border:none;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 20px rgba(102,126,234,0.3)">🚀 Start Campaign</button></div></div></div></div>`;
+  const html = `<div style="padding:20px 0 80px"><div style="max-width:500px;margin:0 auto;padding:0 16px"><div style="display:flex;align-items:center;gap:12px;margin-bottom:24px"><button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--acc);font-size:28px;cursor:pointer;padding:0">←</button><div><h2 style="font-size:18px;color:var(--txt);margin-bottom:4px">${song.title}</h2><p style="font-size:12px;color:var(--mut)">Released • ${(song.streams||0).toLocaleString()} streams</p></div></div><div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--bord)"><button onclick="switchPromoTab(event,'active',${songId})" data-tab="active" style="flex:1;padding:14px;background:none;border:none;color:var(--acc);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--acc);margin-bottom:-2px">Active ${song.campaigns.filter(c=>c.status==='active').length>0?'('+song.campaigns.filter(c=>c.status==='active').length+')':''}</button><button onclick="switchPromoTab(event,'history',${songId})" data-tab="history" style="flex:1;padding:14px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s">History ${completedCampaigns.length>0?'('+completedCampaigns.length+')':''}</button><button onclick="switchPromoTab(event,'new',${songId})" data-tab="new" style="flex:1;padding:14px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s">New</button></div><div data-promo-tab="active" style="display:block">${song.campaigns.filter(c=>c.status==='active').length>0?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px"><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px">Total Spent</div><div style="font-size:18px;font-weight:700;color:var(--acc)">$${totalSpent.toLocaleString()}</div></div><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px">New Listeners</div><div style="font-size:18px;font-weight:700;color:var(--acc)">${totalListeners.toLocaleString()}</div></div></div>`:''}${activeCampaignsHTML || '<div style="text-align:center;padding:40px 20px"><p style="color:var(--mut)">No active campaigns</p></div>'}</div><div data-promo-tab="history" style="display:none">${historyHTML}</div><div data-promo-tab="new" style="display:none"><div style="font-size:12px;color:var(--mut);margin-bottom:16px;padding:12px;background:var(--acc-bg);border-left:3px solid var(--acc);border-radius:6px">Click promo types below to select them. Budget controls appear inline under each selected option. Click the budget buttons to adjust. Then click Start Campaign to launch all selected campaigns at once!</div>${promoOptionsHTML}<button id="launchBtn-${songId}" onclick="launchPromoCampaign(${songId})" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:calc(100% - 40px);max-width:500px;padding:14px;background:linear-gradient(135deg,var(--acc),#764ba2);color:white;border:none;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 20px rgba(102,126,234,0.3)">Start Campaign</button></div></div></div></div>`;
   
   _insertOverlay(html);
   window.currentPromoSong = {id: songId, selectedPromos: {}};
 }
 
 function selectPromoOption(element, promoKey, songId){
-  // Initialize selected promos storage if needed
+  // Initialize selected promos storage
   if(!window.currentPromoSong.selectedPromos) {
     window.currentPromoSong.selectedPromos = {};
   }
 
-  // Toggle selection
-  const isSelected = window.currentPromoSong.selectedPromos[promoKey];
+  const promo = PROMO_TYPES[promoKey];
+  const existingPanel = document.querySelector(`[data-budget-panel="${promoKey}"]`);
 
-  if(isSelected){
-    // Deselect
+  if(existingPanel){
+    // Panel exists - remove it (deselect)
     delete window.currentPromoSong.selectedPromos[promoKey];
+    existingPanel.remove();
     element.style.borderColor = 'var(--bord)';
     element.style.background = 'var(--surf)';
     element.style.boxShadow = 'none';
-    // Remove budget panel for this promo
-    document.querySelector(`[data-budget-panel="${promoKey}"]`)?.remove();
   } else {
-    // Select
+    // No panel - create it (select)
     window.currentPromoSong.selectedPromos[promoKey] = {
-      budget: PROMO_TYPES[promoKey].minBudget,
+      budget: promo.minBudget,
       duration: 1
     };
     element.style.borderColor = 'var(--acc)';
     element.style.background = 'rgba(102,126,234,0.1)';
     element.style.boxShadow = '0 0 20px rgba(102,126,234,0.15)';
 
-    const promo = PROMO_TYPES[promoKey];
-
-    // Create budget panel for this promo
-    const panelHTML = `<div data-budget-panel="${promoKey}" style="background:var(--bg);border:1.5px solid var(--acc);border-radius:12px;padding:16px;margin-bottom:12px;margin-left:0">
+    const panelHTML = `<div data-budget-panel="${promoKey}" style="background:var(--bg);border:1.5px solid var(--acc);border-radius:12px;padding:16px;margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="font-size:12px;color:var(--acc);text-transform:uppercase;letter-spacing:1px;font-weight:700">${promo.icon} ${promo.name}</div>
-        <button onclick="selectPromoOption(document.querySelector('[data-promo=\"${promoKey}\"]'), '${promoKey}', ${songId})" style="background:none;border:none;color:var(--mut);font-size:16px;cursor:pointer;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center">✕</button>
+        <div style="font-size:12px;color:var(--acc);text-transform:uppercase;letter-spacing:1px;font-weight:700">${promo.name}</div>
+        <button onclick="document.querySelector('[data-promo=\"${promoKey}\"]').click()" style="background:none;border:none;color:var(--mut);font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
@@ -8503,7 +8499,7 @@ function selectPromoOption(element, promoKey, songId){
           <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Weekly Budget</label>
           <div style="display:flex;align-items:center;gap:6px">
             <span style="color:var(--mut);font-weight:700">$</span>
-            <input type="number" class="promo-budget-input" data-promo="${promoKey}" placeholder="${promo.minBudget}" min="${promo.minBudget}" max="${promo.maxBudget}" step="100" value="${promo.minBudget}" style="flex:1;padding:10px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--txt);font-size:13px;font-weight:600" oninput="updatePromoMultiEstimate(${songId})">
+            <input type="number" class="promo-budget-input" value="${promo.minBudget}" min="${promo.minBudget}" max="${promo.maxBudget}" step="100" style="flex:1;padding:10px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--txt);font-size:13px;font-weight:600" oninput="updatePromoMultiEstimate(${songId})">
           </div>
           <div style="font-size:9px;color:var(--mut);margin-top:4px">Min: $${promo.minBudget.toLocaleString()} - Max: $${promo.maxBudget.toLocaleString()}</div>
         </div>
@@ -8511,10 +8507,10 @@ function selectPromoOption(element, promoKey, songId){
         <div>
           <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Duration</label>
           <div style="display:flex;gap:4px;flex-wrap:wrap">
-            <button onclick="selectPromoMultiDuration(event,'${promoKey}',1,${songId})" class="multi-duration-pill" data-promo="${promoKey}" data-weeks="1" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">1w</button>
-            <button onclick="selectPromoMultiDuration(event,'${promoKey}',2,${songId})" class="multi-duration-pill" data-promo="${promoKey}" data-weeks="2" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">2w</button>
-            <button onclick="selectPromoMultiDuration(event,'${promoKey}',4,${songId})" class="multi-duration-pill" data-promo="${promoKey}" data-weeks="4" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">4w</button>
-            <button onclick="selectPromoMultiDuration(event,'${promoKey}',8,${songId})" class="multi-duration-pill" data-promo="${promoKey}" data-weeks="8" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">8w</button>
+            <button onclick="setPromoDuration('${promoKey}',1,this,${songId})" class="duration-${promoKey}" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">1w</button>
+            <button onclick="setPromoDuration('${promoKey}',2,this,${songId})" class="duration-${promoKey}" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">2w</button>
+            <button onclick="setPromoDuration('${promoKey}',4,this,${songId})" class="duration-${promoKey}" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">4w</button>
+            <button onclick="setPromoDuration('${promoKey}',8,this,${songId})" class="duration-${promoKey}" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">8w</button>
           </div>
         </div>
       </div>
@@ -8526,28 +8522,44 @@ function selectPromoOption(element, promoKey, songId){
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
           <span>Expected Listeners/Week:</span>
-          <span style="color:var(--acc);font-weight:700" class="promo-listeners" data-promo="${promoKey}">—</span>
+          <span style="color:var(--acc);font-weight:700" class="promo-listeners">0</span>
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
           <span>Campaign Duration:</span>
-          <span style="color:var(--acc);font-weight:700" class="promo-duration" data-promo="${promoKey}">1 week</span>
+          <span style="color:var(--acc);font-weight:700" class="promo-duration">1 week</span>
         </div>
         <div style="border-top:1px solid var(--bord);padding-top:8px;margin-top:8px;display:flex;justify-content:space-between;color:var(--txt);font-weight:700">
-          <span>💰 Campaign Cost:</span>
-          <span style="font-size:13px;color:var(--acc)" class="promo-total" data-promo="${promoKey}">$${promo.minBudget.toLocaleString()}</span>
+          <span>Campaign Cost:</span>
+          <span style="font-size:13px;color:var(--acc)" class="promo-total">$${promo.minBudget.toLocaleString()}</span>
         </div>
       </div>
     </div>`;
 
     element.insertAdjacentHTML('afterend', panelHTML);
-
-    // Focus on the budget input
     setTimeout(() => {
-      document.querySelector(`[data-budget-panel="${promoKey}"] .promo-budget-input`)?.focus();
+      const panel = document.querySelector(`[data-budget-panel="${promoKey}"]`);
+      const input = panel?.querySelector('.promo-budget-input');
+      input?.focus();
     }, 100);
-
     updatePromoMultiEstimate(songId);
   }
+}
+
+function setPromoDuration(promoKey, weeks, buttonEl, songId){
+  if(!window.currentPromoSong.selectedPromos) window.currentPromoSong.selectedPromos = {};
+  window.currentPromoSong.selectedPromos[promoKey].duration = weeks;
+
+  // Update button styles
+  document.querySelectorAll(`.duration-${promoKey}`).forEach(btn => {
+    btn.style.background = 'var(--surf)';
+    btn.style.borderColor = 'var(--bord)';
+    btn.style.color = 'var(--mut)';
+  });
+  buttonEl.style.background = 'var(--acc)';
+  buttonEl.style.borderColor = 'var(--acc)';
+  buttonEl.style.color = 'white';
+
+  updatePromoMultiEstimate(songId);
 }
 
 function selectPromoMultiDuration(event, promoKey, weeks, songId){
@@ -8606,7 +8618,7 @@ function launchPromoCampaign(songId){
   if(!song) return;
 
   if(!window.currentPromoSong.selectedPromos || Object.keys(window.currentPromoSong.selectedPromos).length === 0){
-    showEvent('❌','Select Campaign','Pick at least one promo type',['OK']);
+    showEvent('','Select Campaign','Pick at least one promo type',['OK']);
     return;
   }
 
@@ -8622,7 +8634,7 @@ function launchPromoCampaign(songId){
     const duration = config.duration || 1;
 
     if(budget <= 0){
-      showEvent('❌','No Budget Set','Enter a weekly budget for all selected campaigns.',['OK']);
+      showEvent('','No Budget Set','Enter a weekly budget for all selected campaigns.',['OK']);
       return;
     }
 
@@ -8632,7 +8644,7 @@ function launchPromoCampaign(songId){
 
   // Check if player has enough money for all first week campaigns
   if(GAME.money < totalFirstWeekCost){
-    showEvent('💸','Not Enough Money',`You need $${totalFirstWeekCost.toLocaleString()} for the first week but only have $${Math.floor(GAME.money||0).toLocaleString()}.`,['OK']);
+    showEvent('','Not Enough Money',`You need $${totalFirstWeekCost.toLocaleString()} for the first week but only have $${Math.floor(GAME.money||0).toLocaleString()}.`,['OK']);
     return;
   }
 
@@ -8671,7 +8683,7 @@ function launchPromoCampaign(songId){
     showSongDetails(songId);
     var toast = document.createElement('div');
     toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--acc);color:var(--acc-txt);padding:12px 20px;border-radius:20px;font-size:13px;font-weight:700;z-index:300000;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
-    toast.textContent = '🚀 '+launchedPromos.join(' + ')+' campaigns launched!';
+    toast.textContent = launchedPromos.join(' + ')+' campaigns launched!';
     document.body.appendChild(toast);
     setTimeout(()=>toast.remove(), 3000);
   }, 300);
@@ -8688,7 +8700,7 @@ function editPromoCampaign(songId, campaignType){
   const name = promo ? promo.name : campaignType;
   const html = `<div style="padding:16px;padding-bottom:80px">
     <div style="background:var(--acc-bg);border:1px solid var(--acc);border-radius:10px;padding:12px 14px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:700;color:var(--acc)">${promo?.icon||'🎯'} ${name} — Active Campaign</div>
+      <div style="font-size:13px;font-weight:700;color:var(--acc)">${name} — Active Campaign</div>
       <div style="font-size:12px;color:var(--mut);margin-top:4px">$${campaign.budget.toLocaleString()}/week · ${campaign.weeksRemaining} weeks remaining · ${campaign.listenersGained.toLocaleString()} listeners gained</div>
     </div>
     <div style="font-size:11px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Edit Budget</div>
@@ -8722,16 +8734,16 @@ function updatePromoWeeks(songId, type, weeks, el){
 function stopPromonicCampaign(songId, campaignId){
   const song = GAME.songs.find(s => s.id === songId);
   if(!song) return;
-  
+
   const campaign = song.campaigns.find(c => c.id === campaignId);
   if(campaign){
     campaign.status = 'stopped';
     campaign.stoppedWeek = GAME.week;
     GAME._dirty = true;
-    
-    showEvent('⏸️','Campaign Stopped',`${campaign.typeName} stopped after ${campaign.weeksCompleted} weeks`,['OK']);
+
+    showEvent('','Campaign Stopped',`${campaign.typeName} stopped after ${campaign.weeksCompleted} weeks`,['OK']);
     saveToCloud();
-    
+
     _closeOverlay();
     setTimeout(()=>showPromoManager(songId), 300);
   }
