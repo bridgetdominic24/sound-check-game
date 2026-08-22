@@ -19733,9 +19733,25 @@ function closeiTunesAlbum(){
   showiTunesUI();
 }
 
-function showSpotifyUI(){
+function showLoopifyUI(){
   if(!GAME || !GAME.songs){ showToast('Loading...', 'purple'); return; }
-  if(!GAME.spotifyView)GAME.spotifyView='artist';
+  if(!GAME.loopifyView) GAME.loopifyView = 'home';
+
+  switch(GAME.loopifyView){
+    case 'home': showLoopifyHome(); break;
+    case 'search': showLoopifySearch(); break;
+    case 'library': showLoopifyLibrary(); break;
+    case 'artist': showLoopifyArtistProfile(S.id); break;
+    default: showLoopifyHome();
+  }
+}
+
+function showSpotifyUI(){
+  showLoopifyUI();
+}
+
+function showLoopifyHome(){
+  if(!GAME || !GAME.songs){ showToast('Loading...', 'purple'); return; }
   
   // Initialize artistProfile if it doesn't exist
   if(!GAME.artistProfile){
@@ -20021,6 +20037,469 @@ function saveBioAndClose(){
   }
   closeMenu();
   showSpotifyUI(); // Refresh Spotify to show changes
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOOPIFY STREAMING PLATFORM - Complete Implementation
+// ═══════════════════════════════════════════════════════════════
+
+function getLoopifyTopChart(){
+  const allSongs=[];
+
+  // Add current player's songs - the most reliable data source
+  (GAME.songs||[]).filter(s=>s.released).forEach(song=>{
+    allSongs.push({...song, artistId: S.id, artistName: S.artistName});
+  });
+
+  // Sort by streams (Top 50)
+  allSongs.sort((a,b)=>(b.streams||0)-(a.streams||0));
+  const top50=allSongs.slice(0,50);
+
+  // Calculate chart movement based on lastChartPosition
+  top50.forEach((song,idx)=>{
+    song.chartRank=idx+1;
+    const lastRank=song.lastChartPosition||null;
+    if(lastRank===null) song.chartMove='NEW';
+    else if(lastRank > idx+1) song.chartMove='UP';
+    else if(lastRank < idx+1) song.chartMove='DOWN';
+    else song.chartMove='STAY';
+    song.chartMoveDiff=lastRank ? Math.abs(lastRank-(idx+1)) : 0;
+  });
+
+  return top50;
+}
+
+function showLoopifyHome(){
+  const chart=getLoopifyTopChart();
+
+  let html=`<style>
+  .loopify-container{background:var(--bg);min-height:100%;overflow-y:auto;color:var(--txt);font-family:var(--fb);padding-bottom:80px}
+  .loopify-header{padding:16px;background:var(--surf);border-bottom:1px solid var(--bord)}
+  .loopify-title{font-size:24px;font-weight:700;margin-bottom:4px}
+  .loopify-subtitle{font-size:12px;color:var(--mut)}
+  .loopify-chart-item{padding:12px 16px;border-bottom:1px solid var(--bord);display:flex;gap:12px;align-items:center;cursor:pointer;transition:all 0.2s}
+  .loopify-chart-item:active{background:var(--surf)}
+  .loopify-rank{font-size:16px;font-weight:700;color:var(--acc);min-width:40px;text-align:center}
+  .loopify-rank.new{color:var(--acc)}
+  .loopify-cover{width:40px;height:40px;background:var(--surf);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;border:1px solid var(--bord)}
+  .loopify-info{flex:1;min-width:0}
+  .loopify-song-title{font-size:14px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .loopify-artist{font-size:12px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .loopify-stats{font-size:11px;color:var(--acc);font-weight:600}
+  .loopify-move{min-width:50px;text-align:right;font-size:11px;font-weight:600}
+  .loopify-move.up{color:#22c55e}
+  .loopify-move.down{color:#ef4444}
+  .loopify-move.new{color:var(--acc)}
+  .loopify-nav{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--bord);display:flex;z-index:100}
+  .loopify-nav-item{flex:1;padding:12px 0 8px;text-align:center;color:var(--mut);font-size:11px;cursor:pointer;border-bottom:3px solid transparent}
+  .loopify-nav-item.active{color:var(--acc);border-bottom-color:var(--acc)}
+  </style>
+
+  <div class="loopify-container">
+    <button onclick="closeLoopify()" style="position:fixed;top:12px;left:12px;z-index:200;background:rgba(var(--bg-rgb),0.9);border:1px solid var(--bord);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt);font-size:20px;cursor:pointer">←</button>
+
+    <div class="loopify-header">
+      <div class="loopify-title">Top 50</div>
+      <div class="loopify-subtitle">Songs trending right now</div>
+    </div>
+
+    <div>`;
+
+  chart.forEach(song=>{
+    const moveIcon=song.chartMove==='UP'?'▲':(song.chartMove==='DOWN'?'▼':'');
+    const moveClass=song.chartMove==='UP'?'up':(song.chartMove==='DOWN'?'down':(song.chartMove==='NEW'?'new':''));
+    const streams=Math.floor((song.streams||0)/1000);
+
+    html+=`<div class="loopify-chart-item" onclick="showLoopifyTrackDetails('${song.id}','${song.artistId}')">
+      <div class="loopify-rank ${song.chartMove==='NEW'?'new':''}">${song.chartRank}</div>
+      <div class="loopify-cover">${song.cover||'♫'}</div>
+      <div class="loopify-info">
+        <div class="loopify-song-title">${song.title}</div>
+        <div class="loopify-artist">${song.artistName}</div>
+        <div class="loopify-stats">${streams}K streams</div>
+      </div>
+      <div class="loopify-move ${moveClass}">${moveIcon}${song.chartMoveDiff>0?song.chartMoveDiff:''}</div>
+    </div>`;
+  });
+
+  html+=`</div>
+    <div class="loopify-nav">
+      <div class="loopify-nav-item active" onclick="switchLoopifyView('home')">Home</div>
+      <div class="loopify-nav-item" onclick="switchLoopifyView('search')">Search</div>
+      <div class="loopify-nav-item" onclick="switchLoopifyView('library')">Library</div>
+    </div>
+  </div>`;
+
+  showLoopifyScreen(html);
+}
+
+function showLoopifySearch(){
+  let html=`<style>
+  .loopify-search-container{background:var(--bg);min-height:100%;overflow-y:auto;color:var(--txt);font-family:var(--fb);padding-bottom:80px;padding:16px 0 80px}
+  .loopify-search-box{padding:16px;position:sticky;top:0;background:var(--surf);border-bottom:1px solid var(--bord);z-index:50}
+  .loopify-search-input{width:100%;padding:12px;background:var(--bg);border:1px solid var(--bord);border-radius:20px;color:var(--txt);font-size:14px;font-family:var(--fb)}
+  .loopify-search-results{padding:0}
+  .loopify-search-item{padding:12px 16px;border-bottom:1px solid var(--bord);display:flex;gap:12px;align-items:center;cursor:pointer;transition:all 0.2s}
+  .loopify-search-item:active{background:var(--surf)}
+  .loopify-search-cover{width:48px;height:48px;background:var(--surf);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;border:1px solid var(--bord)}
+  .loopify-search-info{flex:1;min-width:0}
+  .loopify-search-title{font-size:14px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .loopify-search-subtitle{font-size:12px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+  .loopify-empty{text-align:center;padding:60px 20px;color:var(--mut)}
+  </style>
+
+  <div class="loopify-search-container">
+    <button onclick="closeLoopify()" style="position:fixed;top:12px;left:12px;z-index:200;background:rgba(var(--bg-rgb),0.9);border:1px solid var(--bord);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt);font-size:20px;cursor:pointer">←</button>
+
+    <div class="loopify-search-box">
+      <input type="text" id="loopifySearchInput" class="loopify-search-input" placeholder="Search artists, songs..." oninput="loopifySearch(this.value)">
+    </div>
+
+    <div class="loopify-search-results" id="loopifySearchResults">
+      <div class="loopify-empty">Start typing to search</div>
+    </div>
+
+    <div style="position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--bord);display:flex;z-index:100">
+      <div style="flex:1;padding:12px 0 8px;text-align:center;color:var(--mut);font-size:11px;cursor:pointer">Home</div>
+      <div style="flex:1;padding:12px 0 8px;text-align:center;color:var(--acc);font-size:11px;cursor:pointer;border-bottom:3px solid var(--acc)">Search</div>
+      <div style="flex:1;padding:12px 0 8px;text-align:center;color:var(--mut);font-size:11px;cursor:pointer" onclick="switchLoopifyView('library')">Library</div>
+    </div>
+  </div>`;
+
+  showLoopifyScreen(html);
+  setTimeout(()=>document.getElementById('loopifySearchInput')?.focus(), 100);
+}
+
+function loopifySearch(query){
+  const results=document.getElementById('loopifySearchResults');
+  if(!query.trim()){
+    results.innerHTML='<div class="loopify-empty">Start typing to search</div>';
+    return;
+  }
+
+  const q=query.toLowerCase();
+  const items=[];
+
+  // Search in current player's songs
+  (GAME.songs||[]).filter(s=>s.released).forEach(song=>{
+    if(song.title.toLowerCase().includes(q) || S.artistName.toLowerCase().includes(q)){
+      items.push({type:'song',song,artist:S.artistName,artistId:S.id});
+    }
+  });
+
+  // Search in other players by artist name
+  (window.allPlayers||[]).forEach(player=>{
+    if(player.artistName.toLowerCase().includes(q)){
+      items.push({type:'artist',player});
+    }
+  });
+
+  if(items.length===0){
+    results.innerHTML='<div class="loopify-empty">No results found</div>';
+    return;
+  }
+
+  let html='';
+  items.slice(0,30).forEach(item=>{
+    if(item.type==='artist'){
+      const p=item.player;
+      html+=`<div class="loopify-search-item" onclick="showLoopifyArtistProfile('${p.id}')">
+        <div class="loopify-search-cover" style="width:56px;height:56px;border-radius:50%">${p.profilePic||'👤'}</div>
+        <div class="loopify-search-info">
+          <div class="loopify-search-title">${p.artistName}</div>
+          <div class="loopify-search-subtitle">${p.totalStreams.toLocaleString()} total streams</div>
+        </div>
+      </div>`;
+    }else{
+      html+=`<div class="loopify-search-item" onclick="showLoopifyTrackDetails('${item.song.id}','${item.artistId}')">
+        <div class="loopify-search-cover">${item.song.cover||'♫'}</div>
+        <div class="loopify-search-info">
+          <div class="loopify-search-title">${item.song.title}</div>
+          <div class="loopify-search-subtitle">${item.artist}</div>
+        </div>
+      </div>`;
+    }
+  });
+
+  results.innerHTML=html;
+}
+
+function showLoopifyLibrary(){
+  const releasedSongs=(GAME.songs||[]).filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));
+
+  let html=`<style>
+  .loopify-library-container{background:var(--bg);min-height:100%;overflow-y:auto;color:var(--txt);font-family:var(--fb);padding-bottom:80px}
+  .loopify-lib-header{padding:16px;background:var(--surf);border-bottom:1px solid var(--bord)}
+  .loopify-lib-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .loopify-lib-stat{background:var(--bg);padding:12px;border-radius:8px;border:1px solid var(--bord)}
+  .loopify-lib-stat-value{font-size:18px;font-weight:700;color:var(--acc)}
+  .loopify-lib-stat-label{font-size:11px;color:var(--mut);margin-top:4px}
+  </style>
+
+  <div class="loopify-library-container">
+    <button onclick="closeLoopify()" style="position:fixed;top:12px;left:12px;z-index:200;background:rgba(var(--bg-rgb),0.9);border:1px solid var(--bord);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt);font-size:20px;cursor:pointer">←</button>
+
+    <div class="loopify-lib-header">
+      <div style="font-size:20px;font-weight:700">Your Library</div>
+      <div class="loopify-lib-stats">
+        <div class="loopify-lib-stat">
+          <div class="loopify-lib-stat-value">${releasedSongs.length}</div>
+          <div class="loopify-lib-stat-label">Songs Released</div>
+        </div>
+        <div class="loopify-lib-stat">
+          <div class="loopify-lib-stat-value">${releasedSongs.reduce((s,song)=>s+(song.streams||0),0).toLocaleString().slice(0,-3)}K</div>
+          <div class="loopify-lib-stat-label">Total Streams</div>
+        </div>
+      </div>
+    </div>
+
+    <div>`;
+
+  if(releasedSongs.length===0){
+    html+=`<div style="text-align:center;padding:60px 20px;color:var(--mut)">
+      <div style="font-size:48px;margin-bottom:16px">♫</div>
+      <div style="font-size:16px;font-weight:700;color:var(--txt);margin-bottom:8px">No music yet</div>
+      <div style="font-size:14px">Release your first song to get started</div>
+    </div>`;
+  }else{
+    releasedSongs.forEach((song,idx)=>{
+      const streams=Math.floor((song.streams||0)/1000);
+      html+=`<div class="loopify-chart-item" onclick="showLoopifyTrackDetails('${song.id}','${S.id}')">
+        <div class="loopify-rank">${idx+1}</div>
+        <div class="loopify-cover">${song.cover||'♫'}</div>
+        <div class="loopify-info">
+          <div class="loopify-song-title">${song.title}</div>
+          <div class="loopify-artist">${S.artistName}</div>
+          <div class="loopify-stats">${streams}K streams</div>
+        </div>
+      </div>`;
+    });
+  }
+
+  html+=`</div>
+    <div class="loopify-nav">
+      <div class="loopify-nav-item" onclick="switchLoopifyView('home')">Home</div>
+      <div class="loopify-nav-item" onclick="switchLoopifyView('search')">Search</div>
+      <div class="loopify-nav-item active">Library</div>
+    </div>
+  </div>`;
+
+  showLoopifyScreen(html);
+}
+
+function showLoopifyArtistProfile(artistId){
+  let artist, songs;
+
+  if(artistId===S.id){
+    artist={id:S.id,artistName:S.artistName,profilePic:(GAME.artistProfile||{}).profilePic||'👤',bio:(GAME.artistProfile||{}).bio||''};
+    songs=(GAME.songs||[]).filter(s=>s.released);
+  }else{
+    const player=window.allPlayers?.find(p=>p.id===artistId);
+    if(!player){ showToast('Artist not found','error'); return; }
+    artist={id:player.id,artistName:player.artistName,profilePic:player.profilePic||'👤',bio:player.bio||''};
+    // For other players, we only have aggregate data from window.allPlayers
+    songs=[];
+  }
+
+  if(songs.length>0) songs.sort((a,b)=>(b.streams||0)-(a.streams||0));
+
+  let html=`<style>
+  .loopify-artist-container{background:var(--bg);min-height:100%;overflow-y:auto;color:var(--txt);font-family:var(--fb);padding-bottom:80px}
+  .loopify-artist-header{padding:16px;background:var(--surf);border-bottom:1px solid var(--bord)}
+  .loopify-artist-cover{width:80px;height:80px;background:var(--card);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;margin:0 auto 12px;border:2px solid var(--bord)}
+  .loopify-artist-name{font-size:24px;font-weight:700;text-align:center}
+  .loopify-artist-bio{font-size:12px;color:var(--mut);text-align:center;margin-top:8px;line-height:1.4}
+  .loopify-artist-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+  .loopify-stat{background:var(--bg);padding:12px;border-radius:8px;border:1px solid var(--bord);text-align:center}
+  .loopify-stat-value{font-size:16px;font-weight:700;color:var(--acc)}
+  .loopify-stat-label{font-size:10px;color:var(--mut);margin-top:4px}
+  </style>
+
+  <div class="loopify-artist-container">
+    <button onclick="closeLoopify()" style="position:fixed;top:12px;left:12px;z-index:200;background:rgba(var(--bg-rgb),0.9);border:1px solid var(--bord);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt);font-size:20px;cursor:pointer">←</button>
+
+    <div class="loopify-artist-header">
+      <div class="loopify-artist-cover">${artist.profilePic}</div>
+      <div class="loopify-artist-name">${artist.artistName}</div>
+      ${artist.bio?`<div class="loopify-artist-bio">${artist.bio}</div>`:''}
+      <div class="loopify-artist-stats">
+        <div class="loopify-stat">
+          <div class="loopify-stat-value">${songs.length}</div>
+          <div class="loopify-stat-label">Releases</div>
+        </div>
+        <div class="loopify-stat">
+          <div class="loopify-stat-value">${songs.reduce((s,song)=>s+(song.streams||0),0).toLocaleString().slice(0,-3)}K</div>
+          <div class="loopify-stat-label">Streams</div>
+        </div>
+      </div>
+    </div>
+
+    <div>`;
+
+  if(songs.length===0){
+    html+=`<div style="text-align:center;padding:40px 20px;color:var(--mut)">No released songs</div>`;
+  }else{
+    songs.forEach((song,idx)=>{
+      const streams=Math.floor((song.streams||0)/1000);
+      html+=`<div class="loopify-chart-item" onclick="showLoopifyTrackDetails('${song.id}','${artist.id}')">
+        <div class="loopify-rank">${idx+1}</div>
+        <div class="loopify-cover">${song.cover||'♫'}</div>
+        <div class="loopify-info">
+          <div class="loopify-song-title">${song.title}</div>
+          <div class="loopify-artist">${song.topic||'Song'}</div>
+          <div class="loopify-stats">${streams}K streams</div>
+        </div>
+      </div>`;
+    });
+  }
+
+  html+=`</div></div>`;
+
+  _insertOverlay(html);
+}
+
+function showLoopifyTrackDetails(songId, artistId){
+  let song, artist;
+
+  if(artistId===S.id){
+    song=GAME.songs?.find(s=>s.id===songId);
+    artist={id:S.id,name:S.artistName};
+  }else{
+    const player=window.allPlayers?.find(p=>p.id===artistId);
+    if(!player){ showToast('Artist not found','error'); return; }
+    song=player.gameSongs?.find(s=>s.id===songId);
+    artist={id:player.id,name:player.artistName};
+  }
+
+  if(!song){ showToast('Song not found','error'); return; }
+
+  const streams=song.streams||0;
+  const chartRank=song.chartPosition||null;
+  const peakRank=song.peakPosition||null;
+  const weeksOnChart=song.weeksOnChart||0;
+
+  let chartHtml='';
+  if(chartRank){
+    chartHtml=`<div class="loopify-track-stats">
+      <div class="loopify-track-stat">
+        <div class="loopify-track-stat-value">${peakRank?'#'+peakRank:'-'}</div>
+        <div class="loopify-track-stat-label">Peak Position</div>
+      </div>
+      <div class="loopify-track-stat">
+        <div class="loopify-track-stat-value">${weeksOnChart}</div>
+        <div class="loopify-track-stat-label">Weeks on Chart</div>
+      </div>
+    </div>`;
+  }
+
+  let lyricsHtml='';
+  if(song.lyrics){
+    lyricsHtml=`<div class="loopify-track-section">
+      <div class="loopify-track-section-title">Lyrics</div>
+      <div class="loopify-track-section-content">${song.lyrics}</div>
+    </div>`;
+  }
+
+  let creditsHtml='';
+  if(song.credits){
+    creditsHtml=`<div class="loopify-track-section">
+      <div class="loopify-track-section-title">Credits</div>
+      <div class="loopify-track-section-content">${song.credits}</div>
+    </div>`;
+  }
+
+  const coverDisplay=song.coverImage?`<img src="${song.coverImage}">`:song.cover||'♫';
+
+  let html=`<style>
+  .loopify-track-overlay{padding:20px;position:relative}
+  .loopify-track-cover{width:100%;aspect-ratio:1;background:var(--surf);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:80px;margin-bottom:20px;border:1px solid var(--bord);overflow:hidden}
+  .loopify-track-cover img{width:100%;height:100%;object-fit:cover}
+  .loopify-track-title{font-size:20px;font-weight:700;margin-bottom:4px}
+  .loopify-track-artist{font-size:14px;color:var(--mut);margin-bottom:20px;cursor:pointer}
+  .loopify-track-artist:active{opacity:0.7}
+  .loopify-track-buttons{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+  .loopify-track-btn{padding:12px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:8px;font-weight:600;cursor:pointer;transition:all 0.2s}
+  .loopify-track-btn:active{opacity:0.8}
+  .loopify-track-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+  .loopify-track-stat{background:var(--surf);padding:12px;border-radius:8px;border:1px solid var(--bord)}
+  .loopify-track-stat-value{font-size:16px;font-weight:700;color:var(--acc)}
+  .loopify-track-stat-label{font-size:11px;color:var(--mut);margin-top:4px}
+  .loopify-track-section{margin-bottom:20px}
+  .loopify-track-section-title{font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;margin-bottom:8px}
+  .loopify-track-section-content{background:var(--surf);padding:12px;border-radius:8px;border:1px solid var(--bord);font-size:13px;line-height:1.6}
+  </style>
+
+  <div style="padding:20px 0 20px 0;position:relative">
+    <button onclick="closeOverlay(this)" style="position:absolute;top:12px;left:12px;z-index:200;background:rgba(var(--bg-rgb),0.9);border:1px solid var(--bord);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--txt);font-size:20px;cursor:pointer">←</button>
+  </div>
+
+  <div class="loopify-track-overlay">
+    <div class="loopify-track-cover">${coverDisplay}</div>
+
+    <div class="loopify-track-title">${song.title}</div>
+    <div class="loopify-track-artist" onclick="showLoopifyArtistProfile('${artist.id}')">${artist.name}</div>
+
+    <div class="loopify-track-buttons">
+      <button class="loopify-track-btn">Play</button>
+      <button class="loopify-track-btn" onclick="toggleLoopifyFollow('${artist.id}',this)">Follow</button>
+    </div>
+
+    <div class="loopify-track-stats">
+      <div class="loopify-track-stat">
+        <div class="loopify-track-stat-value">${streams.toLocaleString()}</div>
+        <div class="loopify-track-stat-label">Total Streams</div>
+      </div>
+      <div class="loopify-track-stat">
+        <div class="loopify-track-stat-value">${chartRank?'#'+chartRank:'-'}</div>
+        <div class="loopify-track-stat-label">Chart Position</div>
+      </div>
+    </div>
+
+    ${chartHtml}
+    ${lyricsHtml}
+    ${creditsHtml}
+  </div>`;
+
+  _insertOverlay(html);
+}
+
+function toggleLoopifyFollow(artistId, btn){
+  if(!GAME.loopifyFollowing) GAME.loopifyFollowing={};
+  const isFollowing=GAME.loopifyFollowing[artistId];
+
+  GAME.loopifyFollowing[artistId]=!isFollowing;
+  btn.textContent=GAME.loopifyFollowing[artistId]?'Following':'Follow';
+  btn.style.opacity=GAME.loopifyFollowing[artistId]?'0.7':'1';
+}
+
+function switchLoopifyView(view){
+  GAME.loopifyView=view;
+  showLoopifyUI();
+}
+
+function showLoopifyScreen(html){
+  document.getElementById('homeScreen').classList.remove('visible');
+  document.getElementById('musicScreen').classList.remove('visible');
+  document.getElementById('discoverScreen').classList.remove('visible');
+  document.getElementById('bottomNav').style.display='none';
+
+  let loopifyScreen=document.getElementById('loopifyScreen');
+  if(!loopifyScreen){
+    loopifyScreen=document.createElement('div');
+    loopifyScreen.id='loopifyScreen';
+    loopifyScreen.className='screen';
+    loopifyScreen.style.cssText='background:var(--bg);position:absolute;top:0;left:0;width:100%;min-height:100%;z-index:1000;overflow-y:auto';
+    document.getElementById('phone').appendChild(loopifyScreen);
+  }
+  loopifyScreen.innerHTML=html;
+  loopifyScreen.classList.add('visible');
+}
+
+function closeLoopify(){
+  const loopifyScreen=document.getElementById('loopifyScreen');
+  if(loopifyScreen) loopifyScreen.classList.remove('visible');
+  document.getElementById('homeScreen').classList.add('visible');
+  document.getElementById('bottomNav').style.display='flex';
 }
 
 function showOrangeMusicUI(){
