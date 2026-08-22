@@ -2715,13 +2715,18 @@ async function createAccountWithEmail(){
         // They want to sign in
         showSignInPanel();
       } else {
-        // They want a fresh account — update password and proceed
+        // They want a fresh account — update password and establish session
         try {
+          // First update the password (requires valid session in some cases)
           await supabase.auth.updateUser({ password: password });
-          currentUser = data.user;
+          // Now sign in with the new password to get a valid session
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+          if(signInErr || !signInData.user) throw signInErr || new Error('Sign in failed after password update');
+          currentUser = signInData.user;
           onAuthSuccess();
-        } catch(updateErr){
-          alert('Could not update account. Please sign in instead.');
+        } catch(freshErr){
+          console.error('Fresh account creation error:', freshErr);
+          alert('Could not create fresh account. Please sign in instead.');
           showSignInPanel();
         }
       }
@@ -2744,15 +2749,17 @@ async function createAccountWithEmail(){
       if(choice){
         showSignInPanel();
       } else {
-        // Try to update password for fresh start
+        // Try to create fresh account by updating password
         try {
-          const { data: user } = await supabase.auth.signInWithPassword({ email, password: 'temp' });
-          if(user){
-            await supabase.auth.updateUser({ password });
-            currentUser = user.user;
-            onAuthSuccess();
-          }
+          // Attempt to update password (this works if email confirmation is disabled)
+          await supabase.auth.updateUser({ password });
+          // Now sign in with the new password to get a valid session
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+          if(signInErr || !signInData.user) throw signInErr || new Error('Sign in failed after password update');
+          currentUser = signInData.user;
+          onAuthSuccess();
         } catch(freshErr){
+          console.error('Fresh account creation error:', freshErr);
           alert('Could not create fresh account. Please sign in instead.');
           showSignInPanel();
         }
@@ -17651,7 +17658,7 @@ function _loadFindPlayersTab(tab){
       _fpRender(res.data);
     });
   } else if(tab==='labels'){
-    supabase.from('labels').select('*').neq('owner_id',currentUser.id).limit(50).then(function(res){
+    supabase.from('labels').select('*').limit(50).then(function(res){
       var el=document.getElementById('findPlayersList'); if(!el) return;
       if(res.error||!res.data||!res.data.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No labels yet — start one to appear in the directory!</div>';return;}
       window._lblAll=res.data;
