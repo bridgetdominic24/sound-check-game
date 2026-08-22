@@ -8434,23 +8434,28 @@ function selectPromoOption(element, promoKey, songId){
     el.style.background = 'var(--surf)';
     el.style.boxShadow = 'none';
   });
-  
+
   // Select this one
   element.style.borderColor = 'var(--acc)';
   element.style.background = 'rgba(102,126,234,0.1)';
   element.style.boxShadow = '0 0 20px rgba(102,126,234,0.15)';
-  
+
   window.currentPromoSong.selectedPromo = promoKey;
-  
-  // Show budget section
-  document.getElementById('budgetSection-'+songId).style.display = 'block';
-  
+
+  // Show budget section (both inline and via scroll)
+  const budgetSection = document.getElementById('budgetSection-'+songId);
+  if(budgetSection) {
+    budgetSection.style.display = 'block';
+    // Scroll to budget section so it's visible without user needing to scroll
+    budgetSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
   const promo = PROMO_TYPES[promoKey];
   document.getElementById('costPer-'+songId).textContent = '$'+promo.costPerListener.toFixed(2);
   document.getElementById('budgetInput-'+songId).value = promo.minBudget;
   document.getElementById('budgetInput-'+songId).min = promo.minBudget;
   document.getElementById('budgetInput-'+songId).max = promo.maxBudget;
-  
+
   updatePromoEstimate(songId);
 }
 
@@ -13539,7 +13544,8 @@ async function confirmCreateLabel(){
   // Persist to Supabase
   if(GAME_MODE === 'multi' && typeof supabase !== 'undefined'){
     try {
-      await supabase.from('labels').insert([{
+      console.log('💾 Creating label in Supabase:', label.id, label.name);
+      const { data, error } = await supabase.from('labels').insert([{
         id: label.id,
         owner_id: label.ownerId,
         name: label.name,
@@ -13548,11 +13554,22 @@ async function confirmCreateLabel(){
         genre_focus: label.genreFocus,
         region: label.region,
         tier: label.tier,
+        bio: null,
+        featured_artists: [],
         hype: 0, rep: 5.0, debt: 0,
         weekly_maintenance: 5000,
         reset_version: window.CURRENT_RESET_VERSION || 1
       }]);
-    } catch(e){ console.warn('Label save error:', e); }
+      if(error) {
+        console.error('❌ Label creation error:', error);
+        showToast('Warning: Label created locally but sync to Supabase may have failed. Try updating in settings.', 'yellow');
+      } else {
+        console.log('✅ Label created in Supabase');
+      }
+    } catch(e){
+      console.error('❌ Label creation exception:', e);
+      showToast('Label saved locally but Supabase sync failed. Try updating in settings.', 'yellow');
+    }
   }
 
   // Clear pending state
@@ -17675,12 +17692,26 @@ function _loadFindPlayersTab(tab){
       _fpRender(res.data);
     });
   } else if(tab==='labels'){
+    console.log('📂 Loading labels from Supabase...');
     supabase.from('labels').select('*').limit(50).then(function(res){
       var el=document.getElementById('findPlayersList'); if(!el) return;
-      if(res.error||!res.data||!res.data.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No labels yet — start one to appear in the directory!</div>';return;}
+      if(res.error){
+        console.error('❌ Labels query error:', res.error);
+        el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Error loading labels. Please refresh.</div>';
+        return;
+      }
+      console.log('✅ Labels found:', res.data ? res.data.length : 0);
+      if(!res.data||!res.data.length){
+        el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No labels yet — start one to appear in the directory!</div>';
+        return;
+      }
       window._lblAll=res.data;
       window._lblGenreFilter=null;
       _lblRender(res.data);
+    }).catch(function(err){
+      console.error('❌ Labels query exception:', err);
+      var el=document.getElementById('findPlayersList');
+      if(el) el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Error loading labels.</div>';
     });
   }
 }
