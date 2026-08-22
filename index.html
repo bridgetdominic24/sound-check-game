@@ -2715,13 +2715,18 @@ async function createAccountWithEmail(){
         // They want to sign in
         showSignInPanel();
       } else {
-        // They want a fresh account — update password and proceed
+        // They want a fresh account — update password and establish session
         try {
+          // First update the password (requires valid session in some cases)
           await supabase.auth.updateUser({ password: password });
-          currentUser = data.user;
+          // Now sign in with the new password to get a valid session
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+          if(signInErr || !signInData.user) throw signInErr || new Error('Sign in failed after password update');
+          currentUser = signInData.user;
           onAuthSuccess();
-        } catch(updateErr){
-          alert('Could not update account. Please sign in instead.');
+        } catch(freshErr){
+          console.error('Fresh account creation error:', freshErr);
+          alert('Could not create fresh account. Please sign in instead.');
           showSignInPanel();
         }
       }
@@ -2744,15 +2749,17 @@ async function createAccountWithEmail(){
       if(choice){
         showSignInPanel();
       } else {
-        // Try to update password for fresh start
+        // Try to create fresh account by updating password
         try {
-          const { data: user } = await supabase.auth.signInWithPassword({ email, password: 'temp' });
-          if(user){
-            await supabase.auth.updateUser({ password });
-            currentUser = user.user;
-            onAuthSuccess();
-          }
+          // Attempt to update password (this works if email confirmation is disabled)
+          await supabase.auth.updateUser({ password });
+          // Now sign in with the new password to get a valid session
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+          if(signInErr || !signInData.user) throw signInErr || new Error('Sign in failed after password update');
+          currentUser = signInData.user;
+          onAuthSuccess();
         } catch(freshErr){
+          console.error('Fresh account creation error:', freshErr);
           alert('Could not create fresh account. Please sign in instead.');
           showSignInPanel();
         }
