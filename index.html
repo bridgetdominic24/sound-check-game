@@ -14930,29 +14930,44 @@ function showRecordLabel(){
       
       GAME.labelOffers.forEach((offer,idx)=>{
         const typeColor=offer.type.includes('Major Label')?'#FF1493':offer.type.includes('Indie')?'#4CAF50':offer.type.includes('Artist-Friendly')?'#9C27B0':'#FFA726';
-        
-        html+=`<div style="background:var(--surf);padding:18px;border-radius:12px;margin-bottom:16px;border-left:4px solid ${typeColor};box-shadow:0 2px 8px rgba(0,0,0,0.1)">
-          <!-- HEADER -->
-          <div style="margin-bottom:16px">
-            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">
-              <div style="font-size:18px;font-weight:700">${offer.name}</div>
-              <div style="background:${typeColor};color:white;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700">${offer.prestige||'Medium'}</div>
+
+        // Fairness scoring
+        const isFair = (offer.advance >= 10000 && offer.streamRoyalty >= 25 && !offer.recoupment && !offer.is360Deal) ? 'fair' :
+                      (offer.advance >= 5000 && offer.streamRoyalty >= 15 && offer.recoupment === false) ? 'moderate' : 'harsh';
+        const fairnessColor = isFair === 'fair' ? '#4CAF50' : isFair === 'moderate' ? '#FF9800' : '#f44336';
+        const fairnessLabel = isFair === 'fair' ? '✅ Fair Deal' : isFair === 'moderate' ? '⚠️ Standard Terms' : '❌ Artist Unfavorable';
+
+        html+=`<div style="background:var(--surf);border:2px solid ${fairnessColor};padding:0;border-radius:12px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);overflow:hidden">
+          <!-- CONTRACT HEADER -->
+          <div style="background:${fairnessColor}22;padding:14px 18px;border-bottom:2px solid ${fairnessColor};margin-bottom:0">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
+              <div>
+                <div style="font-size:16px;font-weight:900;color:var(--txt)">RECORDING AND ARTIST AGREEMENT</div>
+                <div style="font-size:11px;color:var(--mut);margin-top:2px;letter-spacing:0.5px">Label: ${offer.name} • ${offer.type}</div>
+              </div>
+              <div style="background:${fairnessColor};color:white;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;text-align:center">${fairnessLabel}</div>
             </div>
-            <div style="font-size:13px;color:var(--mut);margin-bottom:6px">${offer.type}</div>
-            ${offer.vibe?`<div style="font-size:12px;color:${typeColor};font-style:italic">• ${offer.vibe}</div>`:''}
-            ${offer.is360Deal?`<div style="font-size:12px;color:#f44336;font-weight:600;margin-top:4px">⚠️ 360 Deal - Label takes cut of EVERYTHING</div>`:''}
-            ${!offer.recoupment?`<div style="font-size:12px;color:#4CAF50;font-weight:600;margin-top:4px">✅ No Recoupment - Advance is yours!</div>`:''}
           </div>
           
-          <!-- MONEY SECTION -->
-          <div style="background:var(--bg);padding:12px;border-radius:8px;margin-bottom:12px">
-            <div style="font-size:14px;font-weight:700;margin-bottom:10px;color:${typeColor}">💰 Financial Terms</div>
-            
-            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-              <div style="font-size:12px;color:var(--mut)">Advance Payment</div>
-              <div style="font-weight:700;font-size:14px;color:#4CAF50">$${offer.advance.toLocaleString()}</div>
+          <!-- ARTICLE 1: ADVANCE & PAYMENT -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--bord)">
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;letter-spacing:0.5px">ARTICLE 1: ADVANCE PAYMENT</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px">Upfront cash payment you receive immediately upon signing</div>
+
+            <div style="background:var(--bg);padding:12px;border-radius:8px;margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <div style="font-size:12px;color:var(--mut)">Advance Payment</div>
+                <div style="font-weight:800;font-size:15px;color:#4CAF50">$${offer.advance.toLocaleString()}</div>
+              </div>
+              ${offer.recoupment?`<div style="font-size:10px;color:#FF9800;font-weight:600;padding:8px;background:rgba(255,152,0,0.1);border-radius:6px;border-left:2px solid #FF9800;margin-bottom:6px"><strong>⚠️ Recoupable:</strong> You must pay back this advance from your royalties before earning additional money.</div>`:'<div style="font-size:10px;color:#4CAF50;font-weight:600;padding:8px;background:rgba(76,175,80,0.1);border-radius:6px;border-left:2px solid #4CAF50"><strong>✅ Non-Recoupable:</strong> This is yours to keep regardless of sales.</div>'}
             </div>
-            
+          </div>
+
+          <!-- ARTICLE 2: ROYALTY RATES -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--bord)">
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;letter-spacing:0.5px">ARTICLE 2: ROYALTY RATES</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px">Your percentage of revenue from streams, sales, merch, and tours</div>
+
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
               <div style="background:var(--surf);padding:8px;border-radius:6px">
                 <div style="font-size:10px;color:var(--mut);margin-bottom:2px">Streaming</div>
@@ -14971,38 +14986,30 @@ function showRecordLabel(){
                 <div style="font-weight:700;font-size:13px">${offer.tourRoyalty}%</div>
               </div>
             </div>
-            
-            <!-- LOW ROYALTY WARNINGS -->
-            ${offer.streamRoyalty<30||offer.merchRoyalty<50||offer.tourRoyalty<70?`
-            <div style="margin-top:10px;padding:10px;background:rgba(244,67,54,0.15);border-radius:6px;border:1px solid rgba(244,67,54,0.4)">
-              <div style="font-size:11px;font-weight:700;color:#f44336;margin-bottom:6px">⚠️ Low Royalty Rates:</div>
-              <div style="font-size:10px;color:#f44336;line-height:1.6">
-                ${offer.streamRoyalty<30?`• They keep ${100-offer.streamRoyalty}% of streaming revenue<br>`:''}
-                ${offer.merchRoyalty<50?`• They keep ${100-offer.merchRoyalty}% of merch sales<br>`:''}
-                ${offer.tourRoyalty<70?`• They keep ${100-offer.tourRoyalty}% of tour income<br>`:''}
-              </div>
-            </div>
-            `:''}
-            
-            <!-- RECOUPMENT WARNING -->
-            ${offer.recoupment?`
-            <div style="margin-top:10px;padding:10px;background:rgba(255,152,0,0.15);border-radius:6px;border:1px solid rgba(255,152,0,0.4)">
-              <div style="font-size:11px;font-weight:700;color:#FF9800;margin-bottom:4px">💸 Recoupment Required</div>
-              <div style="font-size:10px;color:#FF9800">You must pay back the $${offer.advance.toLocaleString()} advance from your royalties before earning additional money.</div>
-            </div>
-            `:''}
-            
-            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bord)">
-              <div style="display:flex;justify-content:space-between;font-size:12px">
-                <div style="color:var(--mut)">Album Commitment</div>
-                <div style="font-weight:600">${offer.albums} album${offer.albums>1?'s':''}</div>
+
+            <!-- Royalty warnings inline -->
+            ${offer.streamRoyalty<25?`<div style="margin-top:8px;font-size:10px;color:#f44336;font-weight:600">❌ Low streaming rate (${100-offer.streamRoyalty}% goes to label)</div>`:'<div style="margin-top:8px;font-size:10px;color:#4CAF50;font-weight:600">✅ Fair streaming rate</div>'}
+            ${offer.merchRoyalty<50?`<div style="font-size:10px;color:#f44336;font-weight:600">❌ Low merch rate (${100-offer.merchRoyalty}% goes to label)</div>`:'<div style="font-size:10px;color:#4CAF50;font-weight:600">✅ Fair merch rate</div>'}
+          </div>
+
+          <!-- ARTICLE 3: ALBUM COMMITMENT -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--bord)">
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;letter-spacing:0.5px">ARTICLE 3: ALBUM COMMITMENT</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px">How many albums/projects you're required to release</div>
+            <div style="background:var(--bg);padding:12px;border-radius:8px">
+              <div style="display:flex;justify-content:space-between">
+                <div style="font-size:12px;color:var(--mut)">Albums Required</div>
+                <div style="font-weight:800;font-size:15px">${offer.albums} album${offer.albums>1?'s':''}</div>
               </div>
             </div>
           </div>
           
-          <!-- BENEFITS SECTION -->
-          <div style="background:var(--bg);padding:12px;border-radius:8px;margin-bottom:12px">
-            <div style="font-size:14px;font-weight:700;margin-bottom:10px;color:${typeColor}">🎯 Label Support</div>
+          <!-- ARTICLE 4: LABEL SUPPORT & BENEFITS -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--bord)">
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;letter-spacing:0.5px">ARTICLE 4: LABEL SUPPORT & BENEFITS</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px">What resources and support the label provides</div>
+
+            <div style="background:var(--bg);padding:12px;border-radius:8px">
             
             <div style="display:flex;justify-content:space-between;margin-bottom:6px">
               <div style="font-size:12px;color:var(--mut)">Marketing Budget</div>
@@ -15030,23 +15037,48 @@ function showRecordLabel(){
             </div>
           </div>
           
-          <!-- RESTRICTIONS SECTION -->
-          ${offer.restrictions.creativApproval||offer.restrictions.releaseSchedule||offer.restrictions.collaboration||offer.restrictions.imageControl?`
-          <div style="background:rgba(244,67,54,0.1);padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid rgba(244,67,54,0.3)">
-            <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#f44336">⚠️ Restrictions</div>
-            <div style="font-size:11px;color:var(--txt);line-height:1.6">
-              ${offer.restrictions.creativApproval?'• Label approves all creative decisions<br>':''}
-              ${offer.restrictions.releaseSchedule?'• Must follow their release timeline<br>':''}
-              ${offer.restrictions.collaboration?'• Need approval for features/collabs<br>':''}
-              ${offer.restrictions.imageControl?'• Label controls your public image':''}
+          <!-- ARTICLE 5: RESTRICTIONS & CREATIVE CONTROL -->
+          <div style="padding:14px 18px;border-bottom:1px solid var(--bord)">
+            <div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:2px;letter-spacing:0.5px">ARTICLE 5: CREATIVE CONTROL</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px">What decisions you make independently vs. needing approval for</div>
+
+            ${offer.restrictions.creativApproval||offer.restrictions.releaseSchedule||offer.restrictions.collaboration||offer.restrictions.imageControl?`
+            <div style="display:flex;flex-direction:column;gap:6px">
+              ${offer.restrictions.creativApproval?`<div style="padding:8px;background:rgba(244,67,54,0.1);border-radius:6px;border-left:2px solid #f44336;font-size:11px"><strong>❌ Label approves:</strong> All creative decisions</div>`:'<div style="padding:8px;background:rgba(76,175,80,0.1);border-radius:6px;border-left:2px solid #4CAF50;font-size:11px"><strong>✅ You decide:</strong> All creative decisions</div>'}
+              ${offer.restrictions.releaseSchedule?`<div style="padding:8px;background:rgba(244,67,54,0.1);border-radius:6px;border-left:2px solid #f44336;font-size:11px"><strong>❌ Label controls:</strong> When you release music</div>`:'<div style="padding:8px;background:rgba(76,175,80,0.1);border-radius:6px;border-left:2px solid #4CAF50;font-size:11px"><strong>✅ You decide:</strong> When you release music</div>'}
+              ${offer.restrictions.collaboration?`<div style="padding:8px;background:rgba(244,67,54,0.1);border-radius:6px;border-left:2px solid #f44336;font-size:11px"><strong>❌ Label approves:</strong> Features and collaborations</div>`:'<div style="padding:8px;background:rgba(76,175,80,0.1);border-radius:6px;border-left:2px solid #4CAF50;font-size:11px"><strong>✅ You decide:</strong> Features and collaborations</div>'}
+              ${offer.restrictions.imageControl?`<div style="padding:8px;background:rgba(244,67,54,0.1);border-radius:6px;border-left:2px solid #f44336;font-size:11px"><strong>❌ Label controls:</strong> Your public image</div>`:'<div style="padding:8px;background:rgba(76,175,80,0.1);border-radius:6px;border-left:2px solid #4CAF50;font-size:11px"><strong>✅ You decide:</strong> Your public image</div>'}
+            </div>
+            `:`<div style="padding:10px;background:rgba(76,175,80,0.1);border-radius:6px;border:1px solid rgba(76,175,80,0.3)"><div style="font-size:12px;font-weight:700;color:#4CAF50">✅ FULL CREATIVE CONTROL</div><div style="font-size:10px;color:#4CAF50;margin-top:4px">You have complete freedom on all creative decisions</div></div>`}
+          </div>
+
+          <!-- SUMMARY -->
+          <div style="padding:14px 18px;background:${fairnessColor}15;border-top:2px solid ${fairnessColor};margin:0">
+            <div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:8px">QUICK SUMMARY</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px">
+              <div>
+                <div style="color:var(--mut);margin-bottom:2px">Upfront Money</div>
+                <div style="font-weight:700;font-size:13px;color:#4CAF50">$${offer.advance.toLocaleString()}</div>
+              </div>
+              <div>
+                <div style="color:var(--mut);margin-bottom:2px">Streaming Cut</div>
+                <div style="font-weight:700;font-size:13px;color:${offer.streamRoyalty>=25?'#4CAF50':'#f44336'}">${offer.streamRoyalty}%</div>
+              </div>
+              <div>
+                <div style="color:var(--mut);margin-bottom:2px">Contract Length</div>
+                <div style="font-weight:700;font-size:13px">${offer.contractTerms?.length||'2 years'}</div>
+              </div>
+              <div>
+                <div style="color:var(--mut);margin-bottom:2px">Early Exit Fee</div>
+                <div style="font-weight:700;font-size:13px;color:${offer.contractTerms?.exitFee?'#FF9800':'#4CAF50'}">${offer.contractTerms?.exitFee||'None'}</div>
+              </div>
             </div>
           </div>
-          `:'<div style="background:rgba(76,175,80,0.1);padding:12px;border-radius:8px;margin-bottom:12px;border:1px solid rgba(76,175,80,0.3)"><div style="font-size:13px;font-weight:700;color:#4CAF50">✅ Full Creative Control</div></div>'}
-          
+
           <!-- ACTION BUTTONS -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
-            <button onclick="acceptLabelOffer(${idx})" class="ms-btn" style="background:#4CAF50;padding:12px;font-weight:700;font-size:14px">✅ Accept</button>
-            <button onclick="declineLabelOffer(${idx})" class="ms-btn" style="background:#f44336;padding:12px;font-weight:700;font-size:14px">❌ Decline</button>
+          <div style="padding:14px 18px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <button onclick="acceptLabelOffer(${idx})" class="ms-btn" style="background:#4CAF50;color:white;padding:12px;font-weight:700;font-size:14px;border-radius:8px;border:none;cursor:pointer">✅ Accept Deal</button>
+            <button onclick="declineLabelOffer(${idx})" class="ms-btn" style="background:#f44336;color:white;padding:12px;font-weight:700;font-size:14px;border-radius:8px;border:none;cursor:pointer">❌ Decline</button>
           </div>
         </div>`;
       });
