@@ -13324,6 +13324,15 @@ function showCreateLabelFlow(){
   </div>
   <div style="font-size:10px;color:var(--mut);margin-bottom:12px">Defaults to your region. Labels can expand globally.</div>`;
 
+  // RECRUITING STATUS
+  html += `<div style="padding:14px 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Recruiting Status</div>
+  <div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px">
+      <div><div style="font-size:12px;font-weight:700;color:var(--txt)">Currently Recruiting</div><div style="font-size:10px;color:var(--mut)">Show on your label profile that you're open to signing artists</div></div>
+      <div onclick="this.classList.toggle('tog-on');this.querySelector('.dot').style.right=this.classList.contains('tog-on')?'2px':'auto';this.querySelector('.dot').style.left=this.classList.contains('tog-on')?'auto':'2px';this.style.background=this.classList.contains('tog-on')?'#22c55e':'var(--bord)';window._labelIsRecruiting=this.classList.contains('tog-on')" style="width:40px;height:22px;border-radius:11px;position:relative;cursor:pointer;flex-shrink:0;background:#22c55e;transition:background 0.2s" class="tog-on"><div class="dot" style="position:absolute;right:2px;top:2px;width:18px;height:18px;background:white;border-radius:50%"></div></div>
+    </div>
+  </div>`;
+
   // DEFAULT CONTRACT TERMS
   html += `<div style="padding:14px 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Default Contract Terms</div>
   <div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
@@ -13564,7 +13573,8 @@ async function confirmCreateLabel(){
     publishingIncome: 0,
     syncIncome: 0,
     defaultCut: window._pendingLabelCut || 25,
-    pendingOffers: []
+    pendingOffers: [],
+    hasRosterFull: !window._labelIsRecruiting
   };
 
   GAME.ownedLabel = label;
@@ -13620,6 +13630,7 @@ async function confirmCreateLabel(){
         featured_artists: [],
         hype: 0, rep: 5.0, debt: 0,
         weekly_maintenance: 5000,
+        has_roster_full: label.hasRosterFull,
         reset_version: window.CURRENT_RESET_VERSION || 1
       };
       console.log('📤 Inserting:', JSON.stringify(labelData));
@@ -14499,6 +14510,16 @@ function showLabelOwnerSettings(){
     ${[15,20,25,30,40].map(c=>`<div onclick="window._settingsLabelCut=${c};document.querySelectorAll('#stgCutChips > div').forEach(el=>{el.style.borderColor='var(--bord)';el.style.background='var(--surf)';el.style.color='var(--mut)'});this.style.borderColor='var(--acc)';this.style.background='var(--acc-bg)';this.style.color='var(--acc)'" style="padding:6px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid ${c===(ol.defaultCut||25)?'var(--acc)':'var(--bord)'};background:${c===(ol.defaultCut||25)?'var(--acc-bg)':'var(--surf)'};color:${c===(ol.defaultCut||25)?'var(--acc)':'var(--mut)'}">${c}%</div>`).join('')}
   </div>`;
 
+  // Recruiting status toggle
+  window._settingsLabelRecruiting = !ol.hasRosterFull;
+  html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Recruiting Status</div>
+  <div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:20px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px">
+      <div><div style="font-size:12px;font-weight:700;color:var(--txt)">Currently Recruiting</div><div style="font-size:10px;color:var(--mut)">Show on your label profile that you're open to signing artists</div></div>
+      <div onclick="this.classList.toggle('tog-on');this.querySelector('.dot').style.right=this.classList.contains('tog-on')?'2px':'auto';this.querySelector('.dot').style.left=this.classList.contains('tog-on')?'auto':'2px';this.style.background=this.classList.contains('tog-on')?'#22c55e':'var(--bord)';window._settingsLabelRecruiting=this.classList.contains('tog-on')" style="width:40px;height:22px;border-radius:11px;position:relative;cursor:pointer;flex-shrink:0;background:${!ol.hasRosterFull?'#22c55e':'var(--bord)'};transition:background 0.2s" ${!ol.hasRosterFull?'class="tog-on"':''}><div class="dot" style="position:absolute;${!ol.hasRosterFull?'right':'left'}:2px;top:2px;width:18px;height:18px;background:white;border-radius:50%"></div></div>
+    </div>
+  </div>`;
+
   // Label bio
   window._settingsLabelBio = ol.bio || '';
   html += `<div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Label Bio</div>
@@ -14545,6 +14566,7 @@ function saveLabelSettings(){
   ol.defaultCut = window._settingsLabelCut || ol.defaultCut;
   ol.bio = window._settingsLabelBio || '';
   ol.featuredArtists = window._settingsLabelFeatured || [];
+  ol.hasRosterFull = !window._settingsLabelRecruiting;
 
   if(GAME.signedLabel && GAME.signedLabel.isOwner){
     GAME.signedLabel.labelName = ol.name;
@@ -14585,7 +14607,8 @@ function saveLabelSettings(){
         genre_focus: ol.genreFocus,
         region: ol.region,
         bio: ol.bio,
-        featured_artists: ol.featuredArtists
+        featured_artists: ol.featuredArtists,
+        has_roster_full: ol.hasRosterFull
       }).eq('id', ol.id).then(r => {
         if(r.error) {
           console.error('❌ Update failed, error code:', r.error.code);
@@ -14608,6 +14631,7 @@ function saveLabelSettings(){
               rep: ol.rep || 5.0,
               debt: ol.debt || 0,
               weekly_maintenance: ol.weeklyMaintenance || 5000,
+              has_roster_full: ol.hasRosterFull,
               roster: ol.roster || []
             }]).then(ir => {
               if(ir.error) {
@@ -18028,7 +18052,7 @@ async function showLabelPublicPage(labelId, labelName){
     _insertOverlay(`<div style="text-align:left;padding:0;border-radius:0;max-height:none">
       <div style="background:var(--bg);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bord)">
         <div style="font-size:14px;font-weight:800">🏷 ${label.name}</div>
-        <button onclick="document.getElementById('_overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0">✕</button>
+        <button onclick="document.querySelectorAll('[data-app-overlay]').forEach(el=>el.remove())" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0">✕</button>
       </div>
       ${html}
     </div>`);
@@ -33277,18 +33301,16 @@ function loadDiscoverContent(){
       </div>`}
     </div>` : ''}
 
-    <!-- FIND PLAYERS (multi) / QIKIPEDIA (single) -->
+    <!-- FIND PLAYERS & LABELS (multi) / QIKIPEDIA (single) -->
     <div style="${sc}">
       <div style="${sh}">
-        <div style="${st}">${GAME_MODE==='multi'?'👥 Find Players':'📚 Qikipedia'}</div>
-        <div style="${sl}" onclick="${GAME_MODE==='multi'?'showCollabArtists()':'showQikipedia()'}">Browse all →</div>
+        <div style="${st}">${GAME_MODE==='multi'?'👥 Find Players & Labels':'📚 Qikipedia'}</div>
       </div>
-      <div onclick="${GAME_MODE==='multi'?'showCollabArtists()':'showQikipedia()'}">
-        ${GAME_MODE==='multi'
-          ? `<div style="${ri}"><div style="${ric};background:var(--bord)">🎤</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-0.1px">Find artists to collaborate with</div><div style="font-size:11px;color:var(--mut);margin-top:1px;font-weight:500">Send collab requests, feature on tracks</div></div><div style="${ra}">Open →</div></div>`
-          : `<div style="${ri}"><div style="${ric};background:var(--bord)">📚</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-0.1px">Browse artist database</div><div style="font-size:11px;color:var(--mut);margin-top:1px;font-weight:500">Profiles, bios and discographies</div></div><div style="${ra}">Open →</div></div>`
-        }
-      </div>
+      ${GAME_MODE==='multi'
+        ? `<div onclick="showCollabArtists()" style="${ri}"><div style="${ric};background:var(--bord)">🎤</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-0.1px">Find artists to collaborate with</div><div style="font-size:11px;color:var(--mut);margin-top:1px;font-weight:500">Send collab requests, feature on tracks</div></div><div style="${ra}">Open →</div></div>
+        <div onclick="showFindPlayersOnly();setTimeout(function(){_switchFindTab('labels');},100)" style="${ri};border-bottom:none"><div style="${ric};background:var(--bord)">🏷️</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-0.1px">Browse record labels</div><div style="font-size:11px;color:var(--mut);margin-top:1px;font-weight:500">Find labels to sign with or scout artists</div></div><div style="${ra}">Open →</div></div>`
+        : `<div onclick="showQikipedia()" style="${ri};border-bottom:none"><div style="${ric};background:var(--bord)">📚</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-0.1px">Browse artist database</div><div style="font-size:11px;color:var(--mut);margin-top:1px;font-weight:500">Profiles, bios and discographies</div></div><div style="${ra}">Open →</div></div>`
+      }
     </div>
 
     <!-- TOURS & GIGS -->
