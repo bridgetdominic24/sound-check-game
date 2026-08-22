@@ -17472,22 +17472,32 @@ async function submitCounter(requestId,currentRound){
 // ──────────────────────────────────────────────────────────
 
 function showFindPlayersOnly(){
-  var html='<div style="padding:12px 16px 80px">'
-    +'<input id="fpSearch" type="text" placeholder="🔍 Search by name or genre..." style="width:100%;padding:11px 14px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:14px;box-sizing:border-box;margin-bottom:12px;outline:none" oninput="_fpFilter()" onfocus="this.style.borderColor=\'var(--acc)\'" onblur="this.style.borderColor=\'var(--bord)\'">'
-    +'<div id="findPlayersList"><div style="text-align:center;padding:40px;color:var(--mut)">Loading...</div></div>'
+  var html='<div style="padding:0;display:flex;flex-direction:column;height:100%">'
+    // Tabs
+    +'<div style="display:flex;gap:0;padding:0;border-bottom:2px solid var(--bord);background:var(--surf);position:sticky;top:0;z-index:10">'
+    +'<button id="fpTabArtists" onclick="_switchFindTab(\'artists\')" style="flex:1;background:transparent;border:none;color:var(--acc);font-family:var(--fb);font-size:13px;font-weight:700;padding:12px;cursor:pointer;border-bottom:3px solid var(--acc);letter-spacing:0.5px">👥 Artists</button>'
+    +'<button id="fpTabLabels" onclick="_switchFindTab(\'labels\')" style="flex:1;background:transparent;border:none;color:var(--mut);font-family:var(--fb);font-size:13px;font-weight:700;padding:12px;cursor:pointer;border-bottom:3px solid transparent;letter-spacing:0.5px">🏷️ Labels</button>'
+    +'</div>'
+    // Search
+    +'<div style="padding:12px 16px">'
+    +'<input id="fpSearch" type="text" placeholder="🔍 Search..." style="width:100%;padding:11px 14px;background:var(--bg);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:14px;box-sizing:border-box;outline:none" oninput="_fpFilter()" onfocus="this.style.borderColor=\'var(--acc)\'" onblur="this.style.borderColor=\'var(--bord)\'">'
+    +'</div>'
+    // Filter pills for labels
+    +'<div id="fpFilterPills" style="padding:0 16px 12px;display:none;flex-wrap:wrap;gap:6px">'
+    +'</div>'
+    // Content
+    +'<div style="flex:1;overflow-y:auto;padding:0 12px 80px 12px">'
+    +'<div id="findPlayersList" style="padding:0 4px"><div style="text-align:center;padding:40px;color:var(--mut)">Loading...</div></div>'
+    +'</div>'
     +'</div>';
   openMenu('🎤 Find Artists',html);
+  window._fpCurrentTab='artists';
   if(GAME_MODE!=='multi'||!supabase||!currentUser){
     var el=document.getElementById('findPlayersList');
     if(el) el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Available in Live mode only.</div>';
     return;
   }
-  supabase.from('players').select('*').neq('user_id',currentUser.id).limit(50).then(function(res){
-    var el=document.getElementById('findPlayersList'); if(!el) return;
-    if(res.error||!res.data||!res.data.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No other artists yet.</div>';return;}
-    window._fpAll=res.data;
-    _fpRender(res.data);
-  });
+  _loadFindPlayersTab('artists');
 }
 function _fpRender(players){
   var el=document.getElementById('findPlayersList'); if(!el) return;
@@ -17518,15 +17528,137 @@ function _fpRender(players){
 }
 function _fpFilter(){
   var q=(document.getElementById('fpSearch')||{}).value||'';
-  if(!window._fpAll) return;
-  if(!q.trim()){_fpRender(window._fpAll);return;}
-  var lq=q.toLowerCase();
-  _fpRender(window._fpAll.filter(function(p){
-    var sd={};try{var raw=p.game_data||p.save_data;sd=typeof raw==='string'?JSON.parse(raw):(raw||{});}catch(e){}
-    var name=(sd.sn||sd.artistName||p.artist_name||'').toLowerCase();
-    var genre=(sd.genre||'').toLowerCase();
-    return name.includes(lq)||genre.includes(lq);
-  }));
+  if(window._fpCurrentTab==='artists'){
+    if(!window._fpAll) return;
+    if(!q.trim()){_fpRender(window._fpAll);return;}
+    var lq=q.toLowerCase();
+    _fpRender(window._fpAll.filter(function(p){
+      var sd={};try{var raw=p.game_data||p.save_data;sd=typeof raw==='string'?JSON.parse(raw):(raw||{});}catch(e){}
+      var name=(sd.sn||sd.artistName||p.artist_name||'').toLowerCase();
+      var genre=(sd.genre||'').toLowerCase();
+      return name.includes(lq)||genre.includes(lq);
+    }));
+  } else if(window._fpCurrentTab==='labels'){
+    if(!window._lblAll) return;
+    if(!q.trim()){_lblRender(window._lblAll);return;}
+    var lq=q.toLowerCase();
+    _lblRender(window._lblAll.filter(function(l){
+      var name=(l.name||'').toLowerCase();
+      var genres=((l.genre_focus||[]).join(' ')).toLowerCase();
+      var region=(l.region||'').toLowerCase();
+      return name.includes(lq)||genres.includes(lq)||region.includes(lq);
+    }));
+  }
+}
+
+function _switchFindTab(tab){
+  window._fpCurrentTab=tab;
+  var artistsBtn=document.getElementById('fpTabArtists');
+  var labelsBtn=document.getElementById('fpTabLabels');
+  var filterPills=document.getElementById('fpFilterPills');
+
+  if(tab==='artists'){
+    if(artistsBtn){artistsBtn.style.color='var(--acc)';artistsBtn.style.borderBottomColor='var(--acc)';}
+    if(labelsBtn){labelsBtn.style.color='var(--mut)';labelsBtn.style.borderBottomColor='transparent';}
+    if(filterPills) filterPills.style.display='none';
+    document.getElementById('fpSearch').placeholder='🔍 Search by name or genre...';
+    _fpRender(window._fpAll||[]);
+  } else if(tab==='labels'){
+    if(artistsBtn){artistsBtn.style.color='var(--mut)';artistsBtn.style.borderBottomColor='transparent';}
+    if(labelsBtn){labelsBtn.style.color='var(--acc)';labelsBtn.style.borderBottomColor='var(--acc)';}
+    if(filterPills) filterPills.style.display='flex';
+    document.getElementById('fpSearch').placeholder='🔍 Search labels...';
+    _lblRender(window._lblAll||[]);
+    _renderLblFilterPills();
+  }
+}
+
+function _loadFindPlayersTab(tab){
+  if(tab==='artists'){
+    supabase.from('players').select('*').neq('user_id',currentUser.id).limit(50).then(function(res){
+      var el=document.getElementById('findPlayersList'); if(!el) return;
+      if(res.error||!res.data||!res.data.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No other artists yet.</div>';return;}
+      window._fpAll=res.data;
+      _fpRender(res.data);
+    });
+  } else if(tab==='labels'){
+    supabase.from('labels').select('*').neq('owner_id',currentUser.id).limit(50).then(function(res){
+      var el=document.getElementById('findPlayersList'); if(!el) return;
+      if(res.error||!res.data||!res.data.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">No labels yet — start one to appear in the directory!</div>';return;}
+      window._lblAll=res.data;
+      window._lblGenreFilter=null;
+      _lblRender(res.data);
+    });
+  }
+}
+
+function _renderLblFilterPills(){
+  var container=document.getElementById('fpFilterPills');
+  if(!container||!window._lblAll) return;
+
+  var allGenres=new Set();
+  var hasRecruiting=false;
+  window._lblAll.forEach(l=>{
+    if(l.genre_focus&&Array.isArray(l.genre_focus)){
+      l.genre_focus.forEach(g=>allGenres.add(g));
+    }
+    // Check if label has roster slots available (simple heuristic: tier-based)
+    if(!l.has_roster_full) hasRecruiting=true;
+  });
+
+  var html='<button onclick="_setLblGenreFilter(null)" style="background:var(--acc);color:var(--acc-txt);border:none;border-radius:12px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">All</button>';
+  if(hasRecruiting){
+    html+='<button onclick="_setLblGenreFilter(\'recruiting\')" style="background:var(--bg);color:var(--txt);border:1.5px solid var(--bord);border-radius:12px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">Recruiting</button>';
+  }
+  Array.from(allGenres).sort().forEach(g=>{
+    html+='<button onclick="_setLblGenreFilter(\''+g+'\')" style="background:var(--bg);color:var(--txt);border:1.5px solid var(--bord);border-radius:12px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">'+g+'</button>';
+  });
+  container.innerHTML=html;
+}
+
+function _setLblGenreFilter(genre){
+  window._lblGenreFilter=genre;
+  var filtered=window._lblAll;
+  if(genre==='recruiting'){
+    filtered=filtered.filter(l=>!l.has_roster_full);
+  } else if(genre){
+    filtered=filtered.filter(l=>(l.genre_focus||[]).includes(genre));
+  }
+  _lblRender(filtered);
+}
+
+function _lblRender(labels){
+  var el=document.getElementById('findPlayersList'); if(!el) return;
+  if(!labels||!labels.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--mut)">No labels match.</div>';return;}
+  var html='';
+  labels.forEach(function(l){
+    var name=l.name||'Unknown Label';
+    var tier=l.tier||'indie';
+    var tierDef={indie:'INDIE',mid:'MID-TIER',major:'MAJOR',global:'GLOBAL'}[tier]||'INDIE';
+    var tierColor={indie:'#667eea',mid:'#f59e0b',major:'#22c55e',global:'#3b82f6'}[tier]||'#667eea';
+    var genres=(l.genre_focus||[]).slice(0,2).join(', ')||'Mixed';
+    var region=l.region||'—';
+    var logo=l.logo_image?'<img src="'+l.logo_image+'" style="width:100%;height:100%;object-fit:cover">':'<span style="font-size:24px">'+(l.logo_emoji||'🏢')+'</span>';
+    var recruitingPill=!l.has_roster_full?'<span style="background:#dcfce7;color:#166534;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap">🟢 Recruiting</span>':'';
+
+    html+='<div data-lid="'+l.id+'" data-lname="'+(name.replace(/"/g,'')).replace(/'/g,'')+'" onclick="showLabelPublicPage(this.dataset.lid,this.dataset.lname)" style="display:flex;align-items:center;gap:12px;background:var(--surf);border:1.5px solid var(--bord);border-left:3px solid '+tierColor+';border-radius:10px;padding:12px 14px;cursor:pointer;margin-bottom:8px;touch-action:manipulation">'
+      +'<div style="width:46px;height:46px;border-radius:8px;background:var(--bg);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">'+logo+'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:14px;font-weight:800;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+name+'</div>'
+      +'<div style="font-size:11px;color:var(--mut);margin-top:3px">'+genres+' · '+region+'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
+      +'<span style="background:'+tierColor+'22;color:'+tierColor+';font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase">'+tierDef+'</span>'
+      +recruitingPill
+      +'</div>'
+      +'</div><div style="color:var(--mut);font-size:18px">›</div></div>';
+  });
+  el.innerHTML=html;
+}
+
+function showLabelPublicPage(labelId, labelName){
+  // Placeholder for Session 2 — opens label's public page
+  showToast('Loading '+labelName+'...','gray');
+  console.log('📖 Opening label:', labelId, labelName);
 }
 // ── Artist Hub renderer — used by viewer, preview, and Find Players ──────────
 function _renderArtistHubPage(gameData, viewerUserId, isPreview){
