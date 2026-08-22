@@ -3170,11 +3170,17 @@ function backToLandingFromLogin(){
 }
 
 // CLOUD SAVE FUNCTIONS
+// Utility: Check if a string is a valid UUID
+function isValidUUID(id) {
+  if(typeof id !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 async function checkAndLoadSave(){
   const debugLog = document.getElementById('debugLog');
-  
+
   console.log('🔍 checkAndLoadSave START - GAME before load:', GAME ? {week: GAME.week, money: GAME.money} : 'null');
-  
+
   if(GAME_MODE !== 'multi' || !currentUser) {
     if(debugLog) debugLog.innerHTML += '⚠️ Skip load: not multi mode<br>';
     // Create fresh game for single player
@@ -3184,31 +3190,60 @@ async function checkAndLoadSave(){
     }
     return false;
   }
-  
+
   try {
     if(debugLog) debugLog.innerHTML += '📥 Loading from Supabase...<br>';
-    
+
     console.log('🔍 Checking Supabase for user:', currentUser.id);
-    
+
     // Query players table
     const { data, error } = await supabase
       .from('players')
       .select('*')
       .eq('user_id', currentUser.id)
       .single();
-    
+
     if(error && error.code !== 'PGRST116') { // PGRST116 = no rows found
       throw error;
     }
-    
+
     console.log('🔍 Supabase data exists:', !!data);
-    
+
     if(data && data.game_data){
       console.log('🔍 RAW SUPABASE DATA:', data);
-      
+
       // Load GAME from game_data JSON column
       GAME = JSON.parse(JSON.stringify(data.game_data));
       _sanitizeGameState(GAME);
+
+      // SELF-HEALING MIGRATION: Fix labels with invalid IDs
+      if(GAME.ownedLabel && !isValidUUID(GAME.ownedLabel.id)){
+        console.log('🔧 Detected legacy label ID format, attempting self-heal:', GAME.ownedLabel.id);
+        try {
+          // Look up label by owner_id instead
+          const { data: labelData, error: labelError } = await supabase
+            .from('labels')
+            .select('id')
+            .eq('owner_id', currentUser.id)
+            .single();
+
+          if(!labelError && labelData) {
+            console.log('✅ Found label in Supabase with UUID:', labelData.id);
+            GAME.ownedLabel.id = labelData.id;
+            // Also update signedLabel if it exists
+            if(GAME.signedLabel && GAME.signedLabel.isOwner) {
+              GAME.signedLabel.labelId = labelData.id;
+            }
+            // Persist the fix back to Supabase
+            await supabase.from('players').update({game_data: GAME}).eq('user_id', currentUser.id);
+            console.log('✅ Label ID auto-fixed and synced to Supabase');
+          } else {
+            console.warn('⚠️ Could not find label by owner_id in Supabase');
+          }
+        } catch(healErr) {
+          console.error('❌ Self-heal failed:', healErr);
+        }
+      }
 
       // Fix broken values only — don't restore spent creativity
       if(typeof GAME.creativity !== 'number' || isNaN(GAME.creativity) || GAME.creativity < 0) GAME.creativity = 100;
@@ -13492,8 +13527,21 @@ async function confirmCreateLabel(){
   if(!name){showEvent('⚠️','Name Required','Please enter a name for your label.',['OK']);return;}
   if((GAME.money||0) < 25000){showEvent('💸','Not Enough Money','You need at least $25,000 to start a label.',['OK']);return;}
 
+  // Generate proper UUID (never fallback to string format)
+  let labelId;
+  if(crypto.randomUUID) {
+    labelId = crypto.randomUUID();
+  } else {
+    // Fallback for older browsers: create a valid UUID format
+    labelId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+  console.log('✨ Generated label UUID:', labelId);
+
   const label = {
-    id: crypto.randomUUID ? crypto.randomUUID() : 'lbl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    id: labelId,
     ownerId: GAME.playerId || GAME.userId,
     name: name,
     logoEmoji: window._pendingLabelEmoji || '🏢',
@@ -14505,8 +14553,10 @@ function saveLabelSettings(){
   }
 
   // Sync changes to Supabase
-  console.log('DEBUG saveLabelSettings sync check:', {GAME_MODE, hasSupabase: typeof supabase !== 'undefined', olId: ol.id});
-  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && ol.id){
+  console.log('DEBUG saveLabelSettings sync check:', {GAME_MODE, hasSupabase: typeof supabase !== 'undefined', olId: ol.id, isValidUUID: isValidUUID(ol.id)});
+
+  // GUARD: Only sync if ID is a valid UUID
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && ol.id && isValidUUID(ol.id)){
     try {
       const originalId = ol.id;
       console.log('🔄 Starting label sync, current ID:', originalId);
@@ -17869,6 +17919,13 @@ async function showLabelPublicPage(labelId, labelName){
 
   if(GAME_MODE!=='multi' || typeof supabase==='undefined' || !currentUser){
     showEvent('⚠️','Multiplayer Only','You can only view labels in multiplayer mode.',['OK']);
+    return;
+  }
+
+  // GUARD: Validate UUID format before querying
+  if(!isValidUUID(labelId)){
+    console.error('❌ Invalid label ID format:', labelId);
+    showEvent('⚠️','Invalid Label','This label ID is in an invalid format. Please try again.',['OK']);
     return;
   }
 
