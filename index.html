@@ -18029,7 +18029,8 @@ async function showLabelPublicPage(labelId, labelName){
       <div style="display:flex;flex-direction:column;gap:8px">`;
 
     for(let member of (label.roster || [])){
-      html += `<div onclick="showArtistHub('${member.userId}','${(member.artistName||'').replace(/"/g,'')}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;cursor:pointer;transition:all 0.2s">
+      const contractJson = encodeURIComponent(JSON.stringify({cut: member.cut, dealType: member.dealType, publishing: member.publishing, masters: member.masters, length: member.length, signedWeek: member.signedWeek, artistName: member.artistName, userId: member.userId}));
+      html += `<div onclick="showContractDetails('${contractJson}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;cursor:pointer;transition:all 0.2s">
         <div style="width:40px;height:40px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px">🎤</div>
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700;color:var(--txt)">${member.artistName}</div>
@@ -18069,6 +18070,94 @@ async function showApplyToLabel(labelId, labelName){
   // Placeholder for application flow
   showToast('Application feature coming soon','gray');
 }
+
+function showContractDetails(contractJson){
+  try {
+    const contract = JSON.parse(decodeURIComponent(contractJson));
+    const artistName = contract.artistName || 'Artist';
+    const cut = contract.cut || 25;
+    const dealType = contract.dealType || 'standard';
+    const publishing = contract.publishing || 'artist';
+    const masters = contract.masters || 'artist';
+    const length = contract.length || 'indefinite';
+    const signedWeek = contract.signedWeek || '—';
+
+    // Format deal type display
+    const dealTypeLabels = {
+      'standard': '📋 Standard Deal',
+      'development': '🌱 Development Deal',
+      'distribution': '📦 Distribution Only',
+      'exclusive': '🔒 Exclusive Deal'
+    };
+
+    // Format rights display
+    const rightsLabels = {
+      'artist': '🎤 Artist Retains',
+      'label': '🏷️ Label Owns',
+      'shared': '🤝 Shared (50/50)'
+    };
+
+    let html = `<div style="padding:20px;padding-bottom:100px">
+      <div style="background:var(--surf);border:1.5px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <div style="width:50px;height:50px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🎤</div>
+          <div>
+            <div style="font-size:16px;font-weight:800;color:var(--txt)">${artistName}</div>
+            <div style="font-size:12px;color:var(--mut);margin-top:2px">Contract Details</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--bord);border-bottom:1px solid var(--bord)">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;margin-bottom:4px;letter-spacing:0.5px">Label Cut</div>
+            <div style="font-size:20px;font-weight:800;color:var(--acc)">${cut}%</div>
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;margin-bottom:4px;letter-spacing:0.5px">Deal Length</div>
+            <div style="font-size:14px;font-weight:700;color:var(--txt)">${length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Deal Type</div>
+      <div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;font-weight:700;color:var(--txt)">
+        ${dealTypeLabels[dealType] || dealType}
+      </div>
+
+      <div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Rights & Ownership</div>
+      <div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;overflow:hidden;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--bord)">
+          <div style="font-size:12px;color:var(--mut)">Publishing Rights</div>
+          <div style="font-size:12px;font-weight:700;color:var(--txt)">${rightsLabels[publishing] || publishing}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">
+          <div style="font-size:12px;color:var(--mut)">Master Rights</div>
+          <div style="font-size:12px;font-weight:700;color:var(--txt)">${rightsLabels[masters] || masters}</div>
+        </div>
+      </div>
+
+      <div style="padding:0 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Status</div>
+      <div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;margin-bottom:24px">
+        <div style="font-size:12px;color:var(--mut)">Contract Signed</div>
+        <div style="font-size:14px;font-weight:700;color:var(--txt);margin-top:4px">Week ${signedWeek}</div>
+      </div>
+
+      <button onclick="document.querySelectorAll('[data-app-overlay]').forEach(el=>el.remove())" style="background:var(--bord);color:var(--txt);border:none;border-radius:8px;padding:12px;font-size:13px;font-weight:700;width:100%;cursor:pointer;font-family:var(--fb)">Close</button>
+    </div>`;
+
+    _insertOverlay(`<div style="text-align:left;padding:0;border-radius:0;max-height:none">
+      <div style="background:var(--bg);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bord)">
+        <div style="font-size:14px;font-weight:800">📋 Contract Details</div>
+        <button onclick="document.querySelectorAll('[data-app-overlay]').forEach(el=>el.remove())" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0">✕</button>
+      </div>
+      ${html}
+    </div>`);
+  } catch(err) {
+    console.error('Error displaying contract details:', err);
+    showToast('Could not display contract details', 'red');
+  }
+}
+
 // ── Artist Hub renderer — used by viewer, preview, and Find Players ──────────
 function _renderArtistHubPage(gameData, viewerUserId, isPreview){
   const H = gameData.artistHub || {};
