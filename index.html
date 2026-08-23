@@ -19921,19 +19921,19 @@ const LOOPIFY_CSS = `
 </style>
 `;
 
-function showLoopifyUI(){if(!GAME||!GAME.songs){showToast('Loading...','purple');return;}if(!GAME.loopifyView)GAME.loopifyView='home';switch(GAME.loopifyView){case'home':showLoopifyHome();break;case'search':showLoopifySearch();break;case'library':showLoopifyLibrary();break;case'artist':showLoopifyArtistProfile(GAME.loopifyArtistId||S.id);break;case'track':showLoopifyTrackDetails(GAME.loopifyTrackId,GAME.loopifyTrackArtistId||S.id);break;default:showLoopifyHome();}}
+function showLoopifyUI(){if(!GAME||!GAME.songs){showToast('Loading...','purple');return;}if(!GAME.loopifyView)GAME.loopifyView='home';switch(GAME.loopifyView){case'home':showLoopifyHome();break;case'search':showLoopifySearch();break;case'library':showLoopifyLibrary();break;case'artist':showLoopifyArtistProfile(GAME.loopifyArtistId||currentUser?.id);break;case'track':showLoopifyTrackDetails(GAME.loopifyTrackId,GAME.loopifyTrackArtistId||currentUser?.id);break;default:showLoopifyHome();}}
 function showSpotifyUI(){showLoopifyUI();}
 function showLoopifyHome(){
   const releasedSongs=GAME.songs.filter(s=>s.released);
   // Build chart: exclude current user from allPlayers to avoid duplicates, then concat own songs with correct name
   let topChartSongs=[];
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    const others=window.allPlayers.filter(p=>p.id!==S.id);
+    const others=window.allPlayers.filter(p=>p.id!==currentUser?.id);
     topChartSongs=others.flatMap(p=>(p.gameSongs||p.songs||[]).filter(s=>s.released&&s.streams).map(s=>({...s,artistId:p.id,artistName:p.artistName||p.name||'Unknown Artist'})))
-      .concat(releasedSongs.map(s=>({...s,artistId:S.id,artistName:S.name})))
+      .concat(releasedSongs.map(s=>({...s,artistId:currentUser?.id,artistName:S.artistName})))
       .sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,50);
   }else{
-    topChartSongs=releasedSongs.slice().sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,50).map(s=>({...s,artistId:S.id,artistName:S.name}));
+    topChartSongs=releasedSongs.slice().sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,50).map(s=>({...s,artistId:currentUser?.id,artistName:S.artistName}));
   }
   // Build chart rows — show Loopify's 42% of total streams
   let chartHTML='';
@@ -19951,9 +19951,9 @@ function showLoopifyHome(){
     chartHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${song.artistId}')"><div class="pos">${idx+1}</div><div class="mv ${movementClass}">${movement}</div><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><div class="strm">${streamStr}</div><div class="dots">⋮</div></div>`;
   });
   // Popular artists — always show current user first
-  let popularArtistsHTML=`<div class="pcard" onclick="loopShowArtist('${S.id}')"><div class="cover" style="border-radius:50%;background:#333">🎤</div><b>${S.name}</b><span>Artist</span></div>`;
+  let popularArtistsHTML=`<div class="pcard" onclick="loopShowArtist('${currentUser?.id}')"><div class="cover" style="border-radius:50%;background:#333">🎤</div><b>${S.artistName}</b><span>Artist</span></div>`;
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    window.allPlayers.filter(p=>p.id!==S.id).slice(0,2).forEach(p=>{
+    window.allPlayers.filter(p=>p.id!==currentUser?.id).slice(0,2).forEach(p=>{
       popularArtistsHTML+=`<div class="pcard" onclick="loopShowArtist('${p.id}')"><div class="cover" style="border-radius:50%;background:#333">🎤</div><b>${p.artistName||p.name||'Artist'}</b><span>Artist</span></div>`;
     });
   }
@@ -19962,14 +19962,14 @@ function showLoopifyHome(){
   _insertOverlay(html);
 }
 function showLoopifySearch(){let html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">←</button><h2>Search</h2><div class="ic"></div></div><div class="srchbox">🔎<input type="text" placeholder="Artists, songs, or albums" oninput="loopFilterSearch(this.value)"></div><div id="loopSearchResults" style="display:none"></div><div class="sect">Browse all</div><div class="ggrid"><div class="gcard" style="background:#8a2a4a">R&B<span class="gem">🎷</span></div><div class="gcard" style="background:#2a6a4a">Afrobeats<span class="gem">🥁</span></div><div class="gcard" style="background:#3d3d8a">Pop<span class="gem">🎤</span></div><div class="gcard" style="background:#8a5a2a">Hip-Hop<span class="gem">🎧</span></div></div><div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div class="on" onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
-function showLoopifyLibrary(){const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));let libraryHTML='';releasedSongs.forEach(song=>{libraryHTML+=`<div class="librow" onclick="loopShowTrack('${song.id}','${S.id}')"><div class="cover">${song.cover||'♫'}</div><div><b>${song.title}</b><span>Song · ${S.name}</span></div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="libhead"><div class="me">${S.name.charAt(0).toUpperCase()}</div><h2>Your Library</h2><span style="font-size:18px;cursor:pointer">＋</span></div><div class="filters"><span class="on">Playlists</span><span>Artists</span><span>Albums</span></div>${releasedSongs.length>0?libraryHTML:'<div style="text-align:center;padding:40px 20px;color:#a7a7a7">No songs released yet</div>'}<div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div class="on" onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
-function showLoopifyArtistProfile(artistId){let player;if(artistId===S.id){const totalStreams=GAME.songs.reduce((sum,s)=>sum+(s.streams||0),0);player={id:S.id,artistName:S.name,bio:GAME.artistProfile?.bio,totalStreams};}else{player=window.allPlayers?.find(p=>p.id===artistId)||null;}if(!player){showToast('Artist not found','error');return;}const songs=(artistId===S.id?GAME.songs:(player.gameSongs||player.songs||[])).filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,10);let popularHTML='';songs.forEach((song,idx)=>{const ls=Math.floor((song.streams||0)*0.42);const lsStr=ls>=1000000?(ls/1000000).toFixed(1)+'M':ls>=1000?Math.floor(ls/1000)+'K':ls.toString();popularHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${artistId}')"><div class="pos">${idx+1}</div><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${lsStr}</span></div><div class="dots">⋮</div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="ahero"><button class="back" onclick="loopSwitchView('home')">←</button><div class="verif">✓ Verified Artist</div><h3>${player.artistName}</h3><div style="font-size:11.5px;color:#d0d0d0;margin-top:2px">${player.totalStreams?(player.totalStreams/1000).toLocaleString()+' monthly listeners':'Coming up'}</div></div><div class="actions"><button class="follow" onclick="loopToggleFollow('${artistId}',this)">Follow</button><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div><div class="sect">Popular</div>${popularHTML}${player.bio?`<div class="aboutcard"><h4>About</h4><p>${player.bio}</p></div>`:''}<div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
-function showLoopifyTrackDetails(songId,artistId){let song,artist;if(artistId===S.id){song=GAME.songs?.find(s=>s.id===songId);artist={id:S.id,name:S.name};}else{const player=window.allPlayers?.find(p=>p.id===artistId);if(!player){showToast('Artist not found','error');return;}song=player.gameSongs?.find(s=>s.id===songId);artist={id:player.id,name:player.artistName};}if(!song){showToast('Song not found','error');return;}const streams=song.streams||0;const chartRank=song.chartPosition||null;const peakRank=song.peakPosition||null;const weeksOnChart=song.weeksOnChart||0;let creditsHTML='';if(song.collabs&&song.collabs.length>0){creditsHTML='<div class="credits"><h4>Credits</h4>';song.collabs.forEach(collab=>{creditsHTML+=`<div class="cr"><b>${collab.artist||'Unknown'}</b><span>${collab.role||'Collaborator'}</span></div>`;});creditsHTML+='</div>';}let html=LOOPIFY_CSS+`<div class="loop"><div class="thero"><button class="back" onclick="loopSwitchView('artist',this)">←</button><div class="cover">${song.cover||'♫'}</div><h3>${song.title}</h3><div class="a">${artist.name} · Single · 3:42</div></div><div class="actions"><span style="font-size:18px;cursor:pointer" onclick="this.textContent=this.textContent==='♡'?'💚':'♡'">♡</span><span style="font-size:17px;cursor:pointer">⤴</span><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div>${song.lyrics?`<div class="lyr" onclick="this.classList.toggle('open')"><h4>LYRICS · TAP TO EXPAND</h4><p>${song.lyrics.split('\n')[0]}</p><p class="more">${song.lyrics}</p></div>`:''}${creditsHTML}<div class="credits"><h4>Stats</h4><div class="cr"><b>${streams.toLocaleString()}</b><span>All-time streams</span></div><div class="cr"><b>${chartRank?'#'+chartRank:'—'}</b><span>Peak — Top 50</span></div><div class="cr"><b>${weeksOnChart}</b><span>On chart</span></div></div><div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
+function showLoopifyLibrary(){const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));let libraryHTML='';releasedSongs.forEach(song=>{libraryHTML+=`<div class="librow" onclick="loopShowTrack('${song.id}','${currentUser?.id}')"><div class="cover">${song.cover||'♫'}</div><div><b>${song.title}</b><span>Song · ${S.artistName}</span></div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="libhead"><div class="me">${(S.artistName||"?").charAt(0).toUpperCase()}</div><h2>Your Library</h2><span style="font-size:18px;cursor:pointer">＋</span></div><div class="filters"><span class="on">Playlists</span><span>Artists</span><span>Albums</span></div>${releasedSongs.length>0?libraryHTML:'<div style="text-align:center;padding:40px 20px;color:#a7a7a7">No songs released yet</div>'}<div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div class="on" onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
+function showLoopifyArtistProfile(artistId){let player;if(artistId===currentUser?.id){const totalStreams=GAME.songs.reduce((sum,s)=>sum+(s.streams||0),0);player={id:currentUser?.id,artistName:S.artistName,bio:GAME.artistProfile?.bio,totalStreams};}else{player=window.allPlayers?.find(p=>p.id===artistId)||null;}if(!player){showToast('Artist not found','error');return;}const songs=(artistId===currentUser?.id?GAME.songs:(player.gameSongs||player.songs||[])).filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,10);let popularHTML='';songs.forEach((song,idx)=>{const ls=Math.floor((song.streams||0)*0.42);const lsStr=ls>=1000000?(ls/1000000).toFixed(1)+'M':ls>=1000?Math.floor(ls/1000)+'K':ls.toString();popularHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${artistId}')"><div class="pos">${idx+1}</div><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${lsStr}</span></div><div class="dots">⋮</div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="ahero"><button class="back" onclick="loopSwitchView('home')">←</button><div class="verif">✓ Verified Artist</div><h3>${player.artistName}</h3><div style="font-size:11.5px;color:#d0d0d0;margin-top:2px">${player.totalStreams?(player.totalStreams/1000).toLocaleString()+' monthly listeners':'Coming up'}</div></div><div class="actions"><button class="follow" onclick="loopToggleFollow('${artistId}',this)">Follow</button><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div><div class="sect">Popular</div>${popularHTML}${player.bio?`<div class="aboutcard"><h4>About</h4><p>${player.bio}</p></div>`:''}<div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
+function showLoopifyTrackDetails(songId,artistId){let song,artist;if(artistId===currentUser?.id){song=GAME.songs?.find(s=>s.id===songId);artist={id:currentUser?.id,name:S.artistName};}else{const player=window.allPlayers?.find(p=>p.id===artistId);if(!player){showToast('Artist not found','error');return;}song=player.gameSongs?.find(s=>s.id===songId);artist={id:player.id,name:player.artistName};}if(!song){showToast('Song not found','error');return;}const streams=song.streams||0;const chartRank=song.chartPosition||null;const peakRank=song.peakPosition||null;const weeksOnChart=song.weeksOnChart||0;let creditsHTML='';if(song.collabs&&song.collabs.length>0){creditsHTML='<div class="credits"><h4>Credits</h4>';song.collabs.forEach(collab=>{creditsHTML+=`<div class="cr"><b>${collab.artist||'Unknown'}</b><span>${collab.role||'Collaborator'}</span></div>`;});creditsHTML+='</div>';}let html=LOOPIFY_CSS+`<div class="loop"><div class="thero"><button class="back" onclick="loopSwitchView('artist',this)">←</button><div class="cover">${song.cover||'♫'}</div><h3>${song.title}</h3><div class="a">${artist.name} · Single · 3:42</div></div><div class="actions"><span style="font-size:18px;cursor:pointer" onclick="this.textContent=this.textContent==='♡'?'💚':'♡'">♡</span><span style="font-size:17px;cursor:pointer">⤴</span><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div>${song.lyrics?`<div class="lyr" onclick="this.classList.toggle('open')"><h4>LYRICS · TAP TO EXPAND</h4><p>${song.lyrics.split('\n')[0]}</p><p class="more">${song.lyrics}</p></div>`:''}${creditsHTML}<div class="credits"><h4>Stats</h4><div class="cr"><b>${streams.toLocaleString()}</b><span>All-time streams</span></div><div class="cr"><b>${chartRank?'#'+chartRank:'—'}</b><span>Peak — Top 50</span></div><div class="cr"><b>${weeksOnChart}</b><span>On chart</span></div></div><div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
 function loopSwitchView(view,navEl){GAME.loopifyView=view;if(navEl){navEl.parentElement.querySelectorAll('div').forEach(d=>d.classList.remove('on'));navEl.classList.add('on');}showLoopifyUI();}
 function loopShowTrack(songId,artistId){GAME.loopifyView='track';GAME.loopifyTrackId=songId;GAME.loopifyTrackArtistId=artistId;showLoopifyUI();}
 function loopShowArtist(artistId){GAME.loopifyView='artist';GAME.loopifyArtistId=artistId;showLoopifyUI();}
 function loopToggleFollow(artistId,btn){if(!GAME.loopifyFollowing)GAME.loopifyFollowing={};GAME.loopifyFollowing[artistId]=!GAME.loopifyFollowing[artistId];btn.textContent=GAME.loopifyFollowing[artistId]?'Following':'Follow';btn.classList.toggle('f',GAME.loopifyFollowing[artistId]);}
-function loopFilterSearch(query){const resultsDiv=document.getElementById('loopSearchResults');if(!query){resultsDiv.style.display='none';return;}resultsDiv.style.display='block';const q=query.toLowerCase();let html='';const songResults=GAME.songs.filter(s=>s.title.toLowerCase().includes(q)&&s.released);songResults.forEach(song=>{html+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${S.id}')"><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>Song · ${S.name}</span></div></div>`;});if(window.allPlayers){window.allPlayers.forEach(p=>{if(p.artistName.toLowerCase().includes(q)){html=`<div class="chartrow" onclick="loopShowArtist('${p.id}')"><div class="cover sm" style="border-radius:50%;background:#333">🎤</div><div class="ti"><b>${p.artistName}</b><span>Artist</span></div></div>`+html;}});}resultsDiv.innerHTML=html||'<div style="text-align:center;padding:20px;color:#a7a7a7">No results</div>';}
+function loopFilterSearch(query){const resultsDiv=document.getElementById('loopSearchResults');if(!query){resultsDiv.style.display='none';return;}resultsDiv.style.display='block';const q=query.toLowerCase();let html='';const songResults=GAME.songs.filter(s=>s.title.toLowerCase().includes(q)&&s.released);songResults.forEach(song=>{html+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${currentUser?.id}')"><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>Song · ${S.artistName}</span></div></div>`;});if(window.allPlayers){window.allPlayers.forEach(p=>{if(p.artistName.toLowerCase().includes(q)){html=`<div class="chartrow" onclick="loopShowArtist('${p.id}')"><div class="cover sm" style="border-radius:50%;background:#333">🎤</div><div class="ti"><b>${p.artistName}</b><span>Artist</span></div></div>`+html;}});}resultsDiv.innerHTML=html||'<div style="text-align:center;padding:20px;color:#a7a7a7">No results</div>';}
 function togglePlay(el){el.textContent=el.textContent.trim()==='▶'?'⏸':'▶';}
 function closeLoopify(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
 
@@ -20034,9 +20034,9 @@ function showOrangeBrowse(){
   const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.apple||0)-(a.platforms&&a.platforms.apple||0));
   let allSongs=[];
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown',platform:'apple'}))).concat(releasedSongs.map(s=>({...s,artistName:S.name}))).sort((a,b)=>(b.platforms&&b.platforms.apple||0)-(a.platforms&&a.platforms.apple||0)).slice(0,20);
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown',platform:'apple'}))).concat(releasedSongs.map(s=>({...s,artistName:S.artistName}))).sort((a,b)=>(b.platforms&&b.platforms.apple||0)-(a.platforms&&a.platforms.apple||0)).slice(0,20);
   }else{
-    allSongs=releasedSongs.slice(0,20).map(s=>({...s,artistName:S.name}));
+    allSongs=releasedSongs.slice(0,20).map(s=>({...s,artistName:S.artistName}));
   }
   let newRelHTML='';
   const recentRels=(GAME.releases||[]).filter(r=>r.songs&&r.songs.length>0).sort((a,b)=>b.releaseDay-a.releaseDay).slice(0,5);
@@ -20044,7 +20044,7 @@ function showOrangeBrowse(){
     const fs=rel.songs[0];
     const cover=fs&&fs.cover?fs.cover:'🎵';
     const coverStyle=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
-    newRelHTML+=`<div class="alb" onclick="showReleaseStats(${rel.id},'apple')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.name}</span></div>`;
+    newRelHTML+=`<div class="alb" onclick="showReleaseStats(${rel.id},'apple')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.artistName}</span></div>`;
   });
   if(!newRelHTML)newRelHTML='<div style="padding:16px;color:#86868b;font-size:13px">No releases yet</div>';
   let topSongsHTML='';
@@ -20054,7 +20054,7 @@ function showOrangeBrowse(){
     topSongsHTML+=`<div class="chartrow"><div class="pos">${i+1}</div><div class="cover sm" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><button class="add" onclick="event.stopPropagation();this.textContent=this.textContent==='＋'?'✓':'＋';this.style.color=this.textContent==='✓'?'#4cc98a':'#fa4b2a'">＋</button></div>`;
   });
   if(!topSongsHTML)topSongsHTML='<div style="text-align:center;padding:30px;color:#86868b">No songs released yet</div>';
-  const initials=(S.name||'?').charAt(0).toUpperCase();
+  const initials=(S.artistName||'?').charAt(0).toUpperCase();
   const html=ORANGE_CSS+`<div class="org"><div class="scroll">
     <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Browse</h2><div class="me">${initials}</div></div>
     <div class="card2"><div class="tag">FEATURED PLAYLIST</div><h3>Top Orange Picks</h3><p>The hottest releases, refreshed every game week.</p><button class="pl" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button></div>
@@ -20074,12 +20074,12 @@ function showOrangeBrowse(){
 
 function showOrangeRadio(){
   GAME.orangeView='radio';
-  const initials=(S.name||'?').charAt(0).toUpperCase();
+  const initials=(S.artistName||'?').charAt(0).toUpperCase();
   const html=ORANGE_CSS+`<div class="org"><div class="scroll">
     <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Radio</h2><div class="me">${initials}</div></div>
     <div class="radiohero"><span class="live">● LIVE</span><h3>Orange Radio 1</h3><p>Now: the hottest player releases, all hour.</p></div>
     <div class="radiohero" style="background:linear-gradient(135deg,#5a1d3a,#2a0e1c)"><span class="live" style="background:#0071e3">SHOW</span><h3>Chart Show Weekly</h3><p>Counting down the Top 10, every game Sunday.</p></div>
-    <div class="radiohero" style="background:linear-gradient(135deg,#1d3a5a,#0e1c2a)"><span class="live" style="background:#30b0c7">EXCLUSIVE</span><h3>${S.name||'Artist'} Radio</h3><p>Songs in the style of ${S.name||'your sound'} and more.</p></div>
+    <div class="radiohero" style="background:linear-gradient(135deg,#1d3a5a,#0e1c2a)"><span class="live" style="background:#30b0c7">EXCLUSIVE</span><h3>${S.artistName||'Artist'} Radio</h3><p>Songs in the style of ${S.artistName||'your sound'} and more.</p></div>
   </div>
   <div class="npbar"><div class="cover">📻</div><b>Orange Radio 1</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
   <div class="bnav">
@@ -20099,9 +20099,9 @@ function showOrangeLibrary(){
     const fs=rel.songs[0];
     const cover=fs&&fs.cover?fs.cover:'🎵';
     const coverStyle=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
-    recentHTML+=`<div class="alb" onclick="showReleaseStats(${rel.id},'apple')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.name}</span></div>`;
+    recentHTML+=`<div class="alb" onclick="showReleaseStats(${rel.id},'apple')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.artistName}</span></div>`;
   });
-  const initials=(S.name||'?').charAt(0).toUpperCase();
+  const initials=(S.artistName||'?').charAt(0).toUpperCase();
   const html=ORANGE_CSS+`<div class="org"><div class="scroll">
     <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Library</h2><div class="me">${initials}</div></div>
     <div class="librow2"><i>♪</i>Songs<s>›</s></div>
@@ -20129,273 +20129,165 @@ function editOrangeMusicProfile(){}
 // YOURTUBE MUSIC — YouTube Music-style (blueprint v3)
 // ════════════════════════════════════════════════════════════════════════════
 const YOURTUBE_CSS=`<style>
-.yt{background:#0f0f0f;color:#f1f1f1;font-family:Roboto,sans-serif;min-height:100%;padding-bottom:52px;position:relative;}
-.yt .scroll{padding-bottom:52px;}
-.yt .head{display:flex;align-items:center;gap:8px;padding:12px 16px;}
-.yt .head .logo{width:30px;height:21px;background:#ff0033;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:800;}
-.yt .head h2{font-size:18px;font-weight:700;flex:1;}
-.yt .head .ic{display:flex;gap:16px;font-size:16px;color:#f1f1f1;}
-.yt .chiprow{display:flex;gap:8px;padding:0 16px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.yt .chiprow span{flex:none;background:#272727;border-radius:8px;font-size:12px;padding:6px 11px;cursor:pointer;}
-.yt .chiprow span.on{background:#f1f1f1;color:#0f0f0f;font-weight:600;}
-.yt .thumb{height:196px;background:linear-gradient(120deg,#3a2a4d,#1c2a3d);display:flex;align-items:center;justify-content:center;font-size:52px;position:relative;cursor:pointer;overflow:hidden;}
-.yt .thumb img{width:100%;height:100%;object-fit:cover;}
-.yt .dur{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.8);font-size:11px;font-weight:600;padding:2px 5px;border-radius:4px;}
-.yt .vmeta{display:flex;gap:10px;padding:10px 12px 6px;}
-.yt .vav{width:36px;height:36px;border-radius:50%;background:#333;flex:none;display:flex;align-items:center;justify-content:center;font-size:17px;}
-.yt .vt b{display:block;font-size:14.5px;font-weight:600;line-height:1.35;}
-.yt .vt span{font-size:12px;color:#aaa;}
-.yt .acts{display:flex;gap:8px;padding:6px 12px 12px;overflow-x:auto;}
-.yt .acts span{flex:none;background:#272727;border-radius:99px;font-size:12px;font-weight:600;padding:7px 13px;cursor:pointer;}
-.yt .acts span.subon{background:#f1f1f1;color:#0f0f0f;}
-.yt .comm{margin:0 12px 16px;background:#272727;border-radius:12px;padding:11px 13px;}
-.yt .comm .ch{font-size:12px;font-weight:600;margin-bottom:6px;}
-.yt .comm .ch span{color:#aaa;font-weight:400;}
-.yt .comm p{font-size:12.5px;line-height:1.45;color:#e0e0e0;}
-.yt .comm .likes{font-size:11px;color:#aaa;margin-top:6px;}
-.yt .bnav{position:sticky;bottom:0;left:0;right:0;height:50px;background:#0f0f0f;border-top:1px solid #272727;display:flex;z-index:5;}
-.yt .bnav div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:9px;color:#aaa;cursor:pointer;}
-.yt .bnav div.on{color:#fff;}
-.yt .bnav div i{font-style:normal;font-size:17px;}
-.yt .sthumb{min-height:520px;background:linear-gradient(160deg,#3d1c2a,#1c0e14);display:flex;align-items:center;justify-content:center;font-size:80px;position:relative;}
-.yt .sside{position:absolute;right:12px;bottom:80px;display:flex;flex-direction:column;gap:18px;text-align:center;font-size:11px;}
-.yt .sside div{cursor:pointer;}
-.yt .sside i{font-style:normal;display:block;font-size:24px;}
-.yt .sinfo{position:absolute;left:12px;bottom:20px;right:70px;}
-.yt .sinfo b{font-size:13.5px;}
-.yt .sinfo p{font-size:12px;color:#ddd;margin-top:4px;}
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+.ytm{background:#0f0f0f;color:#fff;min-height:100%;font-family:Roboto,'Arial',sans-serif;}
+.ytm .head{display:flex;align-items:center;gap:10px;padding:14px 16px 8px;}
+.ytm .head .back{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;line-height:1;}
+.ytm .head .logo{display:flex;align-items:center;gap:4px;flex:1;}
+.ytm .head .logo .yt-icon{background:#ff0000;border-radius:5px;padding:2px 6px;font-size:12px;font-weight:800;color:#fff;letter-spacing:0;}
+.ytm .head .logo .yt-text{font-size:14px;font-weight:500;color:#fff;letter-spacing:.2px;}
+.ytm .head .ic{display:flex;gap:18px;font-size:17px;color:#aaa;}
+.ytm .chips{display:flex;gap:8px;padding:0 16px 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.ytm .chips span{flex:none;background:#212121;border-radius:8px;font-size:13px;font-weight:500;padding:7px 14px;cursor:pointer;color:#e0e0e0;}
+.ytm .chips span.on{background:#fff;color:#0f0f0f;font-weight:600;}
+.ytm .sect{padding:14px 16px 10px;font-size:16px;font-weight:500;display:flex;justify-content:space-between;align-items:center;}
+.ytm .sect a{font-size:12px;color:#aaa;text-decoration:none;cursor:pointer;font-weight:400;}
+.ytm .hrow{display:flex;gap:12px;overflow-x:auto;padding:0 16px 18px;-webkit-overflow-scrolling:touch;}
+.ytm .mcard{flex:none;width:122px;cursor:pointer;}
+.ytm .mcard .cov{width:122px;height:122px;border-radius:8px;background:#212121;display:flex;align-items:center;justify-content:center;font-size:44px;margin-bottom:8px;overflow:hidden;}
+.ytm .mcard b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+.ytm .mcard span{font-size:11.5px;color:#aaa;}
+.ytm .qrow{display:flex;align-items:center;gap:12px;padding:8px 16px;cursor:pointer;}
+.ytm .qrow:active{background:#1a1a1a;}
+.ytm .qrow .cov{width:50px;height:50px;border-radius:4px;background:#212121;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden;}
+.ytm .qrow .ti{flex:1;min-width:0;}
+.ytm .qrow .ti b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400;}
+.ytm .qrow .ti span{font-size:12px;color:#aaa;}
+.ytm .qrow .more{font-size:18px;color:#aaa;padding-left:4px;cursor:pointer;}
+.ytm .npbar{position:sticky;bottom:52px;margin:4px 8px;background:#282828;border-radius:10px;display:flex;align-items:center;gap:10px;padding:8px 12px;z-index:5;cursor:pointer;}
+.ytm .npbar .cov{width:38px;height:38px;background:#3c3c3c;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.ytm .npbar .ti{flex:1;min-width:0;}
+.ytm .npbar .ti b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+.ytm .npbar .ti span{font-size:11px;color:#aaa;}
+.ytm .npbar .ctrl{display:flex;gap:14px;font-size:18px;color:#fff;flex-shrink:0;}
+.ytm .bnav{position:sticky;bottom:0;left:0;right:0;height:52px;background:#0f0f0f;border-top:1px solid #1c1c1c;display:flex;z-index:6;}
+.ytm .bnav div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;color:#aaa;cursor:pointer;}
+.ytm .bnav div.on{color:#ff0000;}
+.ytm .bnav div i{font-style:normal;font-size:18px;}
+.ytm .egrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px 18px;}
+.ytm .ecard{height:80px;border-radius:8px;padding:12px;font-size:14px;font-weight:700;position:relative;overflow:hidden;cursor:pointer;display:flex;align-items:flex-end;}
+.ytm .ecard .gem{position:absolute;top:-6px;right:-4px;font-size:40px;opacity:.75;}
+.ytm .lrow{display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;}
+.ytm .lrow:active{background:#1a1a1a;}
+.ytm .lrow .cov{width:54px;height:54px;border-radius:6px;background:#212121;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden;}
+.ytm .lrow .ti{flex:1;min-width:0;}
+.ytm .lrow .ti b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400;}
+.ytm .lrow .ti span{font-size:12px;color:#aaa;}
 </style>`;
 
 function showYourtubeMusicUI(){
-  if(!GAME.artistProfile){GAME.artistProfile={profilePic:'👤',profilePicType:'emoji',banner:'gradient1',bannerType:'gradient',bio:'An artist on the rise.'}}
+  if(!GAME.artistProfile){GAME.artistProfile={profilePic:'👤',profilePicType:'emoji',bio:'An artist on the rise.'}}
   if(!GAME.yourtubeMusicView)GAME.yourtubeMusicView='home';
   switch(GAME.yourtubeMusicView){
     case'home':showYourtubeHome();break;
-    case'shorts':showYourtubeShorts();break;
-    case'subs':showYourtubeSubs();break;
+    case'shorts':showYourtubeExplore();break;
+    case'subs':showYourtubeLibrary();break;
     default:showYourtubeHome();
   }
 }
 
 function showYourtubeHome(){
   GAME.yourtubeMusicView='home';
-  const releasedSongs=GAME.songs.filter(s=>s.released);
-  // Calculate total Yourtube views (or use aggregate if platforms not set)
-  const totalViews = releasedSongs.reduce((sum, s) => {
-    if(s.platforms && s.platforms.youtube){
-      return sum + s.platforms.youtube;
-    }
-    // Fallback: assume 25% of total streams are from Yourtube
-    return sum + Math.floor((s.streams || 0) * 0.25);
-  }, 0);
-  const monthlyListeners = Math.floor(totalViews * 0.25);
-  const singles=releasedSongs.filter(s=>!s.releaseType||s.releaseType==='single');
-  const albums=releasedSongs.filter(s=>s.releaseType==='album');
-  const eps=releasedSongs.filter(s=>s.releaseType==='ep');
-  
-  let html=`<style>
-  .ytm-container{background:#000;height:100%;overflow-y:auto;color:#fff;font-family:Roboto,sans-serif;padding-bottom:80px}
-  .ytm-header{padding:180px 16px 16px;position:relative}
-  .ytm-bg{position:absolute;top:0;left:0;right:0;height:280px;background-size:cover;background-position:center;filter:blur(20px);opacity:0.3;z-index:0}
-  .ytm-gradient{position:absolute;top:0;left:0;right:0;height:280px;background:linear-gradient(180deg,transparent 0%,#000 100%);z-index:1}
-  .ytm-content{position:relative;z-index:2}
-  .ytm-name{font-size:40px;font-weight:700;margin-bottom:8px}
-  .ytm-monthly{font-size:14px;color:#aaa;margin-bottom:16px}
-  .ytm-controls{display:flex;gap:12px;align-items:center}
-  .ytm-subscribe{background:#cc0000;border:none;border-radius:18px;color:#fff;padding:9px 16px;font-size:14px;font-weight:500;letter-spacing:0.5px;cursor:pointer}
-  .ytm-icon-btn{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer}
-  .ytm-play{width:48px;height:48px;border-radius:50%;background:#fff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer}
-  .ytm-section{padding:16px 16px 24px}
-  .ytm-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-  .ytm-section-title{font-size:20px;font-weight:500}
-  .ytm-more{font-size:13px;color:#aaa;cursor:pointer}
-  .ytm-track{display:flex;gap:12px;padding:8px 0;align-items:center}
-  .ytm-track-num{width:24px;text-align:center;color:#aaa;font-size:14px}
-  .ytm-thumb{width:48px;height:48px;background:#202020;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
-  .ytm-info{flex:1;min-width:0}
-  .ytm-title{font-size:14px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ytm-plays{font-size:12px;color:#aaa}
-  .ytm-album-grid{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
-  .ytm-album-item{min-width:140px;cursor:pointer}
-  .ytm-album-cover{width:140px;height:140px;background:#202020;border-radius:8px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;font-size:56px}
-  .ytm-album-title{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ytm-about{background:#181818;border-radius:8px;padding:16px;margin:16px}
-  </style>
-  <div class="ytm-container">
-    <div style="position:fixed;top:12px;left:12px;z-index:200">
-      <button onclick="closeYourtubeMusicToStreaming()" style="background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:32px;height:32px;color:#fff;font-size:20px;cursor:pointer">←</button>
-    </div>
-    <button onclick="editYourtubeMusicProfile()" style="position:fixed;top:12px;right:12px;background:rgba(0,0,0,0.7);border:1px solid #535353;border-radius:20px;color:#fff;padding:8px 16px;font-size:12px;font-weight:700;z-index:200;cursor:pointer">Edit Profile</button>
-    
-    <div class="ytm-header">
-      <div class="ytm-bg" style="background-image:${GAME.artistProfile.profilePicType==='image'?`url('${GAME.artistProfile.profilePic}')`:'none'}"></div>
-      <div class="ytm-gradient"></div>
-      <div class="ytm-content">
-        ${GAME.artistProfile.profilePicType==='image'?`<div style="width:120px;height:120px;border-radius:50%;background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center;margin:0 auto 16px;border:4px solid #181818"></div>`:''}
-        <div class="ytm-name">${S.name||'Your Artist'}</div>
-        <div class="ytm-monthly">${monthlyListeners.toLocaleString()} monthly listeners</div>
-        <div class="ytm-controls">
-          <button class="ytm-subscribe">SUBSCRIBE</button>
-          <button class="ytm-icon-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
-          <button class="ytm-play"><svg width="20" height="20" viewBox="0 0 24 24" fill="#000"><path d="M8 5v14l11-7z"/></svg></button>
-        </div>
-      </div>
-    </div>`;
-  
-  // Top Releases
-  if(releasedSongs.length>0){
-    html+=`<div class="ytm-section"><div class="ytm-section-header"><div class="ytm-section-title">Top releases</div><div class="ytm-more">MORE</div></div>`;
-    
-    const releasesByPopularity=[];
-    const shownReleases=new Set();
-    
-    releasedSongs.sort((a,b)=>b.platforms.youtube-a.platforms.youtube).forEach(song=>{
-      const release=GAME.releases.find(r=>r.songs&&r.songs.some(s=>s&&s.id===song.id));
-      if(release&&!shownReleases.has(release.id)){
-        shownReleases.add(release.id);
-        const totalStreams=release.songs.reduce((sum,s)=>(sum+(s&&s.platforms&&s.platforms.youtube?s.platforms.youtube:0)),0);
-        releasesByPopularity.push({release,totalStreams});
-      }
+  const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));
+  const topSong=releasedSongs[0];
+  // "Listen again" — horizontal cards of released songs
+  let listenHTML='';
+  if(releasedSongs.length===0){
+    listenHTML='<div style="padding:0 16px 18px;color:#aaa;font-size:13px">Release your first song to see it here.</div>';
+  }else{
+    releasedSongs.slice(0,8).forEach(song=>{
+      const ytViews=song.platforms&&song.platforms.youtube?song.platforms.youtube:Math.floor((song.streams||0)*0.15);
+      const viewStr=ytViews>=1000000?(ytViews/1000000).toFixed(1)+'M':ytViews>=1000?Math.floor(ytViews/1000)+'K':ytViews||'—';
+      const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
+      listenHTML+=`<div class="mcard" onclick=""><div class="cov" style="${cs}">${song.coverImage?'':song.cover||'♫'}</div><b>${song.title}</b><span>${S.artistName||'You'} · ${viewStr} plays</span></div>`;
     });
-    
-    releasesByPopularity.sort((a,b)=>b.totalStreams-a.totalStreams).slice(0,6).forEach((item,i)=>{
-      const release=item.release;
-      const weeks=Math.floor((GAME.day-release.releaseDay)/7);
-      const plays=weeks>=1?item.totalStreams.toLocaleString():'—';
-      const releaseType=release.type==='single'?'Single':(release.type==='ep'||release.type==='EP'?'EP':'Album');
-      const firstSong=release.songs[0];
-      const cover=firstSong&&firstSong.cover?firstSong.cover:'';
-      
-      html+=`<div class="ytm-track" onclick="showReleaseStats(${release.id},'youtube')"><div class="ytm-track-num">${i+1}</div><div class="ytm-thumb">${cover}</div><div class="ytm-info"><div class="ytm-title">${release.title}</div><div class="ytm-plays">${plays} · ${releaseType}</div></div></div>`;
-    });
-    html+=`</div>`;
+    listenHTML=`<div class="hrow">${listenHTML}</div>`;
   }
-  
-  // Albums
-  const albumReleases=GAME.releases.filter(r=>r.type==='album');
-  if(albumReleases.length>0){
-    html+=`<div class="ytm-section"><div class="ytm-section-header"><div class="ytm-section-title">Albums</div></div><div class="ytm-album-grid">`;
-    albumReleases.slice(0,5).forEach(release=>{
-      const firstSong=release.songs[0];
-      
-      // Get cover - prioritize uploaded image over emoji
-      let cover='';
-      if(firstSong){
-        if(firstSong.coverImage){
-          cover=`<img src="${firstSong.coverImage}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`;
-        }else if(firstSong.cover){
-          cover=firstSong.cover; // Emoji fallback
-        }
-      }
-      
-      html+=`<div class="ytm-album-item" onclick="showReleaseStats(${release.id},'youtube')"><div class="ytm-album-cover">${cover}</div><div class="ytm-album-title">${release.title}</div><div class="ytm-plays">Album</div></div>`;
-    });
-    html+=`</div></div>`;
-  }
-  
-  // Singles & EPs
-  const singleEpReleases=GAME.releases.filter(r=>r.type==='single'||r.type==='ep'||r.type==='EP');
-  if(singleEpReleases.length>0){
-    html+=`<div class="ytm-section"><div class="ytm-section-header"><div class="ytm-section-title">Singles & EPs</div></div><div class="ytm-album-grid">`;
-    singleEpReleases.slice(0,6).forEach(release=>{
-      const type=release.type==='ep'||release.type==='EP'?'EP':'Single';
-      const firstSong=release.songs[0];
-      
-      // Get cover - prioritize uploaded image over emoji
-      let cover='';
-      if(firstSong){
-        if(firstSong.coverImage){
-          cover=`<img src="${firstSong.coverImage}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`;
-        }else if(firstSong.cover){
-          cover=firstSong.cover; // Emoji fallback
-        }
-      }
-      
-      html+=`<div class="ytm-album-item" onclick="showReleaseStats(${release.id},'youtube')"><div class="ytm-album-cover">${cover}</div><div class="ytm-album-title">${release.title}</div><div class="ytm-plays">${type}</div></div>`;
-    });
-    html+=`</div></div>`;
-  }
-  
-  // Build video feed from releases
-  let videoFeedHTML='';
-  releasedSongs.slice(0,3).forEach(song=>{
-    const views=song.platforms&&song.platforms.youtube?song.platforms.youtube:Math.floor((song.streams||0)*0.15);
-    const viewStr=views>=1000000?(views/1000000).toFixed(1)+'M views':views>=1000?Math.floor(views/1000)+'K views':views+' views';
-    const cover=song.cover||'🎵';
-    videoFeedHTML+=`<div class="thumb" onclick="showReleaseStats(${song.id},'youtube')" style="font-size:52px">${cover}<div class="dur">3:42</div></div>
-    <div class="vmeta"><div class="vav">🎤</div><div class="vt"><b>${S.name} — ${song.title} (Official Video)</b><span>${S.name} · ${viewStr} · ${song.weeksOnChart||1} week${(song.weeksOnChart||1)===1?'':'s'} ago</span></div></div>
-    <div class="acts"><span class="subon" onclick="this.classList.toggle('subon');this.textContent=this.classList.contains('subon')?'Subscribed '+Math.floor(monthlyListeners/1000)+'K':'Subscribe '+Math.floor(monthlyListeners/1000)+'K'">Subscribed ${Math.floor(monthlyListeners/1000)}K</span><span onclick="event.stopPropagation()">👍 ${Math.floor(views/50)}</span><span>👎</span><span>⤴ Share</span></div>`;
+  // "Quick picks" — list of top songs
+  let picksHTML='';
+  releasedSongs.slice(0,6).forEach((song,i)=>{
+    const ytViews=song.platforms&&song.platforms.youtube?song.platforms.youtube:Math.floor((song.streams||0)*0.15);
+    const viewStr=ytViews>=1000000?(ytViews/1000000).toFixed(1)+'M':ytViews>=1000?Math.floor(ytViews/1000)+'K':ytViews||'—';
+    const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
+    picksHTML+=`<div class="qrow" onclick=""><div class="cov" style="${cs}">${song.coverImage?'':song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${S.artistName||'You'} · ${viewStr} plays</span></div><div class="more">⋮</div></div>`;
   });
-  if(!videoFeedHTML)videoFeedHTML=`<div style="text-align:center;padding:40px 20px;color:#aaa"><div style="font-size:48px;margin-bottom:12px">▶</div><div>No releases yet</div></div>`;
-
-  html=YOURTUBE_CSS+`<div class="yt"><div class="scroll">
-    <div class="head"><button onclick="closeYourtubeMusicToStreaming()" style="background:none;border:none;color:#f1f1f1;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><div class="logo">▶</div><h2>Yourtube</h2><div class="ic">📡 🔔 🔎</div></div>
-    <div class="chiprow"><span class="on">All</span><span>Music</span><span>Music Videos</span><span>Live</span><span>New</span></div>
-    ${videoFeedHTML}
-  </div>
-  <div class="bnav">
-    <div class="on" onclick="ytSwitch('home',this)"><i>⌂</i>Home</div>
-    <div onclick="ytSwitch('shorts',this)"><i>▶</i>Shorts</div>
-    <div onclick="ytSwitch('subs',this)"><i>▤</i>Subscriptions</div>
-    <div><i>👤</i>You</div>
-  </div></div>`;
+  if(!picksHTML)picksHTML='<div style="text-align:center;padding:30px;color:#aaa;font-size:13px">No songs yet — release music to fill this in.</div>';
+  // New releases — horizontal album/ep/single cards from releases
+  let newRelHTML='';
+  const recentRels=(GAME.releases||[]).filter(r=>r.songs&&r.songs.length>0).sort((a,b)=>b.releaseDay-a.releaseDay).slice(0,6);
+  recentRels.forEach(rel=>{
+    const fs=rel.songs[0];const relType=rel.type==='ep'||rel.type==='EP'?'EP':rel.type==='album'?'Album':'Single';
+    const cs=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'';
+    newRelHTML+=`<div class="mcard" onclick="showReleaseStats(${rel.id},'youtube')"><div class="cov" style="${cs}">${fs&&fs.coverImage?'':fs&&fs.cover||'♫'}</div><b>${rel.title}</b><span>${relType}</span></div>`;
+  });
+  const npCov=topSong?topSong.cover||'♫':'♫';
+  const npTitle=topSong?topSong.title:'Nothing playing';
+  const html=YOURTUBE_CSS+`<div class="ytm">
+    <div class="head"><button class="back" onclick="closeYourtubeMusicToStreaming()">←</button><div class="logo"><span class="yt-icon">▶</span><span class="yt-text"> Music</span></div><div class="ic"><span>🔎</span><span>👤</span></div></div>
+    <div class="chips"><span class="on">All</span><span>Mixed for you</span><span>Music Videos</span><span>Artists</span><span>New</span></div>
+    <div class="sect">Listen again</div>
+    ${listenHTML}
+    <div class="sect">Quick picks</div>
+    ${picksHTML}
+    ${newRelHTML?`<div class="sect">New releases</div><div class="hrow">${newRelHTML}</div>`:''}
+    <div class="npbar" onclick=""><div class="cov">${npCov}</div><div class="ti"><b>${npTitle}</b><span>${S.artistName||'You'}</span></div><div class="ctrl"><span onclick="event.stopPropagation();this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span onclick="event.stopPropagation()">⏭</span></div></div>
+    <div class="bnav"><div class="on" onclick="ytSwitch('home',this)"><i>⌂</i>Home</div><div onclick="ytSwitch('shorts',this)"><i>◈</i>Explore</div><div onclick="ytSwitch('subs',this)"><i>▤</i>Library</div></div>
+  </div>`;
   _insertOverlay(html);
 }
 
-function showYourtubeShorts(){
+function showYourtubeExplore(){
   GAME.yourtubeMusicView='shorts';
-  const releasedSongs=GAME.songs.filter(s=>s.released);
-  const topSong=releasedSongs.sort((a,b)=>(b.streams||0)-(a.streams||0))[0];
-  const cover=topSong?topSong.cover||'🎵':'🎵';
-  const likes=topSong?Math.floor((topSong.streams||0)/20):0;
-  const html=YOURTUBE_CSS+`<div class="yt"><div class="scroll" style="padding:0">
-    <div class="sthumb">${cover}
-      <button onclick="closeYourtubeMusicToStreaming()" style="position:absolute;top:14px;left:14px;background:rgba(0,0,0,0.6);border:none;border-radius:50%;width:34px;height:34px;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10">←</button>
-      <div class="sside">
-        <div onclick="this.querySelector('i').style.color='#4c9df3'"><i style="font-style:normal;display:block;font-size:24px">👍</i>${likes>0?Math.floor(likes/1000)+'K':0}</div>
-        <div><i style="font-style:normal;display:block;font-size:24px">💬</i>${topSong?Math.floor((topSong.streams||0)/500):0}</div>
-        <div><i style="font-style:normal;display:block;font-size:24px">⤴</i>Share</div>
-        <div><i style="font-style:normal;display:block;font-size:24px">♪</i></div>
-      </div>
-      <div class="sinfo"><b>@${(S.name||'artist').toLowerCase().replace(/\s+/g,'')}</b><p>${topSong?topSong.title+' challenge 🎵':'Release some music!'} #SoundCheck</p></div>
+  const html=YOURTUBE_CSS+`<div class="ytm">
+    <div class="head"><button class="back" onclick="closeYourtubeMusicToStreaming()">←</button><div class="logo"><span class="yt-icon">▶</span><span class="yt-text"> Music</span></div><div class="ic"><span>🔎</span></div></div>
+    <div class="chips"><span class="on">Genres</span><span>Moods</span><span>Decades</span></div>
+    <div class="sect">Browse by genre</div>
+    <div class="egrid">
+      <div class="ecard" style="background:#4a1a1a">R&B<div class="gem">🎷</div></div>
+      <div class="ecard" style="background:#1a3a1a">Afrobeats<div class="gem">🥁</div></div>
+      <div class="ecard" style="background:#1a1a4a">Pop<div class="gem">🎤</div></div>
+      <div class="ecard" style="background:#3a2a1a">Hip-Hop<div class="gem">🎧</div></div>
+      <div class="ecard" style="background:#2a1a3a">Dance<div class="gem">🎹</div></div>
+      <div class="ecard" style="background:#1a3a3a">Alternative<div class="gem">🎸</div></div>
     </div>
-  </div>
-  <div class="bnav">
-    <div onclick="ytSwitch('home',this)"><i>⌂</i>Home</div>
-    <div class="on" onclick="ytSwitch('shorts',this)"><i>▶</i>Shorts</div>
-    <div onclick="ytSwitch('subs',this)"><i>▤</i>Subscriptions</div>
-    <div><i>👤</i>You</div>
-  </div></div>`;
+    <div class="sect">Moods & activities</div>
+    <div class="egrid">
+      <div class="ecard" style="background:#2a1a1a">Chill<div class="gem">🌙</div></div>
+      <div class="ecard" style="background:#3a3a1a">Workout<div class="gem">🔥</div></div>
+      <div class="ecard" style="background:#1a2a3a">Focus<div class="gem">📚</div></div>
+      <div class="ecard" style="background:#3a1a2a">Party<div class="gem">🎉</div></div>
+    </div>
+    <div class="bnav"><div onclick="ytSwitch('home',this)"><i>⌂</i>Home</div><div class="on" onclick="ytSwitch('shorts',this)"><i>◈</i>Explore</div><div onclick="ytSwitch('subs',this)"><i>▤</i>Library</div></div>
+  </div>`;
   _insertOverlay(html);
 }
 
-function showYourtubeSubs(){
+function showYourtubeLibrary(){
   GAME.yourtubeMusicView='subs';
-  let subFeedHTML='';
-  if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    window.allPlayers.slice(0,3).forEach(p=>{
-      const songs=(p.gameSongs||[]).filter(s=>s.released);
-      if(songs.length>0){
-        const s=songs[0];
-        const views=Math.floor((s.streams||0)*0.15);
-        subFeedHTML+=`<div class="thumb" style="font-size:52px">${s.cover||'🎵'}<div class="dur">3:42</div></div><div class="vmeta"><div class="vav">🎤</div><div class="vt"><b>${s.title} — Behind The Scenes</b><span>${p.artistName||p.name} · ${views>1000?Math.floor(views/1000)+'K':views} views</span></div></div>`;
-      }
-    });
-  }
-  if(!subFeedHTML)subFeedHTML='<div style="text-align:center;padding:40px 20px;color:#aaa">No subscriptions yet</div>';
-  const html=YOURTUBE_CSS+`<div class="yt"><div class="scroll">
-    <div class="head"><button onclick="closeYourtubeMusicToStreaming()" style="background:none;border:none;color:#f1f1f1;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><div class="logo">▶</div><h2 style="font-size:16px">Subscriptions</h2></div>
-    <div class="chiprow"><span class="on">All</span><span>Today</span><span>Continue</span></div>
-    ${subFeedHTML}
-  </div>
-  <div class="bnav">
-    <div onclick="ytSwitch('home',this)"><i>⌂</i>Home</div>
-    <div onclick="ytSwitch('shorts',this)"><i>▶</i>Shorts</div>
-    <div class="on" onclick="ytSwitch('subs',this)"><i>▤</i>Subscriptions</div>
-    <div><i>👤</i>You</div>
-  </div></div>`;
+  const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));
+  const recentRels=(GAME.releases||[]).filter(r=>r.songs&&r.songs.length>0).sort((a,b)=>b.releaseDay-a.releaseDay);
+  let tracksHTML='';
+  releasedSongs.forEach(song=>{
+    const ytViews=song.platforms&&song.platforms.youtube?song.platforms.youtube:Math.floor((song.streams||0)*0.15);
+    const viewStr=ytViews>=1000000?(ytViews/1000000).toFixed(1)+'M':ytViews>=1000?Math.floor(ytViews/1000)+'K':ytViews||'—';
+    const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
+    tracksHTML+=`<div class="lrow" onclick=""><div class="cov" style="${cs}">${song.coverImage?'':song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${S.artistName||'You'} · ${viewStr} plays</span></div><div class="more">⋮</div></div>`;
+  });
+  if(!tracksHTML)tracksHTML='<div style="text-align:center;padding:40px 16px;color:#aaa;font-size:13px">No songs released yet.</div>';
+  const html=YOURTUBE_CSS+`<div class="ytm">
+    <div class="head"><button class="back" onclick="closeYourtubeMusicToStreaming()">←</button><div class="logo"><span class="yt-icon">▶</span><span class="yt-text"> Music</span></div><div class="ic"><span>🔎</span><span>👤</span></div></div>
+    <div style="padding:4px 16px 14px;font-size:22px;font-weight:500">Library</div>
+    <div class="chips"><span class="on">Playlists</span><span>Albums</span><span>Songs</span><span>Artists</span></div>
+    <div class="sect">Your songs</div>
+    ${tracksHTML}
+    <div class="bnav"><div onclick="ytSwitch('home',this)"><i>⌂</i>Home</div><div onclick="ytSwitch('shorts',this)"><i>◈</i>Explore</div><div class="on" onclick="ytSwitch('subs',this)"><i>▤</i>Library</div></div>
+  </div>`;
   _insertOverlay(html);
 }
+
+// legacy aliases kept so old saved views still route correctly
+function showYourtubeShorts(){showYourtubeExplore();}
+function showYourtubeSubs(){showYourtubeLibrary();}
 
 function ytSwitch(view,el){GAME.yourtubeMusicView=view;showYourtubeMusicUI();}
 function closeYourtubeMusicToStreaming(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
@@ -20448,9 +20340,9 @@ function showSaharaHome(){
   const releasedSongs=GAME.songs.filter(s=>s.released);
   let allSongs=[];
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(releasedSongs.map(s=>({...s,artistName:S.name}))).sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,10);
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(releasedSongs.map(s=>({...s,artistName:S.artistName}))).sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,10);
   }else{
-    allSongs=releasedSongs.sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,10).map(s=>({...s,artistName:S.name}));
+    allSongs=releasedSongs.sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,10).map(s=>({...s,artistName:S.artistName}));
   }
   let trendHTML='';
   allSongs.slice(0,6).forEach((song,i)=>{
@@ -20468,7 +20360,7 @@ function showSaharaHome(){
       <span onclick="saharaSwitch('charts',this)">Charts</span>
       <span>New</span><span>Genres</span>
     </div>
-    <div class="feature"><div class="tag">SAHARA ORIGINAL SESSION</div><h3>${S.name||'Your Artist'}: Live Session</h3><p>An exclusive stripped session — your biggest track like you've never heard it.</p></div>
+    <div class="feature"><div class="tag">SAHARA ORIGINAL SESSION</div><h3>${S.artistName||'Your Artist'}: Live Session</h3><p>An exclusive stripped session — your biggest track like you've never heard it.</p></div>
     <div class="sect">Trending on Sahara</div>
     ${trendHTML}
   </div>
@@ -20482,9 +20374,9 @@ function showSaharaCharts(){
   const releasedSongs=GAME.songs.filter(s=>s.released);
   let allSongs=[];
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(releasedSongs.map(s=>({...s,artistName:S.name}))).sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,20);
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(releasedSongs.map(s=>({...s,artistName:S.artistName}))).sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,20);
   }else{
-    allSongs=releasedSongs.sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,20).map(s=>({...s,artistName:S.name}));
+    allSongs=releasedSongs.sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,20).map(s=>({...s,artistName:S.artistName}));
   }
   let chartHTML='';
   allSongs.forEach((song,i)=>{
@@ -20578,9 +20470,9 @@ function showSoundPuffStream(){
   let feedSongs=[];
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
     const otherSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown',isOther:true})));
-    feedSongs=[...releasedSongs.map(s=>({...s,artistName:S.name})),...otherSongs].sort(()=>Math.random()-0.5).slice(0,6);
+    feedSongs=[...releasedSongs.map(s=>({...s,artistName:S.artistName})),...otherSongs].sort(()=>Math.random()-0.5).slice(0,6);
   }else{
-    feedSongs=releasedSongs.slice(0,5).map(s=>({...s,artistName:S.name}));
+    feedSongs=releasedSongs.slice(0,5).map(s=>({...s,artistName:S.artistName}));
   }
   feedSongs.forEach(song=>{
     const streams=song.platforms&&song.platforms.soundcloud?song.platforms.soundcloud:Math.floor((song.streams||0)*0.05);
@@ -20618,9 +20510,9 @@ function showSoundPuffTrending(){
   GAME.soundpuffView='trend';
   let allSongs=[];
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(GAME.songs.filter(s=>s.released).map(s=>({...s,artistName:S.name}))).sort((a,b)=>(b.platforms&&b.platforms.soundcloud||0)-(a.platforms&&a.platforms.soundcloud||0)).slice(0,10);
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(GAME.songs.filter(s=>s.released).map(s=>({...s,artistName:S.artistName}))).sort((a,b)=>(b.platforms&&b.platforms.soundcloud||0)-(a.platforms&&a.platforms.soundcloud||0)).slice(0,10);
   }else{
-    allSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.soundcloud||0)-(a.platforms&&a.platforms.soundcloud||0)).slice(0,10).map(s=>({...s,artistName:S.name}));
+    allSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.soundcloud||0)-(a.platforms&&a.platforms.soundcloud||0)).slice(0,10).map(s=>({...s,artistName:S.artistName}));
   }
   let trendHTML='';
   allSongs.forEach((song,i)=>{
@@ -20663,7 +20555,7 @@ function showSoundPuffYou(){
   if(!myTracksHTML)myTracksHTML='<div style="text-align:center;padding:30px;color:#999">No tracks yet</div>';
   const picEmoji=GAME.artistProfile&&GAME.artistProfile.profilePic&&GAME.artistProfile.profilePicType==='image'?'':GAME.artistProfile&&GAME.artistProfile.profilePic?GAME.artistProfile.profilePic:'🎤';
   const picStyle=GAME.artistProfile&&GAME.artistProfile.profilePicType==='image'?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:'';
-  const handle=(S.name||'artist').toLowerCase().replace(/\s+/g,'');
+  const handle=(S.artistName||'artist').toLowerCase().replace(/\s+/g,'');
   const html=SOUNDPUFF_CSS+`<div class="sp">
     <div class="head"><button onclick="closeSoundPuff()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
     <div class="stab">
@@ -20672,7 +20564,7 @@ function showSoundPuffYou(){
       <span class="on" onclick="spSwitch('you',this)">You</span>
     </div>
     <div class="scroll">
-      <div class="phero"><div class="pav" style="${picStyle}">${picStyle?'':picEmoji}</div><div><b style="font-size:17px">${S.name||'Your Artist'}</b><div style="font-size:11.5px;opacity:.8">soundpuff.com/${handle}</div></div></div>
+      <div class="phero"><div class="pav" style="${picStyle}">${picStyle?'':picEmoji}</div><div><b style="font-size:17px">${S.artistName||'Your Artist'}</b><div style="font-size:11.5px;opacity:.8">soundpuff.com/${handle}</div></div></div>
       <div class="pstats"><div><b>${releasedSongs.length}</b><span>Tracks</span></div><div><b>${followers>=1000?Math.floor(followers/1000)+'K':followers}</b><span>Followers</span></div><div><b>${following}</b><span>Following</span></div></div>
       ${myTracksHTML}
     </div>
@@ -20724,9 +20616,9 @@ function showiTunesUI(){
   const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.itunes||0)-(a.platforms&&a.platforms.itunes||0));
   let allSongs=[];
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(releasedSongs.map(s=>({...s,artistName:S.name}))).sort((a,b)=>(b.platforms&&b.platforms.itunes||0)-(a.platforms&&a.platforms.itunes||0)).slice(0,20);
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(releasedSongs.map(s=>({...s,artistName:S.artistName}))).sort((a,b)=>(b.platforms&&b.platforms.itunes||0)-(a.platforms&&a.platforms.itunes||0)).slice(0,20);
   }else{
-    allSongs=releasedSongs.slice(0,20).map(s=>({...s,artistName:S.name}));
+    allSongs=releasedSongs.slice(0,20).map(s=>({...s,artistName:S.artistName}));
   }
   // Simulate player balance for purchases
   const playerBalance=Math.floor((GAME.money||0)*0.001)||42.18;
@@ -20738,7 +20630,7 @@ function showiTunesUI(){
   if(featuredSong){
     const cover=featuredSong.cover||'🎵';
     const coverStyle=featuredSong.coverImage?`background-image:url('${featuredSong.coverImage}');background-size:cover;background-position:center`:'background:linear-gradient(135deg,#1e3a5e,#0e1a2e)';
-    bannerHTML=`<div class="banner"><div class="cover" style="${coverStyle}">${featuredSong.coverImage?'':cover}</div><div><div class="tag">LATEST RELEASE</div><h3>${featuredRel.title}</h3><p>${S.name} · Week ${GAME.day?Math.ceil(GAME.day/7):1}</p></div><button class="pre" onclick="imBuy(this,9.99,'Pre-ordered ✓')">$9.99</button></div>`;
+    bannerHTML=`<div class="banner"><div class="cover" style="${coverStyle}">${featuredSong.coverImage?'':cover}</div><div><div class="tag">LATEST RELEASE</div><h3>${featuredRel.title}</h3><p>${S.artistName} · Week ${GAME.day?Math.ceil(GAME.day/7):1}</p></div><button class="pre" onclick="imBuy(this,9.99,'Pre-ordered ✓')">$9.99</button></div>`;
   }
   let topSongsHTML='';
   allSongs.slice(0,10).forEach((song,i)=>{
@@ -20756,7 +20648,7 @@ function showiTunesUI(){
     const fs=rel.songs[0];
     const cover=fs&&fs.cover?fs.cover:'🎵';
     const coverStyle=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'background:linear-gradient(135deg,#2a4a7e,#1a2a4e)';
-    albumsHTML+=`<div class="alb2" onclick="showReleaseStats(${rel.id},'itunes')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.name}</span><div class="pr">$7.99</div></div>`;
+    albumsHTML+=`<div class="alb2" onclick="showReleaseStats(${rel.id},'itunes')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.artistName}</span><div class="pr">$7.99</div></div>`;
   });
   const html=IMUSIC_CSS+`<div class="im"><div class="scroll">
     <div class="head"><button onclick="closeiTunes()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 10px 0 0;line-height:1">←</button><h2>iMusic Store</h2><span>Balance: $<b id="imBal">${playerBalance.toFixed(2)}</b></span></div>
