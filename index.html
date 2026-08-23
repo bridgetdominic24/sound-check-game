@@ -3111,6 +3111,7 @@ async function onAuthSuccess(){
                     buzz:gd.buzz||0,totalStreams:(gd.songs||[]).reduce(function(s,sg){return s+(sg.streams||0);},0) + (gd.releases||[]).reduce(function(s,r){return s+((r.songs||[]).reduce(function(ss,song){return ss+(song.streams||0);},0));},0),
                     totalFans:Object.values(gd.fansByRegion||{}).reduce(function(s,v){return s+v;},0),
                     songs:(gd.songs||[]).filter(function(s){return s.released;}).length,
+                    gameSongs:(gd.songs||[]).filter(function(s){return s.released;}).map(function(s){return{id:s.id,title:s.title,streams:s.streams||0,cover:s.cover,genre:s.genre,releaseDay:s.releaseDay,chartPosition:s.chartPosition,peakPosition:s.peakPosition,weeksOnChart:s.weeksOnChart,collabs:s.collabs,lyrics:s.lyrics};}).sort(function(a,b){return(b.streams||0)-(a.streams||0);}),
                     online:p.online,joinedPlatforms:gd.joinedPlatforms||{},
                     socialPosts:(gd.socialPosts||[]).slice(-10),socialUsernames:gd.socialUsernames||{},
                     social:gd.social||{},profilePic:(gd.artistProfile||{}).profilePic||null,
@@ -19955,10 +19956,13 @@ function showLoopifyHome(){
     chartHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${song.artistId}')"><div class="pos">${idx+1}</div><div class="mv ${movementClass}">${movement}</div><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><div class="strm">${streamStr}</div><div class="dots">⋮</div></div>`;
   });
   // Popular artists — always show current user first
-  let popularArtistsHTML=`<div class="pcard" onclick="loopShowArtist('${currentUser?.id}')"><div class="cover" style="border-radius:50%;background:#535353;color:#fff;font-size:28px;font-weight:700">${(S.artistName||'?').charAt(0).toUpperCase()}</div><b>${S.artistName}</b><span>Artist</span></div>`;
+  const myTotalStreams=GAME.songs.reduce((s,sg)=>s+(sg.streams||0),0);
+  const myListeners=myTotalStreams>=1000000?(myTotalStreams/1000000).toFixed(1)+'M':myTotalStreams>=1000?Math.round(myTotalStreams/1000)+'K':myTotalStreams||'New';
+  let popularArtistsHTML=`<div class="pcard" onclick="loopShowArtist('${currentUser?.id}')"><div class="cover" style="border-radius:50%;background:#535353;color:#fff;font-size:28px;font-weight:700">${(S.artistName||'?').charAt(0).toUpperCase()}</div><b>${S.artistName}</b><span>${myListeners} listeners</span></div>`;
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    window.allPlayers.filter(p=>p.id!==currentUser?.id).slice(0,2).forEach(p=>{
-      popularArtistsHTML+=`<div class="pcard" onclick="loopShowArtist('${p.id}')"><div class="cover" style="border-radius:50%;background:#535353;color:#fff;font-size:28px;font-weight:700">${(p.artistName||p.name||'?').charAt(0).toUpperCase()}</div><b>${p.artistName||p.name||'Artist'}</b><span>Artist</span></div>`;
+    window.allPlayers.filter(p=>p.id!==currentUser?.id).slice(0,5).forEach(p=>{
+      const pStr=p.totalStreams>=1000000?(p.totalStreams/1000000).toFixed(1)+'M':p.totalStreams>=1000?Math.round(p.totalStreams/1000)+'K':p.totalStreams||'New';
+      popularArtistsHTML+=`<div class="pcard" onclick="loopShowArtist('${p.id}')"><div class="cover" style="border-radius:50%;background:#535353;color:#fff;font-size:28px;font-weight:700">${(p.artistName||p.name||'?').charAt(0).toUpperCase()}</div><b>${p.artistName||p.name||'Artist'}</b><span>${pStr} listeners</span></div>`;
     });
   }
   const hr=new Date().getHours();const tod=hr<12?'morning':hr<18?'afternoon':'evening';
@@ -19967,13 +19971,21 @@ function showLoopifyHome(){
 }
 function showLoopifySearch(){let html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">←</button><h2>Search</h2><div class="ic"></div></div><div class="srchbox">${getSVG('search','18px')}<input type="text" placeholder="Artists, songs, or albums" oninput="loopFilterSearch(this.value)"></div><div id="loopSearchResults" style="display:none"></div><div class="sect">Browse all</div><div class="ggrid"><div class="gcard" style="background:#8a2a4a">R&amp;B</div><div class="gcard" style="background:#2a6a4a">Afrobeats</div><div class="gcard" style="background:#3d3d8a">Pop</div><div class="gcard" style="background:#8a5a2a">Hip-Hop</div><div class="gcard" style="background:#2a3a6a">Dance</div><div class="gcard" style="background:#4a2a6a">Alternative</div></div><div class="foot"><div class="bnav"><div onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div class="on" onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;_insertOverlay(html);}
 function showLoopifyLibrary(){const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));let libraryHTML='';releasedSongs.forEach(song=>{libraryHTML+=`<div class="librow" onclick="loopShowTrack('${song.id}','${currentUser?.id}')"><div class="cover" style="display:flex;align-items:center;justify-content:center;font-size:20px">&#9834;</div><div><b>${song.title}</b><span>Song · ${S.artistName}</span></div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="libhead"><div class="me">${(S.artistName||"?").charAt(0).toUpperCase()}</div><h2>Your Library</h2><span style="font-size:18px;cursor:pointer">+</span></div><div class="filters"><span class="on">Playlists</span><span>Artists</span><span>Albums</span></div>${releasedSongs.length>0?libraryHTML:'<div style="text-align:center;padding:40px 20px;color:#a7a7a7">No songs released yet</div>'}<div class="foot"><div class="bnav"><div onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div class="on" onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;_insertOverlay(html);}
-function showLoopifyArtistProfile(artistId){let player;if(artistId===currentUser?.id){const totalStreams=GAME.songs.reduce((sum,s)=>sum+(s.streams||0),0);player={id:currentUser?.id,artistName:S.artistName,bio:GAME.artistProfile?.bio,totalStreams};}else{player=window.allPlayers?.find(p=>p.id===artistId)||null;}if(!player){showToast('Artist not found','error');return;}const songs=(artistId===currentUser?.id?GAME.songs:(Array.isArray(player.gameSongs)?player.gameSongs:[])).filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,10);let popularHTML='';songs.forEach((song,idx)=>{const ls=Math.floor((song.streams||0)*0.42);const lsStr=ls>=1000000?(ls/1000000).toFixed(1)+'M':ls>=1000?Math.floor(ls/1000)+'K':ls.toString();popularHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${artistId}')"><div class="pos">${idx+1}</div><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${lsStr}</span></div><div class="dots">⋮</div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="ahero"><button class="back" onclick="loopSwitchView('home')">←</button><div class="verif">✓ Verified Artist</div><h3>${player.artistName}</h3><div style="font-size:11.5px;color:#d0d0d0;margin-top:2px">${player.totalStreams?Math.round(player.totalStreams).toLocaleString()+' monthly listeners':'New artist'}</div></div><div class="actions"><button class="follow" onclick="loopToggleFollow('${artistId}',this)">Follow</button><span class="dots" style="display:inline-flex">${getSVG('dots','18px')}</span><span class="shuf" style="font-size:19px;color:#a7a7a7;margin-left:auto;cursor:pointer">&#8644;</span><button class="play" onclick="togglePlay(this)" style="display:flex;align-items:center;justify-content:center">${getSVG('play','18px')}</button></div><div class="sect">Popular</div>${popularHTML}${player.bio?`<div class="aboutcard"><h4>About</h4><p>${player.bio}</p></div>`:''}<div class="foot"><div class="bnav"><div onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;_insertOverlay(html);}
+function showLoopifyArtistProfile(artistId){let player;if(artistId===currentUser?.id){const totalStreams=GAME.songs.reduce((sum,s)=>sum+(s.streams||0),0);player={id:currentUser?.id,artistName:S.artistName,bio:GAME.artistProfile?.bio,totalStreams};}else{player=window.allPlayers?.find(p=>p.id===artistId)||null;}if(!player){showToast('Artist not found','error');return;}const songs=(artistId===currentUser?.id?GAME.songs:(Array.isArray(player.gameSongs)?player.gameSongs:[])).filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,10);let popularHTML='';songs.forEach((song,idx)=>{const ls=Math.floor((song.streams||0)*0.42);const lsStr=ls>=1000000?(ls/1000000).toFixed(1)+'M':ls>=1000?Math.floor(ls/1000)+'K':ls.toString();popularHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${artistId}')"><div class="pos">${idx+1}</div><div class="cover sm" style="display:flex;align-items:center;justify-content:center;font-size:16px">&#9834;</div><div class="ti"><b>${song.title}</b><span>${lsStr}</span></div><div class="dots">⋮</div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="ahero"><button class="back" onclick="loopSwitchView('home')">←</button><div class="verif">✓ Verified Artist</div><h3>${player.artistName}</h3><div style="font-size:11.5px;color:#d0d0d0;margin-top:2px">${player.totalStreams?Math.round(player.totalStreams).toLocaleString()+' monthly listeners':'New artist'}</div></div><div class="actions"><button class="follow" onclick="loopToggleFollow('${artistId}',this)">Follow</button><span class="dots" style="display:inline-flex">${getSVG('dots','18px')}</span><span class="shuf" style="font-size:19px;color:#a7a7a7;margin-left:auto;cursor:pointer">&#8644;</span><button class="play" onclick="togglePlay(this)" style="display:flex;align-items:center;justify-content:center">${getSVG('play','18px')}</button></div><div class="sect">Popular</div>${popularHTML}${player.bio?`<div class="aboutcard"><h4>About</h4><p>${player.bio}</p></div>`:''}<div class="foot"><div class="bnav"><div onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;_insertOverlay(html);}
 function showLoopifyTrackDetails(songId,artistId){let song,artist;if(artistId===currentUser?.id){song=GAME.songs?.find(s=>s.id===songId);artist={id:currentUser?.id,name:S.artistName};}else{const player=window.allPlayers?.find(p=>p.id===artistId);if(!player){showToast('Artist not found','error');return;}song=player.gameSongs?.find(s=>s.id===songId);artist={id:player.id,name:player.artistName};}if(!song){showToast('Song not found','error');return;}const streams=song.streams||0;const chartRank=song.chartPosition||null;const peakRank=song.peakPosition||null;const weeksOnChart=song.weeksOnChart||0;let creditsHTML='';if(song.collabs&&song.collabs.length>0){creditsHTML='<div class="credits"><h4>Credits</h4>';song.collabs.forEach(collab=>{creditsHTML+=`<div class="cr"><b>${collab.artist||'Unknown'}</b><span>${collab.role||'Collaborator'}</span></div>`;});creditsHTML+='</div>';}let html=LOOPIFY_CSS+`<div class="loop"><div class="thero"><button class="back" onclick="loopSwitchView('artist',this)">←</button><div class="cover">${song.cover||'♫'}</div><h3>${song.title}</h3><div class="a">${artist.name} · Single · 3:42</div></div><div class="actions"><span style="cursor:pointer;color:#a7a7a7;font-size:22px" onclick="this.style.color=this.style.color==='#1fdf64'?'#a7a7a7':'#1fdf64'">&#9825;</span><span style="cursor:pointer;font-size:20px;color:#a7a7a7">&#8599;</span><span class="dots" style="display:inline-flex">${getSVG('dots','18px')}</span><span class="shuf" style="font-size:19px;color:#a7a7a7;margin-left:auto;cursor:pointer">&#8644;</span><button class="play" onclick="togglePlay(this)" style="display:flex;align-items:center;justify-content:center">${getSVG('play','18px')}</button></div>${song.lyrics?`<div class="lyr" onclick="this.classList.toggle('open')"><h4>LYRICS · TAP TO EXPAND</h4><p>${song.lyrics.split('\n')[0]}</p><p class="more">${song.lyrics}</p></div>`:''}${creditsHTML}<div class="credits"><h4>Stats</h4><div class="cr"><b>${streams.toLocaleString()}</b><span>All-time streams</span></div><div class="cr"><b>${chartRank?'#'+chartRank:'—'}</b><span>Peak — Top 50</span></div><div class="cr"><b>${weeksOnChart}</b><span>On chart</span></div></div><div class="foot"><div class="bnav"><div onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;_insertOverlay(html);}
 function loopSwitchView(view,navEl){GAME.loopifyView=view;if(navEl){navEl.parentElement.querySelectorAll('div').forEach(d=>d.classList.remove('on'));navEl.classList.add('on');}showLoopifyUI();}
 function loopShowTrack(songId,artistId){GAME.loopifyView='track';GAME.loopifyTrackId=songId;GAME.loopifyTrackArtistId=artistId;showLoopifyUI();}
 function loopShowArtist(artistId){GAME.loopifyView='artist';GAME.loopifyArtistId=artistId;showLoopifyUI();}
 function loopToggleFollow(artistId,btn){if(!GAME.loopifyFollowing)GAME.loopifyFollowing={};GAME.loopifyFollowing[artistId]=!GAME.loopifyFollowing[artistId];btn.textContent=GAME.loopifyFollowing[artistId]?'Following':'Follow';btn.classList.toggle('f',GAME.loopifyFollowing[artistId]);}
-function loopFilterSearch(query){const resultsDiv=document.getElementById('loopSearchResults');if(!query){resultsDiv.style.display='none';return;}resultsDiv.style.display='block';const q=query.toLowerCase();let html='';const songResults=GAME.songs.filter(s=>s.title.toLowerCase().includes(q)&&s.released);songResults.forEach(song=>{html+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${currentUser?.id}')"><div class="cover sm" style="display:flex;align-items:center;justify-content:center;font-size:18px">&#9834;</div><div class="ti"><b>${song.title}</b><span>Song · ${S.artistName}</span></div></div>`;});if(window.allPlayers){window.allPlayers.forEach(p=>{if(p.artistName.toLowerCase().includes(q)){html=`<div class="chartrow" onclick="loopShowArtist('${p.id}')"><div class="cover sm" style="border-radius:50%;background:#535353;color:#fff;font-size:16px;font-weight:700">${(p.artistName||'?').charAt(0).toUpperCase()}</div><div class="ti"><b>${p.artistName}</b><span>Artist</span></div></div>`+html;}});}resultsDiv.innerHTML=html||'<div style="text-align:center;padding:20px;color:#a7a7a7">No results</div>';}
+function loopFilterSearch(query){const resultsDiv=document.getElementById('loopSearchResults');if(!query){resultsDiv.style.display='none';return;}resultsDiv.style.display='block';const q=query.toLowerCase();let html='';
+// Own songs
+GAME.songs.filter(s=>s.title.toLowerCase().includes(q)&&s.released).forEach(song=>{html+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${currentUser?.id}')"><div class="cover sm" style="display:flex;align-items:center;justify-content:center;font-size:18px">&#9834;</div><div class="ti"><b>${song.title}</b><span>Song · ${S.artistName}</span></div></div>`;});
+// Other players' songs
+if(window.allPlayers){window.allPlayers.forEach(p=>{
+  if(p.artistName.toLowerCase().includes(q)){html=`<div class="chartrow" onclick="loopShowArtist('${p.id}')"><div class="cover sm" style="border-radius:50%;background:#535353;color:#fff;font-size:16px;font-weight:700">${(p.artistName||'?').charAt(0).toUpperCase()}</div><div class="ti"><b>${p.artistName}</b><span>Artist</span></div></div>`+html;}
+  (p.gameSongs||[]).filter(s=>s.title.toLowerCase().includes(q)).forEach(song=>{html+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${p.id}')"><div class="cover sm" style="display:flex;align-items:center;justify-content:center;font-size:18px">&#9834;</div><div class="ti"><b>${song.title}</b><span>Song · ${p.artistName}</span></div></div>`;});
+});}
+resultsDiv.innerHTML=html||'<div style="text-align:center;padding:20px;color:#a7a7a7">No results</div>';}
 function togglePlay(el){el.textContent=el.textContent.trim()==='▶'?'⏸':'▶';}
 function closeLoopify(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
 
@@ -20195,26 +20207,35 @@ function showYourtubeHome(){
   GAME.yourtubeMusicView='home';
   const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));
   const topSong=releasedSongs[0];
-  // "Listen again" — horizontal cards of released songs
+  // Build mixed "Listen again" from own + other players
+  const allReleasedForYT=[];
+  releasedSongs.forEach(song=>allReleasedForYT.push({...song,ownerName:S.artistName||'You',ownerId:currentUser?.id}));
+  if(window.allPlayers&&Array.isArray(window.allPlayers)){
+    window.allPlayers.forEach(p=>{
+      (p.gameSongs||[]).forEach(song=>allReleasedForYT.push({...song,ownerName:p.artistName||'Artist',ownerId:p.id}));
+    });
+  }
+  allReleasedForYT.sort((a,b)=>(b.streams||0)-(a.streams||0));
+  // "Listen again" — horizontal cards
   let listenHTML='';
-  if(releasedSongs.length===0){
+  if(allReleasedForYT.length===0){
     listenHTML='<div style="padding:0 16px 18px;color:#aaa;font-size:13px">Release your first song to see it here.</div>';
   }else{
-    releasedSongs.slice(0,8).forEach(song=>{
-      const ytViews=song.platforms&&song.platforms.youtube?song.platforms.youtube:Math.floor((song.streams||0)*0.15);
-      const viewStr=ytViews>=1000000?(ytViews/1000000).toFixed(1)+'M':ytViews>=1000?Math.floor(ytViews/1000)+'K':ytViews||'—';
+    allReleasedForYT.slice(0,10).forEach(song=>{
+      const ytViews=Math.floor((song.streams||0)*0.15);
+      const viewStr=ytViews>=1000000?(ytViews/1000000).toFixed(1)+'M':ytViews>=1000?Math.round(ytViews/1000)+'K':ytViews||'—';
       const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
-      listenHTML+=`<div class="mcard" onclick=""><div class="cov" style="${cs}">${song.coverImage?'':song.cover||'♫'}</div><b>${song.title}</b><span>${S.artistName||'You'} · ${viewStr} plays</span></div>`;
+      listenHTML+=`<div class="mcard" onclick="ytShowTrack('${song.id}','${song.ownerId}')"><div class="cov" style="${cs}">${song.coverImage?'':'&#9834;'}</div><b>${song.title}</b><span>${song.ownerName} · ${viewStr} plays</span></div>`;
     });
     listenHTML=`<div class="hrow">${listenHTML}</div>`;
   }
-  // "Quick picks" — list of top songs
+  // "Quick picks" — mixed list
   let picksHTML='';
-  releasedSongs.slice(0,6).forEach((song,i)=>{
-    const ytViews=song.platforms&&song.platforms.youtube?song.platforms.youtube:Math.floor((song.streams||0)*0.15);
-    const viewStr=ytViews>=1000000?(ytViews/1000000).toFixed(1)+'M':ytViews>=1000?Math.floor(ytViews/1000)+'K':ytViews||'—';
+  allReleasedForYT.slice(0,8).forEach(song=>{
+    const ytViews=Math.floor((song.streams||0)*0.15);
+    const viewStr=ytViews>=1000000?(ytViews/1000000).toFixed(1)+'M':ytViews>=1000?Math.round(ytViews/1000)+'K':ytViews||'—';
     const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
-    picksHTML+=`<div class="qrow" onclick=""><div class="cov" style="${cs}">${song.coverImage?'':song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${S.artistName||'You'} · ${viewStr} plays</span></div><div class="more">⋮</div></div>`;
+    picksHTML+=`<div class="qrow" onclick="ytShowTrack('${song.id}','${song.ownerId}')"><div class="cov" style="${cs}">${song.coverImage?'':'&#9834;'}</div><div class="ti"><b>${song.title}</b><span>${song.ownerName} · ${viewStr} plays</span></div><div class="more" style="display:inline-flex">${getSVG('dots','18px')}</div></div>`;
   });
   if(!picksHTML)picksHTML='<div style="text-align:center;padding:30px;color:#aaa;font-size:13px">No songs yet — release music to fill this in.</div>';
   // New releases — horizontal album/ep/single cards from releases
@@ -20272,18 +20293,27 @@ function showYourtubeLibrary(){
   const recentRels=(GAME.releases||[]).filter(r=>r.songs&&r.songs.length>0).sort((a,b)=>b.releaseDay-a.releaseDay);
   let tracksHTML='';
   releasedSongs.forEach(song=>{
-    const ytViews=song.platforms&&song.platforms.youtube?song.platforms.youtube:Math.floor((song.streams||0)*0.15);
-    const viewStr=ytViews>=1000000?(ytViews/1000000).toFixed(1)+'M':ytViews>=1000?Math.floor(ytViews/1000)+'K':ytViews||'—';
+    const ytViews=Math.floor((song.streams||0)*0.15);
+    const viewStr=ytViews>=1000000?(ytViews/1000000).toFixed(1)+'M':ytViews>=1000?Math.round(ytViews/1000)+'K':ytViews||'—';
     const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
-    tracksHTML+=`<div class="lrow" onclick=""><div class="cov" style="${cs}">${song.coverImage?'':song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${S.artistName||'You'} · ${viewStr} plays</span></div><div class="more">⋮</div></div>`;
+    tracksHTML+=`<div class="lrow" onclick="ytShowTrack('${song.id}','${currentUser?.id}')"><div class="cov" style="${cs}">${song.coverImage?'':'&#9834;'}</div><div class="ti"><b>${song.title}</b><span>${S.artistName||'You'} · ${viewStr} plays</span></div><div class="more" style="display:inline-flex">${getSVG('dots','18px')}</div></div>`;
   });
   if(!tracksHTML)tracksHTML='<div style="text-align:center;padding:40px 16px;color:#aaa;font-size:13px">No songs released yet.</div>';
+  // Other players' trending
+  let trendHTML='';
+  if(window.allPlayers&&Array.isArray(window.allPlayers)){
+    window.allPlayers.forEach(p=>{(p.gameSongs||[]).slice(0,2).forEach(song=>{
+      const ytV=Math.floor((song.streams||0)*0.15);const vStr=ytV>=1000000?(ytV/1000000).toFixed(1)+'M':ytV>=1000?Math.round(ytV/1000)+'K':ytV||'—';
+      trendHTML+=`<div class="lrow" onclick="ytShowTrack('${song.id}','${p.id}')"><div class="cov" style="display:flex;align-items:center;justify-content:center;font-size:18px">&#9834;</div><div class="ti"><b>${song.title}</b><span>${p.artistName} · ${vStr} plays</span></div></div>`;
+    });});
+  }
   const html=YOURTUBE_CSS+`<div class="ytm">
     <div class="head"><button class="back" onclick="closeYourtubeMusicToStreaming()">←</button><div class="logo"><span class="yt-icon">&#9654;</span><span class="yt-text"> Music</span></div><div class="ic"><button onclick="ytSwitch('search',this)" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px;display:flex;align-items:center">${getSVG('search','20px')}</button><button onclick="showYtMusicProfile()" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px;display:flex;align-items:center">${getSVG('profile','20px')}</button></div></div>
     <div style="padding:4px 16px 14px;font-size:22px;font-weight:500">Library</div>
     <div class="chips"><span class="on">Playlists</span><span>Albums</span><span>Songs</span><span>Artists</span></div>
     <div class="sect">Your songs</div>
     ${tracksHTML}
+    ${trendHTML?`<div class="sect">Trending from artists</div>${trendHTML}`:''}
     <div class="foot"><div class="bnav"><div onclick="ytSwitch('home',this)">${getSVG('home','22px')}<span>Home</span></div><div onclick="ytSwitch('shorts',this)">${getSVG('search','22px')}<span>Explore</span></div><div class="on" onclick="ytSwitch('subs',this)">${getSVG('library','22px')}<span>Library</span></div></div></div>
   </div>`;
   _insertOverlay(html);
@@ -20316,6 +20346,42 @@ function ytFilterSearch(q){
 function showYourtubeShorts(){showYourtubeExplore();}
 function showYourtubeSubs(){showYourtubeLibrary();}
 
+function ytShowTrack(songId,ownerId){
+  let song, ownerName;
+  if(ownerId===currentUser?.id){
+    song=GAME.songs?.find(s=>s.id===songId||s.id==songId);
+    ownerName=S.artistName||'You';
+  }else{
+    const p=window.allPlayers?.find(pl=>pl.id===ownerId);
+    song=p?.gameSongs?.find(s=>s.id===songId||s.id==songId);
+    ownerName=p?.artistName||'Artist';
+  }
+  if(!song){showToast('Song not found','error');return;}
+  const ytV=Math.floor((song.streams||0)*0.15);
+  const vStr=ytV>=1000000?(ytV/1000000).toFixed(1)+'M':ytV>=1000?Math.round(ytV/1000)+'K':ytV||'—';
+  const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
+  const lyrHTML=song.lyrics?`<div style="margin:0 16px;background:#1a1a1a;border-radius:10px;padding:14px;cursor:pointer" onclick="this.style.whiteSpace=this.style.whiteSpace==='normal'?'nowrap':'normal'"><div style="font-size:11px;letter-spacing:1px;font-weight:700;opacity:.7;margin-bottom:8px">LYRICS</div><div style="font-size:14px;line-height:1.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e0e0e0">${song.lyrics.replace(/\n/g,'<br>')}</div></div>`:'';
+  const html=YOURTUBE_CSS+`<div class="ytm"><div style="padding:16px 16px 0;display:flex;align-items:center;gap:10px"><button onclick="ytSwitch('home',null)" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;line-height:1">←</button><span style="color:#aaa;font-size:13px">Now playing</span></div><div style="padding:20px 16px;text-align:center"><div style="width:200px;height:200px;border-radius:10px;margin:0 auto 16px;background:#212121;display:flex;align-items:center;justify-content:center;font-size:64px;${cs}">&#9834;</div><div style="font-size:20px;font-weight:600;margin-bottom:6px">${song.title}</div><div style="font-size:14px;color:#aaa;cursor:pointer" onclick="ytShowArtist('${ownerId}')">${ownerName}</div></div><div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 20px"><span style="color:#aaa;cursor:pointer;font-size:24px" onclick="this.style.color=this.style.color==='#ff0000'?'#aaa':'#ff0000'">&#9825;</span><span style="cursor:pointer;font-size:28px" onclick="this.textContent=this.textContent==='&#9654;'?'&#9646;&#9646;':'&#9654;'">&#9654;</span><span style="color:#aaa;cursor:pointer;font-size:20px">&#8599;</span></div><div style="margin:0 16px;background:#1a1a1a;border-radius:10px;padding:14px;margin-bottom:12px"><div style="font-size:11px;color:#aaa;letter-spacing:1px;font-weight:700;margin-bottom:8px">STATS</div><div style="display:flex;justify-content:space-around;text-align:center"><div><div style="font-size:18px;font-weight:600">${vStr}</div><div style="font-size:11px;color:#aaa">YT plays</div></div><div><div style="font-size:18px;font-weight:600">${song.chartPosition?'#'+song.chartPosition:'—'}</div><div style="font-size:11px;color:#aaa">Chart rank</div></div><div><div style="font-size:18px;font-weight:600">${song.weeksOnChart||0}</div><div style="font-size:11px;color:#aaa">Weeks charted</div></div></div></div>${lyrHTML}<div class="foot" style="padding-top:12px"><div class="bnav"><div onclick="ytSwitch('home',this)">${getSVG('home','22px')}<span>Home</span></div><div onclick="ytSwitch('shorts',this)">${getSVG('search','22px')}<span>Explore</span></div><div onclick="ytSwitch('subs',this)">${getSVG('library','22px')}<span>Library</span></div></div></div></div>`;
+  _insertOverlay(html);
+}
+function ytShowArtist(artistId){
+  let player;
+  if(artistId===currentUser?.id){
+    const ts=GAME.songs.reduce((s,sg)=>s+(sg.streams||0),0);
+    player={id:currentUser?.id,artistName:S.artistName,bio:GAME.artistProfile?.bio,totalStreams:ts,gameSongs:GAME.songs.filter(s=>s.released)};
+  }else{
+    player=window.allPlayers?.find(p=>p.id===artistId);
+  }
+  if(!player){showToast('Artist not found','error');return;}
+  const ts=player.totalStreams||0;
+  const ytT=Math.floor(ts*0.15);
+  const ytStr=ytT>=1000000?(ytT/1000000).toFixed(1)+'M':ytT>=1000?Math.round(ytT/1000)+'K':ytT||'—';
+  const songs=(player.gameSongs||[]).slice(0,10);
+  let songsH=songs.map(song=>{const v=Math.floor((song.streams||0)*0.15);const vs=v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?Math.round(v/1000)+'K':v||'—';return`<div class="qrow" onclick="ytShowTrack('${song.id}','${player.id}')"><div class="cov" style="display:flex;align-items:center;justify-content:center;font-size:18px">&#9834;</div><div class="ti"><b>${song.title}</b><span>${vs} plays</span></div></div>`;}).join('');
+  if(!songsH)songsH='<div style="text-align:center;padding:20px;color:#aaa;font-size:13px">No songs on Yourtube Music yet.</div>';
+  const html=YOURTUBE_CSS+`<div class="ytm"><div class="head"><button onclick="ytSwitch('home',null)" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;line-height:1">←</button><div class="logo" style="flex:1;padding-left:8px"><span style="font-size:15px;font-weight:500">${player.artistName}</span></div><button onclick="loopToggleFollow('${player.id}',this)" style="background:none;border:1px solid #aaa;color:#fff;border-radius:4px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:inherit">Follow</button></div><div style="padding:16px;display:flex;align-items:center;gap:14px"><div style="width:70px;height:70px;border-radius:50%;background:#ff0000;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff">${(player.artistName||'?').charAt(0).toUpperCase()}</div><div><div style="font-size:20px;font-weight:600">${player.artistName}</div><div style="font-size:13px;color:#aaa;margin-top:4px">${ytStr} Yourtube plays</div>${player.bio?`<div style="font-size:12px;color:#aaa;margin-top:4px">${player.bio}</div>`:''}</div></div><div class="sect">Songs</div>${songsH}<div class="foot" style="padding-top:12px"><div class="bnav"><div onclick="ytSwitch('home',this)">${getSVG('home','22px')}<span>Home</span></div><div onclick="ytSwitch('shorts',this)">${getSVG('search','22px')}<span>Explore</span></div><div onclick="ytSwitch('subs',this)">${getSVG('library','22px')}<span>Library</span></div></div></div></div>`;
+  _insertOverlay(html);
+}
 function ytSwitch(view,el){GAME.yourtubeMusicView=view;if(view==='search'){showYtMusicSearchView();}else{showYourtubeMusicUI();}}
 function closeYourtubeMusicToStreaming(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
 function editYourtubeMusicProfile(){}
@@ -21587,7 +21653,10 @@ async function loadPentagramFeed(){
           email: p.email,
           socialPosts: p.game_data && p.game_data.socialPosts ? p.game_data.socialPosts : [],
           socialUsernames: p.game_data && p.game_data.socialUsernames ? p.game_data.socialUsernames : {},
-          profilePic: p.game_data && p.game_data.artistProfile && p.game_data.artistProfile.profilePic ? p.game_data.artistProfile.profilePic : null
+          profilePic: p.game_data && p.game_data.artistProfile && p.game_data.artistProfile.profilePic ? p.game_data.artistProfile.profilePic : null,
+          gameSongs: p.game_data && p.game_data.songs ? p.game_data.songs.filter(function(s){return s.released;}).map(function(s){return{id:s.id,title:s.title,streams:s.streams||0,cover:s.cover,genre:s.genre,releaseDay:s.releaseDay,chartPosition:s.chartPosition,peakPosition:s.peakPosition,weeksOnChart:s.weeksOnChart,collabs:s.collabs,lyrics:s.lyrics};}).sort(function(a,b){return(b.streams||0)-(a.streams||0);}) : [],
+          totalStreams: p.game_data && p.game_data.songs ? p.game_data.songs.reduce(function(s,sg){return s+(sg.streams||0);},0) : 0,
+          bio: p.game_data && p.game_data.artistProfile ? p.game_data.artistProfile.bio || '' : ''
         };
       });
     }
