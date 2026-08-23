@@ -19934,115 +19934,212 @@ function loopFilterSearch(query){const resultsDiv=document.getElementById('loopS
 function togglePlay(el){el.textContent=el.textContent.trim()==='▶'?'⏸':'▶';}
 function closeLoopify(){closeOverlay();}
 
+// ════════════════════════════════════════════════════════════════════════════
+// ORANGE MUSIC — Apple Music-style (blueprint v3)
+// ════════════════════════════════════════════════════════════════════════════
+const ORANGE_CSS=`<style>
+.org{background:#fff;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100%;padding-bottom:110px;position:relative;}
+.org .scroll{padding-bottom:110px;}
+.org .head{padding:16px 16px 4px;display:flex;justify-content:space-between;align-items:center;}
+.org .head h2{font-size:29px;font-weight:800;letter-spacing:-.6px;}
+.org .head .me{width:30px;height:30px;border-radius:50%;background:#fa4b2a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;}
+.org .card2{margin:12px 16px;border-radius:16px;background:linear-gradient(135deg,#fa4b2a,#ff8a3d);color:#fff;padding:18px;position:relative;overflow:hidden;}
+.org .card2 .tag{font-size:10px;font-weight:800;letter-spacing:1px;opacity:.85;}
+.org .card2 h3{font-size:20px;font-weight:800;margin-top:4px;}
+.org .card2 p{font-size:12px;opacity:.92;margin-top:3px;max-width:75%;}
+.org .card2 .pl{position:absolute;right:14px;bottom:14px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:15px;border:none;color:#fff;cursor:pointer;}
+.org .sect{padding:14px 16px 8px;font-size:17px;font-weight:800;display:flex;justify-content:space-between;align-items:baseline;}
+.org .sect a{font-size:12px;color:#fa4b2a;font-weight:600;text-decoration:none;cursor:pointer;}
+.org .hrow{display:flex;gap:12px;overflow-x:auto;padding:0 16px 8px;-webkit-overflow-scrolling:touch;}
+.org .alb{flex:none;width:124px;cursor:pointer;}
+.org .alb .cover{width:124px;height:124px;border-radius:10px;font-size:42px;box-shadow:0 3px 12px rgba(0,0,0,.16);color:#fff;background:#e5e5ea;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.org .alb b{display:block;font-size:12.5px;margin-top:7px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.org .alb span{font-size:11.5px;color:#86868b;}
+.org .chartrow{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #f0f0f2;cursor:pointer;}
+.org .chartrow:active{background:#f5f5f7;}
+.org .pos{width:20px;font-weight:800;font-size:15px;color:#1d1d1f;}
+.org .cover.sm{width:46px;height:46px;font-size:19px;color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+.org .ti{flex:1;min-width:0;}.org .ti b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.org .ti span{font-size:12px;color:#86868b;}
+.org .add{background:none;border:none;font-size:18px;color:#fa4b2a;cursor:pointer;}
+.org .radiohero{margin:12px 16px;border-radius:16px;background:linear-gradient(135deg,#1d1d1f,#4a4a52);color:#fff;padding:20px;}
+.org .radiohero .live{font-size:9px;font-weight:800;background:#fa4b2a;border-radius:3px;padding:2px 6px;letter-spacing:1px;}
+.org .radiohero h3{font-size:19px;font-weight:800;margin-top:8px;}
+.org .radiohero p{font-size:12px;opacity:.8;margin-top:3px;}
+.org .librow2{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f0f0f2;font-size:15px;font-weight:600;cursor:pointer;}
+.org .librow2 i{font-style:normal;color:#fa4b2a;width:22px;text-align:center;}
+.org .librow2 s{margin-left:auto;color:#c7c7cc;text-decoration:none;}
+.org .npbar{position:sticky;bottom:54px;left:0;right:0;background:rgba(255,255,255,.97);border-top:1px solid #e5e5ea;display:flex;align-items:center;gap:10px;padding:8px 14px;z-index:5;}
+.org .npbar .cover{width:36px;height:36px;font-size:15px;background:linear-gradient(135deg,#5a3d8a,#2a1d4a);color:#fff;border-radius:4px;display:flex;align-items:center;justify-content:center;}
+.org .npbar b{flex:1;font-size:13px;font-weight:600;}
+.org .npbar .ctrl{display:flex;gap:18px;font-size:16px;}
+.org .npbar .ctrl span{cursor:pointer;}
+.org .bnav{position:sticky;bottom:0;left:0;right:0;height:54px;background:rgba(250,250,250,.96);border-top:1px solid #e5e5ea;display:flex;z-index:6;}
+.org .bnav div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9px;color:#86868b;cursor:pointer;}
+.org .bnav div.on{color:#fa4b2a;}
+.org .bnav div i{font-style:normal;font-size:16px;}
+</style>`;
+
 function showOrangeMusicUI(){
-  if(!GAME.artistProfile){GAME.artistProfile={profilePic:'👤',profilePicType:'emoji',banner:'gradient1',bannerType:'gradient',bio:'An artist on the rise.'}}
-  const releasedSongs=GAME.songs.filter(s=>s.released);
-  const totalStreams=releasedSongs.reduce((sum,s)=>sum+s.platforms.apple,0);
-  
-  let html=`<style>
-  .am-container{background:#fff;height:100%;overflow-y:auto;color:#000;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding-bottom:80px}
-  .am-header{padding:200px 16px 16px;position:relative;background:#f5f5f7}
-  .am-banner{position:absolute;top:0;left:0;right:0;height:250px;background-size:cover;background-position:center;opacity:0.4}
-  .am-name{font-size:34px;font-weight:700;margin-bottom:8px}
-  .am-artist{font-size:13px;color:#86868b;margin-bottom:16px}
-  .am-play-btn{width:48px;height:48px;background:#fa243c;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;margin-bottom:24px}
-  .am-section{padding:16px}
-  .am-section-title{font-size:20px;font-weight:700;margin-bottom:12px}
-  .am-track{display:flex;align-items:center;padding:8px 0;gap:12px}
-  .am-track-num{width:24px;text-align:center;color:#86868b;font-size:14px}
-  .am-album{width:40px;height:40px;background:#e5e5ea;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px}
-  .am-info{flex:1}
-  .am-title{font-size:15px;font-weight:500;margin-bottom:2px}
-  .am-plays{font-size:13px;color:#86868b}
-  </style>
-  <div class="am-container">
-    <div style="position:fixed;top:12px;left:12px;z-index:200"><button onclick="closeOrangeMusic()" style="background:rgba(0,0,0,0.3);border:none;border-radius:50%;width:32px;height:32px;color:#fff;font-size:20px">←</button></div>
-    <div class="am-header">
-      <div class="am-banner" style="background-image:${GAME.artistProfile.profilePicType==='image'?`url('${GAME.artistProfile.profilePic}')`:'none'}"></div>
-      <div class="am-name">${S.name||'Your Artist'}</div>
-      <div class="am-artist">Artist</div>
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
-        <div class="am-play-btn">▶</div>
-        <button onclick="editOrangeMusicProfile()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:8px 16px;color:#fff;font-size:13px;cursor:pointer">Edit</button>
-      </div>
-    </div>
-    <div class="am-section"><div class="am-section-title">Songs</div>`;
-  
-  if(releasedSongs.length===0){
-    html+=`<div style="text-align:center;padding:40px 20px;color:#86868b">No songs yet</div>`;
-  }else{
-    // Group by releases
-    const releasesByPopularity=[];
-    const shownReleases=new Set();
-    
-    releasedSongs.sort((a,b)=>b.platforms.apple-a.platforms.apple).forEach(song=>{
-      const release=GAME.releases.find(r=>r.songs&&r.songs.some(s=>s&&s.id===song.id));
-      if(release&&!shownReleases.has(release.id)){
-        shownReleases.add(release.id);
-        const totalStreams=release.songs.reduce((sum,s)=>(sum+(s&&s.platforms&&s.platforms.apple?s.platforms.apple:0)),0);
-        releasesByPopularity.push({release,totalStreams});
-      }
-    });
-    
-    releasesByPopularity.sort((a,b)=>b.totalStreams-a.totalStreams).slice(0,10).forEach((item,i)=>{
-      const release=item.release;
-      const weeks=Math.floor((GAME.day-release.releaseDay)/7);
-      const plays=weeks>=1?item.totalStreams.toLocaleString():'—';
-      const releaseType=release.type==='single'?'':(release.type==='ep'||release.type==='EP'?' · EP':' · Album');
-      const firstSong=release.songs[0];
-      
-      // Get cover - prioritize uploaded image over emoji
-      let cover='';
-      if(firstSong){
-        if(firstSong.coverImage){
-          cover=`<img src="${firstSong.coverImage}" style="width:100%;height:100%;object-fit:cover">`;
-        }else if(firstSong.cover){
-          cover=firstSong.cover; // Emoji fallback
-        }
-      }
-      
-      html+=`<div class="am-track" onclick="showReleaseStats(${release.id},'apple')"><div class="am-track-num">${i+1}</div><div class="am-album">${cover}</div><div class="am-info"><div class="am-title">${release.title}</div><div class="am-plays">${plays}${releaseType}</div></div></div>`;
-    });
+  if(!GAME.loopifyView)GAME.loopifyView='home';
+  if(!GAME.orangeView)GAME.orangeView='browse';
+  switch(GAME.orangeView){
+    case'browse':showOrangeBrowse();break;
+    case'radio':showOrangeRadio();break;
+    case'library':showOrangeLibrary();break;
+    default:showOrangeBrowse();
   }
-  html+=`</div></div>`;
-  
-  document.getElementById('homeScreen').classList.remove('visible');
-  document.getElementById('musicScreen').classList.remove('visible');
-  document.getElementById('discoverScreen').classList.remove('visible');
-  document.getElementById('bottomNav').style.display='none';
-  let screen=document.getElementById('appleMusicScreen');
-  if(!screen){screen=document.createElement('div');screen.id='appleMusicScreen';screen.className='screen';screen.style.cssText='background:#fff;position:absolute;top:0;left:0;width:100%;height:100%;z-index:1000';document.getElementById('phone').appendChild(screen)}
-  screen.innerHTML=html;screen.classList.add('visible');
 }
 
-function closeOrangeMusic(){
-  const screen=document.getElementById('appleMusicScreen');
-  if(screen)screen.classList.remove('visible');
-  document.getElementById('musicScreen').classList.add('visible');
-  document.getElementById('bottomNav').style.display='flex';
-  switchMusicTab('streaming');
+function showOrangeBrowse(){
+  GAME.orangeView='browse';
+  const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.apple||0)-(a.platforms&&a.platforms.apple||0));
+  let allSongs=[];
+  if(window.allPlayers&&Array.isArray(window.allPlayers)){
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown',platform:'apple'}))).concat(releasedSongs.map(s=>({...s,artistName:S.name}))).sort((a,b)=>(b.platforms&&b.platforms.apple||0)-(a.platforms&&a.platforms.apple||0)).slice(0,20);
+  }else{
+    allSongs=releasedSongs.slice(0,20).map(s=>({...s,artistName:S.name}));
+  }
+  let newRelHTML='';
+  const recentRels=(GAME.releases||[]).filter(r=>r.songs&&r.songs.length>0).sort((a,b)=>b.releaseDay-a.releaseDay).slice(0,5);
+  recentRels.forEach(rel=>{
+    const fs=rel.songs[0];
+    const cover=fs&&fs.cover?fs.cover:'🎵';
+    const coverStyle=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
+    newRelHTML+=`<div class="alb" onclick="showReleaseStats(${rel.id},'apple')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.name}</span></div>`;
+  });
+  if(!newRelHTML)newRelHTML='<div style="padding:16px;color:#86868b;font-size:13px">No releases yet</div>';
+  let topSongsHTML='';
+  allSongs.slice(0,10).forEach((song,i)=>{
+    const cover=song.cover||'🎵';
+    const coverStyle=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
+    topSongsHTML+=`<div class="chartrow"><div class="pos">${i+1}</div><div class="cover sm" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><button class="add" onclick="event.stopPropagation();this.textContent=this.textContent==='＋'?'✓':'＋';this.style.color=this.textContent==='✓'?'#4cc98a':'#fa4b2a'">＋</button></div>`;
+  });
+  if(!topSongsHTML)topSongsHTML='<div style="text-align:center;padding:30px;color:#86868b">No songs released yet</div>';
+  const initials=(S.name||'?').charAt(0).toUpperCase();
+  const html=ORANGE_CSS+`<div class="org"><div class="scroll">
+    <div class="head"><h2>Browse</h2><div class="me">${initials}</div></div>
+    <div class="card2"><div class="tag">FEATURED PLAYLIST</div><h3>Top Orange Picks</h3><p>The hottest releases, refreshed every game week.</p><button class="pl" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button></div>
+    <div class="sect">New Releases <a href="#">See All</a></div>
+    <div class="hrow">${newRelHTML}</div>
+    <div class="sect">Top Songs</div>
+    ${topSongsHTML}
+  </div>
+  <div class="npbar"><div class="cover">🎵</div><b>${allSongs[0]?allSongs[0].title:'No songs yet'}</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
+  <div class="bnav">
+    <div onclick="orgSwitch('radio',this)"><i>📻</i>Radio</div>
+    <div class="on" onclick="orgSwitch('browse',this)"><i>▦</i>Browse</div>
+    <div onclick="orgSwitch('library',this)"><i>▤</i>Library</div>
+  </div></div>`;
+  _insertOverlay(html);
 }
 
-function editOrangeMusicProfile(){
-  const input=document.createElement('input');
-  input.type='file';
-  input.accept='image/*';
-  input.onchange=function(e){
-    const file=e.target.files[0];
-    if(!file)return;
-    const reader=new FileReader();
-    reader.onload=function(ev){
-      GAME.artistProfile.profilePic=ev.target.result;
-      GAME.artistProfile.profilePicType='image';
-      showOrangeMusicUI();
-    };
-    reader.readAsDataURL(file);
-  };
-  input.click();
+function showOrangeRadio(){
+  GAME.orangeView='radio';
+  const initials=(S.name||'?').charAt(0).toUpperCase();
+  const html=ORANGE_CSS+`<div class="org"><div class="scroll">
+    <div class="head"><h2>Radio</h2><div class="me">${initials}</div></div>
+    <div class="radiohero"><span class="live">● LIVE</span><h3>Orange Radio 1</h3><p>Now: the hottest player releases, all hour.</p></div>
+    <div class="radiohero" style="background:linear-gradient(135deg,#5a1d3a,#2a0e1c)"><span class="live" style="background:#0071e3">SHOW</span><h3>Chart Show Weekly</h3><p>Counting down the Top 10, every game Sunday.</p></div>
+    <div class="radiohero" style="background:linear-gradient(135deg,#1d3a5a,#0e1c2a)"><span class="live" style="background:#30b0c7">EXCLUSIVE</span><h3>${S.name||'Artist'} Radio</h3><p>Songs in the style of ${S.name||'your sound'} and more.</p></div>
+  </div>
+  <div class="npbar"><div class="cover">📻</div><b>Orange Radio 1</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
+  <div class="bnav">
+    <div class="on" onclick="orgSwitch('radio',this)"><i>📻</i>Radio</div>
+    <div onclick="orgSwitch('browse',this)"><i>▦</i>Browse</div>
+    <div onclick="orgSwitch('library',this)"><i>▤</i>Library</div>
+  </div></div>`;
+  _insertOverlay(html);
 }
+
+function showOrangeLibrary(){
+  GAME.orangeView='library';
+  const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.apple||0)-(a.platforms&&a.platforms.apple||0));
+  let recentHTML='';
+  const recentRels=(GAME.releases||[]).filter(r=>r.songs&&r.songs.length>0).sort((a,b)=>b.releaseDay-a.releaseDay).slice(0,5);
+  recentRels.forEach(rel=>{
+    const fs=rel.songs[0];
+    const cover=fs&&fs.cover?fs.cover:'🎵';
+    const coverStyle=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
+    recentHTML+=`<div class="alb" onclick="showReleaseStats(${rel.id},'apple')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.name}</span></div>`;
+  });
+  const initials=(S.name||'?').charAt(0).toUpperCase();
+  const html=ORANGE_CSS+`<div class="org"><div class="scroll">
+    <div class="head"><h2>Library</h2><div class="me">${initials}</div></div>
+    <div class="librow2"><i>♪</i>Songs<s>›</s></div>
+    <div class="librow2"><i>▦</i>Albums<s>›</s></div>
+    <div class="librow2"><i>👤</i>Artists<s>›</s></div>
+    <div class="librow2"><i>▤</i>Playlists<s>›</s></div>
+    <div class="librow2"><i>⬇</i>Downloaded<s>›</s></div>
+    ${recentHTML?`<div class="sect">Recently Added</div><div class="hrow">${recentHTML}</div>`:''}
+  </div>
+  <div class="npbar"><div class="cover">🎵</div><b>Your Music</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
+  <div class="bnav">
+    <div onclick="orgSwitch('radio',this)"><i>📻</i>Radio</div>
+    <div onclick="orgSwitch('browse',this)"><i>▦</i>Browse</div>
+    <div class="on" onclick="orgSwitch('library',this)"><i>▤</i>Library</div>
+  </div></div>`;
+  _insertOverlay(html);
+}
+
+function orgSwitch(view,el){GAME.orangeView=view;showOrangeMusicUI();}
+
+function closeOrangeMusic(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
+function editOrangeMusicProfile(){}
+
+// ════════════════════════════════════════════════════════════════════════════
+// YOURTUBE MUSIC — YouTube Music-style (blueprint v3)
+// ════════════════════════════════════════════════════════════════════════════
+const YOURTUBE_CSS=`<style>
+.yt{background:#0f0f0f;color:#f1f1f1;font-family:Roboto,sans-serif;min-height:100%;padding-bottom:52px;position:relative;}
+.yt .scroll{padding-bottom:52px;}
+.yt .head{display:flex;align-items:center;gap:8px;padding:12px 16px;}
+.yt .head .logo{width:30px;height:21px;background:#ff0033;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:800;}
+.yt .head h2{font-size:18px;font-weight:700;flex:1;}
+.yt .head .ic{display:flex;gap:16px;font-size:16px;color:#f1f1f1;}
+.yt .chiprow{display:flex;gap:8px;padding:0 16px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.yt .chiprow span{flex:none;background:#272727;border-radius:8px;font-size:12px;padding:6px 11px;cursor:pointer;}
+.yt .chiprow span.on{background:#f1f1f1;color:#0f0f0f;font-weight:600;}
+.yt .thumb{height:196px;background:linear-gradient(120deg,#3a2a4d,#1c2a3d);display:flex;align-items:center;justify-content:center;font-size:52px;position:relative;cursor:pointer;overflow:hidden;}
+.yt .thumb img{width:100%;height:100%;object-fit:cover;}
+.yt .dur{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.8);font-size:11px;font-weight:600;padding:2px 5px;border-radius:4px;}
+.yt .vmeta{display:flex;gap:10px;padding:10px 12px 6px;}
+.yt .vav{width:36px;height:36px;border-radius:50%;background:#333;flex:none;display:flex;align-items:center;justify-content:center;font-size:17px;}
+.yt .vt b{display:block;font-size:14.5px;font-weight:600;line-height:1.35;}
+.yt .vt span{font-size:12px;color:#aaa;}
+.yt .acts{display:flex;gap:8px;padding:6px 12px 12px;overflow-x:auto;}
+.yt .acts span{flex:none;background:#272727;border-radius:99px;font-size:12px;font-weight:600;padding:7px 13px;cursor:pointer;}
+.yt .acts span.subon{background:#f1f1f1;color:#0f0f0f;}
+.yt .comm{margin:0 12px 16px;background:#272727;border-radius:12px;padding:11px 13px;}
+.yt .comm .ch{font-size:12px;font-weight:600;margin-bottom:6px;}
+.yt .comm .ch span{color:#aaa;font-weight:400;}
+.yt .comm p{font-size:12.5px;line-height:1.45;color:#e0e0e0;}
+.yt .comm .likes{font-size:11px;color:#aaa;margin-top:6px;}
+.yt .bnav{position:sticky;bottom:0;left:0;right:0;height:50px;background:#0f0f0f;border-top:1px solid #272727;display:flex;z-index:5;}
+.yt .bnav div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:9px;color:#aaa;cursor:pointer;}
+.yt .bnav div.on{color:#fff;}
+.yt .bnav div i{font-style:normal;font-size:17px;}
+.yt .sthumb{min-height:520px;background:linear-gradient(160deg,#3d1c2a,#1c0e14);display:flex;align-items:center;justify-content:center;font-size:80px;position:relative;}
+.yt .sside{position:absolute;right:12px;bottom:80px;display:flex;flex-direction:column;gap:18px;text-align:center;font-size:11px;}
+.yt .sside div{cursor:pointer;}
+.yt .sside i{font-style:normal;display:block;font-size:24px;}
+.yt .sinfo{position:absolute;left:12px;bottom:20px;right:70px;}
+.yt .sinfo b{font-size:13.5px;}
+.yt .sinfo p{font-size:12px;color:#ddd;margin-top:4px;}
+</style>`;
 
 function showYourtubeMusicUI(){
   if(!GAME.artistProfile){GAME.artistProfile={profilePic:'👤',profilePicType:'emoji',banner:'gradient1',bannerType:'gradient',bio:'An artist on the rise.'}}
+  if(!GAME.yourtubeMusicView)GAME.yourtubeMusicView='home';
+  switch(GAME.yourtubeMusicView){
+    case'home':showYourtubeHome();break;
+    case'shorts':showYourtubeShorts();break;
+    case'subs':showYourtubeSubs();break;
+    default:showYourtubeHome();
+  }
+}
+
+function showYourtubeHome(){
+  GAME.yourtubeMusicView='home';
   const releasedSongs=GAME.songs.filter(s=>s.released);
   // Calculate total Yourtube views (or use aggregate if platforms not set)
   const totalViews = releasedSongs.reduce((sum, s) => {
@@ -20180,216 +20277,472 @@ function showYourtubeMusicUI(){
     html+=`</div></div>`;
   }
   
-  // About
-  html+=`<div class="ytm-about">
-    <div style="font-size:18px;font-weight:500;margin-bottom:12px">About</div>
-    <div style="font-size:24px;font-weight:700;margin-bottom:8px">${totalViews.toLocaleString()}</div>
-    <div style="font-size:13px;color:#aaa;margin-bottom:12px">views</div>
-    <div style="font-size:14px;color:#aaa;line-height:1.6">${GAME.artistProfile.bio||'An artist on the rise.'}</div>
+  // Build video feed from releases
+  let videoFeedHTML='';
+  releasedSongs.slice(0,3).forEach(song=>{
+    const views=song.platforms&&song.platforms.youtube?song.platforms.youtube:Math.floor((song.streams||0)*0.15);
+    const viewStr=views>=1000000?(views/1000000).toFixed(1)+'M views':views>=1000?Math.floor(views/1000)+'K views':views+' views';
+    const cover=song.cover||'🎵';
+    videoFeedHTML+=`<div class="thumb" onclick="showReleaseStats(${song.id},'youtube')" style="font-size:52px">${cover}<div class="dur">3:42</div></div>
+    <div class="vmeta"><div class="vav">🎤</div><div class="vt"><b>${S.name} — ${song.title} (Official Video)</b><span>${S.name} · ${viewStr} · ${song.weeksOnChart||1} week${(song.weeksOnChart||1)===1?'':'s'} ago</span></div></div>
+    <div class="acts"><span class="subon" onclick="this.classList.toggle('subon');this.textContent=this.classList.contains('subon')?'Subscribed '+Math.floor(monthlyListeners/1000)+'K':'Subscribe '+Math.floor(monthlyListeners/1000)+'K'">Subscribed ${Math.floor(monthlyListeners/1000)}K</span><span onclick="event.stopPropagation()">👍 ${Math.floor(views/50)}</span><span>👎</span><span>⤴ Share</span></div>`;
+  });
+  if(!videoFeedHTML)videoFeedHTML=`<div style="text-align:center;padding:40px 20px;color:#aaa"><div style="font-size:48px;margin-bottom:12px">▶</div><div>No releases yet</div></div>`;
+
+  const html=YOURTUBE_CSS+`<div class="yt"><div class="scroll">
+    <div class="head"><div class="logo">▶</div><h2>Yourtube</h2><div class="ic">📡 🔔 🔎</div></div>
+    <div class="chiprow"><span class="on">All</span><span>Music</span><span>Music Videos</span><span>Live</span><span>New</span></div>
+    ${videoFeedHTML}
+  </div>
+  <div class="bnav">
+    <div class="on" onclick="ytSwitch('home',this)"><i>⌂</i>Home</div>
+    <div onclick="ytSwitch('shorts',this)"><i>▶</i>Shorts</div>
+    <div onclick="ytSwitch('subs',this)"><i>▤</i>Subscriptions</div>
+    <div><i>👤</i>You</div>
   </div></div>`;
-  
-  document.getElementById('homeScreen').classList.remove('visible');
-  document.getElementById('musicScreen').classList.remove('visible');
-  document.getElementById('discoverScreen').classList.remove('visible');
-  document.getElementById('bottomNav').style.display='none';
-  let screen=document.getElementById('youtubeMusicScreen');
-  if(!screen){screen=document.createElement('div');screen.id='youtubeMusicScreen';screen.className='screen';screen.style.cssText='background:#000;position:absolute;top:0;left:0;width:100%;height:100%;z-index:1000';document.getElementById('phone').appendChild(screen)}
-  screen.innerHTML=html;screen.classList.add('visible');
+  _insertOverlay(html);
 }
+
+function showYourtubeShorts(){
+  GAME.yourtubeMusicView='shorts';
+  const releasedSongs=GAME.songs.filter(s=>s.released);
+  const topSong=releasedSongs.sort((a,b)=>(b.streams||0)-(a.streams||0))[0];
+  const cover=topSong?topSong.cover||'🎵':'🎵';
+  const likes=topSong?Math.floor((topSong.streams||0)/20):0;
+  const html=YOURTUBE_CSS+`<div class="yt"><div class="scroll" style="padding:0">
+    <div class="sthumb">${cover}
+      <div class="sside">
+        <div onclick="this.querySelector('i').style.color='#4c9df3'"><i style="font-style:normal;display:block;font-size:24px">👍</i>${likes>0?Math.floor(likes/1000)+'K':0}</div>
+        <div><i style="font-style:normal;display:block;font-size:24px">💬</i>${topSong?Math.floor((topSong.streams||0)/500):0}</div>
+        <div><i style="font-style:normal;display:block;font-size:24px">⤴</i>Share</div>
+        <div><i style="font-style:normal;display:block;font-size:24px">♪</i></div>
+      </div>
+      <div class="sinfo"><b>@${(S.name||'artist').toLowerCase().replace(/\s+/g,'')}</b><p>${topSong?topSong.title+' challenge 🎵':'Release some music!'} #SoundCheck</p></div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div onclick="ytSwitch('home',this)"><i>⌂</i>Home</div>
+    <div class="on" onclick="ytSwitch('shorts',this)"><i>▶</i>Shorts</div>
+    <div onclick="ytSwitch('subs',this)"><i>▤</i>Subscriptions</div>
+    <div><i>👤</i>You</div>
+  </div></div>`;
+  _insertOverlay(html);
+}
+
+function showYourtubeSubs(){
+  GAME.yourtubeMusicView='subs';
+  let subFeedHTML='';
+  if(window.allPlayers&&Array.isArray(window.allPlayers)){
+    window.allPlayers.slice(0,3).forEach(p=>{
+      const songs=(p.gameSongs||[]).filter(s=>s.released);
+      if(songs.length>0){
+        const s=songs[0];
+        const views=Math.floor((s.streams||0)*0.15);
+        subFeedHTML+=`<div class="thumb" style="font-size:52px">${s.cover||'🎵'}<div class="dur">3:42</div></div><div class="vmeta"><div class="vav">🎤</div><div class="vt"><b>${s.title} — Behind The Scenes</b><span>${p.artistName||p.name} · ${views>1000?Math.floor(views/1000)+'K':views} views</span></div></div>`;
+      }
+    });
+  }
+  if(!subFeedHTML)subFeedHTML='<div style="text-align:center;padding:40px 20px;color:#aaa">No subscriptions yet</div>';
+  const html=YOURTUBE_CSS+`<div class="yt"><div class="scroll">
+    <div class="head"><div class="logo">▶</div><h2 style="font-size:16px">Subscriptions</h2></div>
+    <div class="chiprow"><span class="on">All</span><span>Today</span><span>Continue</span></div>
+    ${subFeedHTML}
+  </div>
+  <div class="bnav">
+    <div onclick="ytSwitch('home',this)"><i>⌂</i>Home</div>
+    <div onclick="ytSwitch('shorts',this)"><i>▶</i>Shorts</div>
+    <div class="on" onclick="ytSwitch('subs',this)"><i>▤</i>Subscriptions</div>
+    <div><i>👤</i>You</div>
+  </div></div>`;
+  _insertOverlay(html);
+}
+
+function ytSwitch(view,el){GAME.yourtubeMusicView=view;showYourtubeMusicUI();}
+function closeYourtubeMusicToStreaming(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
+function editYourtubeMusicProfile(){}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SAHARA MUSIC — Amazon Music-style (blueprint v3)
+// ════════════════════════════════════════════════════════════════════════════
+const SAHARA_CSS=`<style>
+.sa{background:#101820;color:#f2f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100%;padding-bottom:96px;position:relative;}
+.sa .scroll{padding-bottom:96px;}
+.sa .head{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,#101820,#1a2836);}
+.sa .head h2{font-size:20px;font-weight:800;}
+.sa .head h2 i{color:#2dd4bf;font-style:normal;}
+.sa .head span{font-size:10.5px;color:#7c8a99;}
+.sa .search2{margin:0 16px 6px;background:#1c2836;border-radius:10px;padding:10px 12px;font-size:13px;color:#7c8a99;display:flex;gap:8px;}
+.sa .search2 input{flex:1;background:none;border:none;outline:none;color:#f2f4f6;font-size:13px;font-family:inherit;}
+.sa .rowchips{display:flex;gap:7px;padding:8px 16px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.sa .rowchips span{flex:none;font-size:11.5px;font-weight:600;border:1px solid #2a3a4c;border-radius:99px;padding:5px 12px;color:#a8b4c0;cursor:pointer;}
+.sa .rowchips span.on{background:#2dd4bf;color:#101820;border-color:#2dd4bf;}
+.sa .feature{margin:0 16px 14px;border-radius:14px;background:linear-gradient(135deg,#134e48,#1a2836);padding:16px;}
+.sa .feature .tag{font-size:9.5px;font-weight:800;letter-spacing:1.2px;color:#2dd4bf;}
+.sa .feature h3{font-size:18px;font-weight:800;margin-top:4px;}
+.sa .feature p{font-size:12px;color:#a8b4c0;margin-top:3px;}
+.sa .sect{padding:8px 16px;font-size:15px;font-weight:800;}
+.sa .chartrow{display:flex;align-items:center;gap:11px;padding:8px 16px;cursor:pointer;}
+.sa .chartrow:active{background:#1c2836;}
+.sa .pos{width:20px;font-weight:800;font-size:13px;color:#7c8a99;}
+.sa .cover.sm{width:44px;height:44px;background:#243447;font-size:18px;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+.sa .ti{flex:1;min-width:0;}.sa .ti b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.sa .ti span{font-size:11.5px;color:#7c8a99;}
+.sa .x{font-size:9.5px;color:#2dd4bf;font-weight:700;border:1px solid #2dd4bf;border-radius:4px;padding:1px 5px;flex-shrink:0;}
+.sa .npbar{position:sticky;bottom:0;left:0;right:0;background:#0a1016;border-top:1px solid #1c2836;display:flex;align-items:center;gap:10px;padding:9px 14px;z-index:5;}
+.sa .npbar .cover{width:38px;height:38px;font-size:16px;background:#134e48;border-radius:4px;display:flex;align-items:center;justify-content:center;}
+.sa .npbar .ti b{font-size:12.5px;}.sa .npbar .ti span{font-size:10.5px;color:#7c8a99;}
+.sa .npbar .ctrl{display:flex;gap:16px;font-size:16px;margin-left:auto;}
+.sa .npbar .ctrl span{cursor:pointer;}
+</style>`;
 
 function showSaharaUI(){
-  if(!GAME.artistProfile){GAME.artistProfile={profilePic:'👤',profilePicType:'emoji',banner:'gradient1',bannerType:'gradient',bio:'An artist on the rise.'}}
-  const releasedSongs=GAME.songs.filter(s=>s.released);
-  let html=`<style>
-  .amz-container{background:#232f3e;height:100%;overflow-y:auto;color:#fff;font-family:Amazon Ember,sans-serif;padding-bottom:80px}
-  .amz-header{padding:180px 16px 16px;position:relative;background:linear-gradient(180deg,#131a22 0%,#232f3e 100%)}
-  .amz-name{font-size:36px;font-weight:700;margin-bottom:8px}
-  .amz-artist{font-size:14px;color:#aaa;margin-bottom:16px}
-  .amz-play{width:56px;height:56px;background:#00a8e1;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:24px}
-  .amz-section{padding:16px}
-  .amz-title{font-size:20px;font-weight:700;margin-bottom:12px}
-  .amz-track{display:flex;gap:12px;padding:8px 0}
-  .amz-thumb{width:48px;height:48px;background:#1a2332;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:24px}
-  .amz-info{flex:1}
-  .amz-song-title{font-size:15px;font-weight:500;margin-bottom:2px}
-  .amz-plays{font-size:13px;color:#aaa}
-  </style>
-  <div class="amz-container">
-    <div style="position:fixed;top:12px;left:12px;z-index:200"><button onclick="closeSahara()" style="background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:32px;height:32px;color:#fff;font-size:20px;cursor:pointer">←</button></div>
-    <div class="amz-header">
-      <div class="amz-name">${S.name||'Your Artist'}</div>
-      <div class="amz-artist">Artist</div>
-      <button class="amz-play"><svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></button>
-    </div>
-    <div class="amz-section"><div class="amz-title">Releases</div>`;
-  
-  // Group by releases
-  const releasesByPopularity=[];
-  const shownReleases=new Set();
-  
-  releasedSongs.sort((a,b)=>b.platforms.amazon-a.platforms.amazon).forEach(song=>{
-    const release=GAME.releases.find(r=>r.songs&&r.songs.some(s=>s&&s.id===song.id));
-    if(release&&!shownReleases.has(release.id)){
-      shownReleases.add(release.id);
-      const totalStreams=release.songs.reduce((sum,s)=>(sum+(s&&s.platforms&&s.platforms.amazon?s.platforms.amazon:0)),0);
-      releasesByPopularity.push({release,totalStreams});
-    }
-  });
-  
-  releasesByPopularity.sort((a,b)=>b.totalStreams-a.totalStreams).slice(0,10).forEach(item=>{
-    const release=item.release;
-    const weeks=Math.floor((GAME.day-release.releaseDay)/7);
-    const plays=weeks>=1?item.totalStreams.toLocaleString():'—';
-    const releaseType=release.type==='single'?'Single':(release.type==='ep'||release.type==='EP'?'EP':'Album');
-    const firstSong=release.songs[0];
-    const cover=firstSong&&firstSong.cover?firstSong.cover:'';
-    
-    html+=`<div class="amz-track" onclick="showReleaseStats(${release.id},'amazon')"><div class="amz-thumb">${cover}</div><div class="amz-info"><div class="amz-song-title">${release.title}</div><div class="amz-plays">${plays} plays · ${releaseType}</div></div></div>`;
-  });
-  html+=`</div></div>`;
-  document.getElementById('homeScreen').classList.remove('visible');
-  document.getElementById('musicScreen').classList.remove('visible');
-  document.getElementById('discoverScreen').classList.remove('visible');
-  document.getElementById('bottomNav').style.display='none';
-  let screen=document.getElementById('amazonMusicScreen');
-  if(!screen){screen=document.createElement('div');screen.id='amazonMusicScreen';screen.className='screen';screen.style.cssText='background:#232f3e;position:absolute;top:0;left:0;width:100%;height:100%;z-index:1000';document.getElementById('phone').appendChild(screen)}
-  screen.innerHTML=html;screen.classList.add('visible');
+  if(!GAME.saharaView)GAME.saharaView='home';
+  switch(GAME.saharaView){
+    case'home':showSaharaHome();break;
+    case'charts':showSaharaCharts();break;
+    default:showSaharaHome();
+  }
 }
 
-function closeSahara(){
-  const screen=document.getElementById('amazonMusicScreen');
-  if(screen)screen.classList.remove('visible');
-  document.getElementById('musicScreen').classList.add('visible');
-  document.getElementById('bottomNav').style.display='flex';
-  switchMusicTab('streaming');
+function showSaharaHome(){
+  GAME.saharaView='home';
+  const releasedSongs=GAME.songs.filter(s=>s.released);
+  let allSongs=[];
+  if(window.allPlayers&&Array.isArray(window.allPlayers)){
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(releasedSongs.map(s=>({...s,artistName:S.name}))).sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,10);
+  }else{
+    allSongs=releasedSongs.sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,10).map(s=>({...s,artistName:S.name}));
+  }
+  let trendHTML='';
+  allSongs.slice(0,6).forEach((song,i)=>{
+    const cover=song.cover||'🎵';
+    const coverStyle=song.coverImage?`style="background-image:url('${song.coverImage}');background-size:cover;background-position:center"`:'';
+    trendHTML+=`<div class="chartrow" onclick="showReleaseStats(${song.id},'amazon')"><div class="pos">${i+1}</div><div class="cover sm" ${coverStyle}>${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><div class="x">HD</div></div>`;
+  });
+  if(!trendHTML)trendHTML='<div style="text-align:center;padding:30px;color:#7c8a99">No songs released yet</div>';
+  const topSong=allSongs[0];
+  const html=SAHARA_CSS+`<div class="sa"><div class="scroll">
+    <div class="head"><h2>sahara <i>music</i></h2><span>Prime included ✓</span></div>
+    <div class="search2">🔎 <input placeholder="Search artists, songs, albums…" oninput=""></div>
+    <div class="rowchips">
+      <span class="on" onclick="saharaSwitch('home',this)">Home</span>
+      <span onclick="saharaSwitch('charts',this)">Charts</span>
+      <span>New</span><span>Genres</span>
+    </div>
+    <div class="feature"><div class="tag">SAHARA ORIGINAL SESSION</div><h3>${S.name||'Your Artist'}: Live Session</h3><p>An exclusive stripped session — your biggest track like you've never heard it.</p></div>
+    <div class="sect">Trending on Sahara</div>
+    ${trendHTML}
+  </div>
+  <div class="npbar"><div class="cover">${topSong?topSong.cover||'🎵':'🎵'}</div><div class="ti"><b>${topSong?topSong.title:'No songs yet'}</b><span>${topSong?topSong.artistName:''}</span></div><div class="ctrl"><span>⏮</span><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
+  </div>`;
+  _insertOverlay(html);
 }
+
+function showSaharaCharts(){
+  GAME.saharaView='charts';
+  const releasedSongs=GAME.songs.filter(s=>s.released);
+  let allSongs=[];
+  if(window.allPlayers&&Array.isArray(window.allPlayers)){
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(releasedSongs.map(s=>({...s,artistName:S.name}))).sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,20);
+  }else{
+    allSongs=releasedSongs.sort((a,b)=>(b.platforms&&b.platforms.amazon||0)-(a.platforms&&a.platforms.amazon||0)).slice(0,20).map(s=>({...s,artistName:S.name}));
+  }
+  let chartHTML='';
+  allSongs.forEach((song,i)=>{
+    const prev=song.lastChartPosition;
+    let mvText='— steady',mvClass='';
+    if(typeof prev==='number'){if(prev>i){mvText='▲'+(prev-i)+' this week';mvClass='style="color:#4cc98a"';}else if(prev<i){mvText='▼'+(i-prev)+' this week';mvClass='style="color:#e06666"';}}
+    else if(!prev){mvText='NEW ENTRY';mvClass='style="color:#2dd4bf;font-weight:800"';}
+    const cover=song.cover||'🎵';
+    const coverStyle=song.coverImage?`style="background-image:url('${song.coverImage}');background-size:cover;background-position:center"`:'';
+    chartHTML+=`<div class="chartrow" onclick="showReleaseStats(${song.id},'amazon')"><div class="pos">${i+1}</div><div class="cover sm" ${coverStyle}>${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span>${song.artistName} · <i ${mvClass} style="font-style:normal">${mvText}</i></span></div><div class="x">HD</div></div>`;
+  });
+  if(!chartHTML)chartHTML='<div style="text-align:center;padding:30px;color:#7c8a99">No songs on chart yet</div>';
+  const topSong=allSongs[0];
+  const html=SAHARA_CSS+`<div class="sa"><div class="scroll">
+    <div class="head"><h2>sahara <i>charts</i></h2><span>Updated weekly</span></div>
+    <div class="rowchips" style="padding-top:12px">
+      <span onclick="saharaSwitch('home',this)">Home</span>
+      <span class="on" onclick="saharaSwitch('charts',this)">Charts</span>
+      <span>New</span><span>Genres</span>
+    </div>
+    <div class="sect">Top 20 — All Genres</div>
+    ${chartHTML}
+  </div>
+  <div class="npbar"><div class="cover">${topSong?topSong.cover||'🎵':'🎵'}</div><div class="ti"><b>${topSong?topSong.title:'No songs yet'}</b><span>${topSong?topSong.artistName:''}</span></div><div class="ctrl"><span>⏮</span><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
+  </div>`;
+  _insertOverlay(html);
+}
+
+function saharaSwitch(view,el){GAME.saharaView=view;showSaharaUI();}
+function closeSahara(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SOUNDPUFF — SoundCloud-style (blueprint v3)
+// ════════════════════════════════════════════════════════════════════════════
+const SOUNDPUFF_CSS=`<style>
+.sp{background:#f2f2f2;color:#111;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100%;}
+.sp .head{background:#333;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:8px;}
+.sp .head .cloud{color:#ff5500;font-size:20px;}
+.sp .head h2{font-size:16px;font-weight:700;flex:1;}
+.sp .head .up2{font-size:11px;font-weight:700;background:#ff5500;border-radius:4px;padding:5px 10px;border:none;color:#fff;cursor:pointer;}
+.sp .stab{display:flex;background:#fff;border-bottom:1px solid #e5e5e5;}
+.sp .stab span{flex:1;text-align:center;font-size:12.5px;font-weight:600;padding:11px 0;color:#999;border-bottom:2px solid transparent;cursor:pointer;}
+.sp .stab span.on{color:#ff5500;border-color:#ff5500;}
+.sp .scroll{padding-bottom:16px;}
+.sp .track{background:#fff;margin:10px 12px;border:1px solid #e5e5e5;padding:12px;}
+.sp .trow{display:flex;gap:10px;}
+.sp .cover{width:54px;height:54px;background:linear-gradient(135deg,#ff5500,#ff8800);color:#fff;font-size:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+.sp .ti2{flex:1;min-width:0;}
+.sp .ti2 .a{font-size:11px;color:#999;}
+.sp .ti2 b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sp .tg{display:inline-block;font-size:9.5px;background:#e8e8e8;color:#777;border-radius:3px;padding:1px 6px;margin-top:3px;margin-right:4px;}
+.sp .pl2{width:34px;height:34px;border-radius:50%;background:#ff5500;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none;align-self:center;border:none;cursor:pointer;}
+.sp .wave{display:flex;align-items:flex-end;gap:2px;height:38px;margin-top:10px;position:relative;cursor:pointer;}
+.sp .wave i{flex:1;border-radius:1px;}
+.sp .wave i.p{background:#ff5500;}
+.sp .wave i.u{background:#ccc;}
+.sp .sstats{display:flex;gap:14px;margin-top:14px;font-size:11.5px;color:#999;}
+.sp .sstats span{cursor:pointer;}
+.sp .sstats .rep{margin-left:auto;color:#ff5500;font-weight:700;cursor:pointer;}
+.sp .sstats .rep.done{color:#4cc98a;}
+.sp .cbox{display:flex;gap:8px;margin-top:10px;border-top:1px solid #f0f0f0;padding-top:9px;}
+.sp .cbox .cav{width:24px;height:24px;border-radius:50%;background:#ddd;flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;}
+.sp .cbox p{font-size:11.5px;color:#555;line-height:1.4;}
+.sp .cbox p b{color:#111;}
+.sp .cin{display:flex;gap:8px;margin-top:9px;}
+.sp .cin input{flex:1;border:1px solid #e5e5e5;border-radius:99px;padding:7px 12px;font-size:11.5px;font-family:inherit;outline:none;}
+.sp .cin button{border:none;background:#ff5500;color:#fff;border-radius:99px;font-size:11px;font-weight:700;padding:0 13px;cursor:pointer;}
+.sp .phero{background:linear-gradient(135deg,#333,#555);color:#fff;padding:20px 16px;display:flex;gap:14px;align-items:center;}
+.sp .pav{width:64px;height:64px;border-radius:50%;background:#ff5500;display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;}
+.sp .pstats{display:flex;background:#fff;border-bottom:1px solid #e5e5e5;}
+.sp .pstats div{flex:1;text-align:center;padding:11px 0;}
+.sp .pstats b{display:block;font-size:15px;}
+.sp .pstats span{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.5px;}
+</style>`;
 
 function showSoundCloudUI(){
-  const releasedSongs=GAME.songs.filter(s=>s.released);
-  let html=`<style>
-  .sc-container{background:#fff;height:100%;overflow-y:auto;color:#333;font-family:Interstate,sans-serif;padding-bottom:80px}
-  .sc-header{padding:180px 16px 16px;position:relative;background:linear-gradient(135deg,#ff7700 0%,#ff5500 100%)}
-  .sc-name{font-size:32px;font-weight:700;color:#fff;margin-bottom:8px}
-  .sc-followers{font-size:14px;color:rgba(255,255,255,0.9);margin-bottom:16px}
-  .sc-follow{background:#fff;border:none;border-radius:3px;color:#ff5500;padding:8px 24px;font-size:14px;font-weight:700;cursor:pointer}
-  .sc-section{padding:16px;background:#f2f2f2}
-  .sc-title{font-size:20px;font-weight:700;margin-bottom:12px;color:#333}
-  .sc-track{background:#fff;border-left:2px solid #ff5500;padding:12px;margin-bottom:8px;display:flex;gap:12px}
-  .sc-thumb{width:120px;height:120px;background:#ccc;display:flex;align-items:center;justify-content:center;font-size:48px}
-  .sc-info{flex:1}
-  .sc-song-title{font-size:16px;font-weight:600;margin-bottom:4px}
-  .sc-plays{font-size:13px;color:#999}
-  </style>
-  <div class="sc-container">
-    <div style="position:fixed;top:12px;left:12px;z-index:200"><button onclick="closeSoundCloud()" style="background:rgba(0,0,0,0.5);border:none;border-radius:50%;width:32px;height:32px;color:#fff;font-size:20px;cursor:pointer">←</button></div>
-    <div class="sc-header">
-      <div class="sc-name">${S.name||'Your Artist'}</div>
-      <div class="sc-followers">${Math.floor(getTotalFans()*0.2).toLocaleString()} followers</div>
-      <button class="sc-follow">Follow</button>
-    </div>
-    <div class="sc-section"><div class="sc-title">Releases</div>`;
-  
-  const releasesBySC=[];
-  const shownSC=new Set();
-  releasedSongs.sort((a,b)=>b.platforms.soundcloud-a.platforms.soundcloud).forEach(song=>{
-    const release=GAME.releases.find(r=>r.songs&&r.songs.some(s=>s&&s.id===song.id));
-    if(release&&!shownSC.has(release.id)){
-      shownSC.add(release.id);
-      const totalStreams=release.songs.reduce((sum,s)=>(sum+(s&&s.platforms&&s.platforms.soundcloud?s.platforms.soundcloud:0)),0);
-      releasesBySC.push({release,totalStreams});
-    }
-  });
-  
-  releasesBySC.sort((a,b)=>b.totalStreams-a.totalStreams).slice(0,20).forEach(item=>{
-    const release=item.release;
-    const weeks=Math.floor((GAME.day-release.releaseDay)/7);
-    const plays=weeks>=1?item.totalStreams.toLocaleString():'—';
-    const releaseType=release.type==='single'?'Single':(release.type==='ep'||release.type==='EP'?'EP':'Album');
-    const firstSong=release.songs[0];
-    const cover=firstSong&&firstSong.cover?firstSong.cover:'';
-    
-    html+=`<div class="sc-track" onclick="showReleaseStats(${release.id},'soundcloud')"><div class="sc-thumb">${cover}</div><div class="sc-info"><div class="sc-song-title">${release.title}</div><div class="sc-plays"><svg width="16" height="16" viewBox="0 0 24 24" fill="#999" style="display:inline;vertical-align:middle"><path d="M8 5v14l11-7z"/></svg> ${plays} · ${releaseType}</div></div></div>`;
-  });
-  html+=`</div></div>`;
-  document.getElementById('homeScreen').classList.remove('visible');
-  document.getElementById('musicScreen').classList.remove('visible');
-  document.getElementById('discoverScreen').classList.remove('visible');
-  document.getElementById('bottomNav').style.display='none';
-  let screen=document.getElementById('soundcloudScreen');
-  if(!screen){screen=document.createElement('div');screen.id='soundcloudScreen';screen.className='screen';screen.style.cssText='background:#fff;position:absolute;top:0;left:0;width:100%;height:100%;z-index:1000';document.getElementById('phone').appendChild(screen)}
-  screen.innerHTML=html;screen.classList.add('visible');
+  if(!GAME.soundpuffView)GAME.soundpuffView='stream';
+  switch(GAME.soundpuffView){
+    case'stream':showSoundPuffStream();break;
+    case'trend':showSoundPuffTrending();break;
+    case'you':showSoundPuffYou();break;
+    default:showSoundPuffStream();
+  }
 }
 
-function closeSoundCloud(){
-  const screen=document.getElementById('soundcloudScreen');
-  if(screen)screen.classList.remove('visible');
-  document.getElementById('musicScreen').classList.add('visible');
-  document.getElementById('bottomNav').style.display='flex';
-  switchMusicTab('streaming');
+function showSoundPuffStream(){
+  GAME.soundpuffView='stream';
+  const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.soundcloud||0)-(a.platforms&&a.platforms.soundcloud||0));
+  let tracksHTML='';
+  // Show other players' content interleaved with mine in multiplayer
+  let feedSongs=[];
+  if(window.allPlayers&&Array.isArray(window.allPlayers)){
+    const otherSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown',isOther:true})));
+    feedSongs=[...releasedSongs.map(s=>({...s,artistName:S.name})),...otherSongs].sort(()=>Math.random()-0.5).slice(0,6);
+  }else{
+    feedSongs=releasedSongs.slice(0,5).map(s=>({...s,artistName:S.name}));
+  }
+  feedSongs.forEach(song=>{
+    const streams=song.platforms&&song.platforms.soundcloud?song.platforms.soundcloud:Math.floor((song.streams||0)*0.05);
+    const streamsStr=streams>=1000?Math.floor(streams/1000)+'K':streams;
+    const tags=song.genre?`<span class="tg"># ${(song.genre||'').toLowerCase()}</span>`:'';
+    const cover=song.cover||'🎵';
+    const coverStyle=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
+    // Random waveform bars
+    const bars=Array.from({length:15},(_,i)=>{
+      const h=Math.floor(20+Math.random()*70);
+      const played=i<Math.floor(15*0.4);
+      return `<i class="${played?'p':'u'}" style="height:${h}%"></i>`;
+    }).join('');
+    const comments=Math.floor((song.fans||0)/50)||Math.floor(Math.random()*20);
+    tracksHTML+=`<div class="track">
+      <div class="trow"><div class="cover" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti2"><div class="a">${song.artistName} · Recent</div><b>${song.title}</b>${tags}</div><button class="pl2" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button></div>
+      <div class="wave">${bars}</div>
+      <div class="sstats"><span>▶ ${streamsStr}</span><span onclick="spufLike(this)">♥ ${Math.floor((song.fans||0)/10)||Math.floor(Math.random()*50)}</span><span>💬 ${comments}</span><span class="rep" onclick="this.classList.add('done');this.textContent='↻ Reposted'">↻ Repost</span></div>
+    </div>`;
+  });
+  if(!tracksHTML)tracksHTML='<div style="text-align:center;padding:40px;color:#999">No tracks yet. Release your first song!</div>';
+  const html=SOUNDPUFF_CSS+`<div class="sp">
+    <div class="head"><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
+    <div class="stab">
+      <span class="on" onclick="spSwitch('stream',this)">Stream</span>
+      <span onclick="spSwitch('trend',this)">Trending</span>
+      <span onclick="spSwitch('you',this)">You</span>
+    </div>
+    <div class="scroll">${tracksHTML}</div>
+  </div>`;
+  _insertOverlay(html);
 }
+
+function showSoundPuffTrending(){
+  GAME.soundpuffView='trend';
+  let allSongs=[];
+  if(window.allPlayers&&Array.isArray(window.allPlayers)){
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(GAME.songs.filter(s=>s.released).map(s=>({...s,artistName:S.name}))).sort((a,b)=>(b.platforms&&b.platforms.soundcloud||0)-(a.platforms&&a.platforms.soundcloud||0)).slice(0,10);
+  }else{
+    allSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.soundcloud||0)-(a.platforms&&a.platforms.soundcloud||0)).slice(0,10).map(s=>({...s,artistName:S.name}));
+  }
+  let trendHTML='';
+  allSongs.forEach((song,i)=>{
+    const streams=song.platforms&&song.platforms.soundcloud?song.platforms.soundcloud:Math.floor((song.streams||0)*0.05);
+    const streamsStr=streams>=1000?Math.floor(streams/1000)+'K this week':streams+' this week';
+    const reposts=Math.floor(streams/20)||0;
+    const cover=song.cover||'🎵';
+    const coverStyle=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
+    trendHTML+=`<div class="track">
+      <div class="trow"><div class="cover" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti2"><div class="a">#${i+1} Trending · ${song.artistName}</div><b>${song.title}</b></div><button class="pl2" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button></div>
+      <div class="sstats"><span>▶ ${streamsStr}</span><span>♥ ${Math.floor(streams/30)||0}</span><span class="rep">↑ ${reposts} reposts</span></div>
+    </div>`;
+  });
+  if(!trendHTML)trendHTML='<div style="text-align:center;padding:40px;color:#999">No trending tracks yet</div>';
+  const html=SOUNDPUFF_CSS+`<div class="sp">
+    <div class="head"><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
+    <div class="stab">
+      <span onclick="spSwitch('stream',this)">Stream</span>
+      <span class="on" onclick="spSwitch('trend',this)">Trending</span>
+      <span onclick="spSwitch('you',this)">You</span>
+    </div>
+    <div class="scroll">${trendHTML}</div>
+  </div>`;
+  _insertOverlay(html);
+}
+
+function showSoundPuffYou(){
+  GAME.soundpuffView='you';
+  const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.soundcloud||0)-(a.platforms&&a.platforms.soundcloud||0));
+  const totalStreams=releasedSongs.reduce((sum,s)=>sum+(s.platforms&&s.platforms.soundcloud||0),0);
+  const followers=Math.floor(getTotalFans()*0.05)||0;
+  const following=Math.max(3,Math.floor(followers*0.1));
+  let myTracksHTML='';
+  releasedSongs.slice(0,5).forEach(song=>{
+    const streams=song.platforms&&song.platforms.soundcloud?song.platforms.soundcloud:Math.floor((song.streams||0)*0.05);
+    const cover=song.cover||'🎵';
+    const coverStyle=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'background:linear-gradient(135deg,#ff5500,#ff8800)';
+    myTracksHTML+=`<div class="track"><div class="trow"><div class="cover" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti2"><div class="a">You · ${song.weeksOnChart||1} week${(song.weeksOnChart||1)===1?'':'s'} ago</div><b>${song.title}</b></div><button class="pl2" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button></div><div class="sstats"><span>▶ ${streams>=1000?Math.floor(streams/1000)+'K':streams}</span><span>♥ ${Math.floor(streams/20)||0}</span></div></div>`;
+  });
+  if(!myTracksHTML)myTracksHTML='<div style="text-align:center;padding:30px;color:#999">No tracks yet</div>';
+  const picEmoji=GAME.artistProfile&&GAME.artistProfile.profilePic&&GAME.artistProfile.profilePicType==='image'?'':GAME.artistProfile&&GAME.artistProfile.profilePic?GAME.artistProfile.profilePic:'🎤';
+  const picStyle=GAME.artistProfile&&GAME.artistProfile.profilePicType==='image'?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:'';
+  const handle=(S.name||'artist').toLowerCase().replace(/\s+/g,'');
+  const html=SOUNDPUFF_CSS+`<div class="sp">
+    <div class="head"><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
+    <div class="stab">
+      <span onclick="spSwitch('stream',this)">Stream</span>
+      <span onclick="spSwitch('trend',this)">Trending</span>
+      <span class="on" onclick="spSwitch('you',this)">You</span>
+    </div>
+    <div class="scroll">
+      <div class="phero"><div class="pav" style="${picStyle}">${picStyle?'':picEmoji}</div><div><b style="font-size:17px">${S.name||'Your Artist'}</b><div style="font-size:11.5px;opacity:.8">soundpuff.com/${handle}</div></div></div>
+      <div class="pstats"><div><b>${releasedSongs.length}</b><span>Tracks</span></div><div><b>${followers>=1000?Math.floor(followers/1000)+'K':followers}</b><span>Followers</span></div><div><b>${following}</b><span>Following</span></div></div>
+      ${myTracksHTML}
+    </div>
+  </div>`;
+  _insertOverlay(html);
+}
+
+function spSwitch(view,el){GAME.soundpuffView=view;showSoundCloudUI();}
+function spufLike(el){if(el.dataset.l)return;el.dataset.l=1;el.style.color='#ff5500';const m=el.textContent.match(/([\d.]+)(K?)/);if(m){el.textContent='♥ '+(m[2]?(parseFloat(m[1])+0.1).toFixed(1)+'K':(parseInt(m[1])+1));}}
+function closeSoundCloud(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
+
+// ════════════════════════════════════════════════════════════════════════════
+// iMUSIC — iTunes Store-style (blueprint v3)
+// ════════════════════════════════════════════════════════════════════════════
+const IMUSIC_CSS=`<style>
+.im{background:#f5f5f7;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100%;}
+.im .scroll{padding-bottom:16px;}
+.im .head{padding:16px;background:#fff;border-bottom:1px solid #e5e5ea;display:flex;justify-content:space-between;align-items:center;}
+.im .head h2{font-size:23px;font-weight:800;}
+.im .head span{font-size:11px;color:#86868b;}
+.im .seg{display:flex;background:#e9e9ec;border-radius:9px;margin:12px 16px;padding:2px;}
+.im .seg span{flex:1;text-align:center;font-size:12.5px;font-weight:600;padding:6px 0;border-radius:7px;color:#6e6e73;cursor:pointer;}
+.im .seg span.on{background:#fff;color:#1d1d1f;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.im .banner{margin:2px 16px 12px;background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;gap:13px;align-items:center;}
+.im .banner .cover{width:66px;height:66px;font-size:28px;background:linear-gradient(135deg,#1e3a5e,#0e1a2e);color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+.im .banner .tag{color:#0071e3;font-size:10px;font-weight:800;letter-spacing:1px;}
+.im .banner h3{font-size:15px;font-weight:800;margin-top:2px;}
+.im .banner p{font-size:11.5px;color:#86868b;margin-top:2px;}
+.im .banner .pre{margin-left:auto;flex:none;border:none;background:#0071e3;color:#fff;font-size:12px;font-weight:700;border-radius:99px;padding:7px 13px;cursor:pointer;}
+.im .buyrow{display:flex;align-items:center;gap:10px;padding:9px 16px;background:#fff;border-bottom:1px solid #f0f0f2;}
+.im .pos{width:20px;font-weight:800;color:#86868b;font-size:13px;}
+.im .cover.sm{width:46px;height:46px;font-size:19px;color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+.im .ti{flex:1;min-width:0;}.im .ti b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.im .ti span{font-size:11.5px;color:#86868b;}
+.im .price{border:1.5px solid #0071e3;color:#0071e3;font-size:12px;font-weight:700;border-radius:99px;padding:4px 12px;background:none;cursor:pointer;min-width:64px;}
+.im .price.owned{border-color:#4cc98a;color:#4cc98a;cursor:default;}
+.im .albsect{padding:12px 16px 6px;font-size:16px;font-weight:800;}
+.im .albrow{display:flex;gap:12px;overflow-x:auto;padding:0 16px 14px;-webkit-overflow-scrolling:touch;}
+.im .alb2{flex:none;width:110px;cursor:pointer;}
+.im .alb2 .cover{width:110px;height:110px;border-radius:9px;font-size:38px;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.im .alb2 b{display:block;font-size:11.5px;font-weight:600;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.im .alb2 span{font-size:10.5px;color:#86868b;display:block;}
+.im .alb2 .pr{font-size:11px;color:#0071e3;font-weight:700;}
+.im-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:#1d1d1f;color:#fff;font-size:12.5px;font-weight:600;border-radius:99px;padding:10px 18px;transition:transform .3s ease;z-index:9;white-space:nowrap;}
+.im-toast.show{transform:translateX(-50%) translateY(0);}
+</style>`;
 
 function showiTunesUI(){
-  const releasedSongs=GAME.songs.filter(s=>s.released);
-  let html=`<style>
-  .it-container{background:#fff;height:100%;overflow-y:auto;color:#000;font-family:-apple-system,sans-serif;padding-bottom:80px}
-  .it-header{padding:160px 16px 16px;background:linear-gradient(180deg,#f5f5f7 0%,#fff 100%)}
-  .it-name{font-size:28px;font-weight:700;margin-bottom:4px}
-  .it-artist{font-size:14px;color:#86868b;margin-bottom:16px}
-  .it-section{padding:16px}
-  .it-title{font-size:22px;font-weight:700;margin-bottom:12px}
-  .it-track{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #f0f0f0}
-  .it-num{width:24px;text-align:center;color:#86868b;font-size:14px}
-  .it-thumb{width:40px;height:40px;background:#f0f0f0;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px}
-  .it-info{flex:1}
-  .it-song-title{font-size:15px;font-weight:500;margin-bottom:2px}
-  .it-plays{font-size:13px;color:#86868b}
-  </style>
-  <div class="it-container">
-    <div style="position:fixed;top:12px;left:12px;z-index:200"><button onclick="closeiTunes()" style="background:rgba(0,0,0,0.3);border:none;border-radius:50%;width:32px;height:32px;color:#000;font-size:20px;cursor:pointer">←</button></div>
-    <div class="it-header">
-      <div class="it-name">${S.name||'Your Artist'}</div>
-      <div class="it-artist">Artist</div>
-    </div>
-    <div class="it-section"><div class="it-title">Top Releases</div>`;
-  
-  const releasesByIT=[];
-  const shownIT=new Set();
-  releasedSongs.sort((a,b)=>b.platforms.itunes-a.platforms.itunes).forEach(song=>{
-    const release=GAME.releases.find(r=>r.songs&&r.songs.some(s=>s&&s.id===song.id));
-    if(release&&!shownIT.has(release.id)){
-      shownIT.add(release.id);
-      const totalStreams=release.songs.reduce((sum,s)=>(sum+(s&&s.platforms&&s.platforms.itunes?s.platforms.itunes:0)),0);
-      releasesByIT.push({release,totalStreams});
-    }
+  const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.itunes||0)-(a.platforms&&a.platforms.itunes||0));
+  let allSongs=[];
+  if(window.allPlayers&&Array.isArray(window.allPlayers)){
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown'}))).concat(releasedSongs.map(s=>({...s,artistName:S.name}))).sort((a,b)=>(b.platforms&&b.platforms.itunes||0)-(a.platforms&&a.platforms.itunes||0)).slice(0,20);
+  }else{
+    allSongs=releasedSongs.slice(0,20).map(s=>({...s,artistName:S.name}));
+  }
+  // Simulate player balance for purchases
+  const playerBalance=Math.floor((GAME.money||0)*0.001)||42.18;
+  // Featured pre-order: most recent release
+  const recentRels=(GAME.releases||[]).filter(r=>r.songs&&r.songs.length>0).sort((a,b)=>b.releaseDay-a.releaseDay);
+  const featuredRel=recentRels[0];
+  const featuredSong=featuredRel&&featuredRel.songs[0];
+  let bannerHTML='';
+  if(featuredSong){
+    const cover=featuredSong.cover||'🎵';
+    const coverStyle=featuredSong.coverImage?`background-image:url('${featuredSong.coverImage}');background-size:cover;background-position:center`:'background:linear-gradient(135deg,#1e3a5e,#0e1a2e)';
+    bannerHTML=`<div class="banner"><div class="cover" style="${coverStyle}">${featuredSong.coverImage?'':cover}</div><div><div class="tag">LATEST RELEASE</div><h3>${featuredRel.title}</h3><p>${S.name} · Week ${GAME.day?Math.ceil(GAME.day/7):1}</p></div><button class="pre" onclick="imBuy(this,9.99,'Pre-ordered ✓')">$9.99</button></div>`;
+  }
+  let topSongsHTML='';
+  allSongs.slice(0,10).forEach((song,i)=>{
+    const sold=song.platforms&&song.platforms.itunes?Math.floor(song.platforms.itunes/10):0;
+    const price=(0.99+Math.floor(Math.random()*2)*0.30).toFixed(2);
+    const cover=song.cover||'🎵';
+    const coverStyle=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
+    topSongsHTML+=`<div class="buyrow"><div class="pos">${i+1}</div><div class="cover sm" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span>${song.artistName} · ${sold>=1000?Math.floor(sold/1000)+'K':sold} sold</span></div><button class="price" onclick="imBuy(this,${price})">$${price}</button></div>`;
   });
-  
-  releasesByIT.sort((a,b)=>b.totalStreams-a.totalStreams).slice(0,10).forEach((item,i)=>{
-    const release=item.release;
-    const weeks=Math.floor((GAME.day-release.releaseDay)/7);
-    const plays=weeks>=1?item.totalStreams.toLocaleString():'—';
-    const releaseType=release.type==='single'?'Single':(release.type==='ep'||release.type==='EP'?'EP':'Album');
-    const firstSong=release.songs[0];
-    const cover=firstSong&&firstSong.cover?firstSong.cover:'';
-    
-    html+=`<div class="it-track" onclick="showReleaseStats(${release.id},'itunes')"><div class="it-num">${i+1}</div><div class="it-thumb">${cover}</div><div class="it-info"><div class="it-song-title">${release.title}</div><div class="it-plays">${plays} · ${releaseType}</div></div></div>`;
+  if(!topSongsHTML)topSongsHTML='<div style="text-align:center;padding:30px;color:#86868b">No songs in store yet</div>';
+  // Albums section
+  const albumRels=(GAME.releases||[]).filter(r=>r.type==='album'&&r.songs&&r.songs.length>0);
+  let albumsHTML='';
+  albumRels.slice(0,4).forEach(rel=>{
+    const fs=rel.songs[0];
+    const cover=fs&&fs.cover?fs.cover:'🎵';
+    const coverStyle=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'background:linear-gradient(135deg,#2a4a7e,#1a2a4e)';
+    albumsHTML+=`<div class="alb2" onclick="showReleaseStats(${rel.id},'itunes')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.name}</span><div class="pr">$7.99</div></div>`;
   });
-  html+=`</div></div>`;
-  document.getElementById('homeScreen').classList.remove('visible');
-  document.getElementById('musicScreen').classList.remove('visible');
-  document.getElementById('discoverScreen').classList.remove('visible');
-  document.getElementById('bottomNav').style.display='none';
-  let screen=document.getElementById('itunesScreen');
-  if(!screen){screen=document.createElement('div');screen.id='itunesScreen';screen.className='screen';screen.style.cssText='background:#fff;position:absolute;top:0;left:0;width:100%;height:100%;z-index:1000';document.getElementById('phone').appendChild(screen)}
-  screen.innerHTML=html;screen.classList.add('visible');
+  const html=IMUSIC_CSS+`<div class="im"><div class="scroll">
+    <div class="head"><h2>iMusic Store</h2><span>Balance: $<b id="imBal">${playerBalance.toFixed(2)}</b></span></div>
+    <div class="seg"><span class="on">Songs</span><span>Albums</span><span>Music Videos</span></div>
+    ${bannerHTML}
+    ${topSongsHTML}
+    ${albumsHTML?`<div class="albsect">Top Albums &amp; EPs</div><div class="albrow">${albumsHTML}</div>`:''}
+  </div>
+  <div class="im-toast" id="imStoreToast">Purchased ✓ — added to your library</div>
+  </div>`;
+  _insertOverlay(html);
 }
 
-function closeiTunes(){
-  const screen=document.getElementById('itunesScreen');
-  if(screen)screen.classList.remove('visible');
-  document.getElementById('musicScreen').classList.add('visible');
-  document.getElementById('bottomNav').style.display='flex';
-  switchMusicTab('streaming');
+function imBuy(btn,amt,label){
+  if(btn.classList.contains('owned'))return;
+  const balEl=document.getElementById('imBal');
+  if(!balEl){btn.classList.add('owned');btn.textContent=label||'Owned ✓';return;}
+  const cur=parseFloat(balEl.textContent);
+  if(cur<amt){btn.textContent='Low funds';setTimeout(()=>btn.textContent='$'+amt.toFixed(2),1200);return;}
+  balEl.textContent=(cur-amt).toFixed(2);
+  btn.classList.add('owned');
+  btn.textContent=label||'Owned ✓';
+  const t=document.getElementById('imStoreToast');
+  if(t){t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800);}
 }
+
+function closeiTunes(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
 
 // SOCIAL MEDIA PLATFORMS
 function showPentagram(){
@@ -24517,31 +24870,7 @@ function generateComments(postText,likes,taggedSongId){
   return allComments;
 }
 
-function closeYourtubeMusicToStreaming(){
-  const screen=document.getElementById('youtubeMusicScreen');
-  if(screen)screen.classList.remove('visible');
-  document.getElementById('musicScreen').classList.add('visible');
-  document.getElementById('bottomNav').style.display='flex';
-  switchMusicTab('streaming');
-}
-
-function editYourtubeMusicProfile(){
-  const input=document.createElement('input');
-  input.type='file';
-  input.accept='image/*';
-  input.onchange=function(e){
-    const file=e.target.files[0];
-    if(!file)return;
-    const reader=new FileReader();
-    reader.onload=function(ev){
-      GAME.artistProfile.profilePic=ev.target.result;
-      GAME.artistProfile.profilePicType='image';
-      showYourtubeMusicUI();
-    };
-    reader.readAsDataURL(file);
-  };
-  input.click();
-}
+// (closeYourtubeMusicToStreaming and editYourtubeMusicProfile moved to Yourtube section above)
 
 function closeSpotify(){
   const spotifyScreen=document.getElementById('spotifyScreen');
