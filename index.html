@@ -19832,7 +19832,7 @@ function getSVG(name, size='16px') {
 const LOOPIFY_CSS = `
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900&display=swap');
-.loop { background: #121212; color: #fff; min-height: 100%; overflow-y: auto; padding-bottom: 112px; font-family: 'Plus Jakarta Sans', 'Circular Std', ui-sans-serif, -apple-system, sans-serif; }
+.loop { background: #121212; color: #fff; min-height: 100%; padding-bottom: 4px; font-family: 'Plus Jakarta Sans', 'Circular Std', ui-sans-serif, -apple-system, sans-serif; }
 .loop .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; }
 .loop .topbar h2 { font-size: 22px; font-weight: 800; flex: 1; text-align: center; }
 .loop .topbar .ic { display: flex; gap: 16px; font-size: 20px; color: #e0e0e0; cursor: pointer; }
@@ -19902,14 +19902,14 @@ const LOOPIFY_CSS = `
 .loop .librow .cover { width: 56px; height: 56px; font-size: 22px; display: flex; align-items: center; justify-content: center; background: #333; border-radius: 6px; }
 .loop .librow b { display: block; font-size: 14.5px; font-weight: 600; }
 .loop .librow span { font-size: 12px; color: #a7a7a7; }
-.loop .npbar { position: absolute; bottom: 52px; left: 8px; right: 8px; background: #3d2a4a; border-radius: 8px; display: flex; align-items: center; gap: 10px; padding: 7px 10px; box-shadow: 0 4px 14px rgba(0,0,0,.5); z-index: 5; cursor: pointer; }
+.loop .npbar { position: sticky; bottom: 52px; left: 8px; right: 8px; margin: 0 8px; background: #3d2a4a; border-radius: 8px; display: flex; align-items: center; gap: 10px; padding: 7px 10px; box-shadow: 0 4px 14px rgba(0,0,0,.5); z-index: 5; cursor: pointer; }
 .loop .npbar .cover { width: 38px; height: 38px; font-size: 16px; background: #5a3d6e; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
 .loop .npbar .ti b { font-size: 12.5px; }
 .loop .npbar .ti span { font-size: 10.5px; }
 .loop .npbar .ctrl { display: flex; gap: 16px; font-size: 17px; padding-right: 4px; cursor: pointer; }
 .loop .npbar .prog { position: absolute; bottom: 0; left: 10px; right: 10px; height: 2px; background: rgba(255,255,255,.2); }
 .loop .npbar .prog i { display: block; height: 100%; width: 35%; background: #fff; transition: width 1s linear; }
-.loop .bnav { position: absolute; bottom: 0; left: 0; right: 0; height: 52px; background: linear-gradient(180deg, rgba(18,18,18,.55), #000 40%); display: flex; z-index: 5; }
+.loop .bnav { position: sticky; bottom: 0; left: 0; right: 0; height: 52px; background: linear-gradient(180deg, rgba(18,18,18,.55), #000 40%); display: flex; z-index: 5; }
 .loop .bnav div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 9.5px; color: #a7a7a7; cursor: pointer; }
 .loop .bnav div.on { color: #fff; }
 .loop .bnav div i { font-style: normal; font-size: 17px; }
@@ -19929,7 +19929,7 @@ function showLoopifyHome(){
   let topChartSongs=[];
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
     const others=window.allPlayers.filter(p=>p.id!==S.id);
-    topChartSongs=others.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released&&s.streams).map(s=>({...s,artistId:p.id,artistName:p.artistName||p.name||'Unknown Artist'})))
+    topChartSongs=others.flatMap(p=>(p.gameSongs||p.songs||[]).filter(s=>s.released&&s.streams).map(s=>({...s,artistId:p.id,artistName:p.artistName||p.name||'Unknown Artist'})))
       .concat(releasedSongs.map(s=>({...s,artistId:S.id,artistName:S.name})))
       .sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,50);
   }else{
@@ -19958,12 +19958,12 @@ function showLoopifyHome(){
     });
   }
   const hr=new Date().getHours();const tod=hr<12?'morning':hr<18?'afternoon':'evening';
-  const html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">✕</button><h2>Good ${tod}</h2><div class="ic"><span onclick="">🔔</span><span onclick="">⚙</span></div></div><div class="filters"><span class="on">All</span><span>Music</span><span>Charts</span></div><div class="sect">Top 50 — Global <a href="#">See chart</a></div>${chartHTML}<div class="sect">Popular artists</div><div class="hrow">${popularArtistsHTML}</div><div class="npbar" onclick="loopShowTrack()"><div class="cover">♫</div><div class="ti" style="flex:1"><b>Your Track</b><span>Artist</span></div><div class="ctrl">▶</div><div class="prog"><i id="lprog"></i></div></div><div class="bnav"><div class="on" onclick="loopSwitchView('home',this)"><i>⌂</i>Home</div><div onclick="loopSwitchView('search',this)"><i>🔎</i>Search</div><div onclick="loopSwitchView('library',this)"><i>▤</i>Library</div></div></div>`;
+  const html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">←</button><h2>Good ${tod}</h2><div class="ic"><span onclick="">🔔</span><span onclick="">⚙</span></div></div><div class="filters"><span class="on">All</span><span>Music</span><span>Charts</span></div><div class="sect">Top 50 — Global <a href="#">See chart</a></div>${chartHTML}<div class="sect">Popular artists</div><div class="hrow">${popularArtistsHTML}</div><div class="npbar" onclick="loopShowTrack()"><div class="cover">♫</div><div class="ti" style="flex:1"><b>Your Track</b><span>Artist</span></div><div class="ctrl">▶</div><div class="prog"><i id="lprog"></i></div></div><div class="bnav"><div class="on" onclick="loopSwitchView('home',this)"><i>⌂</i>Home</div><div onclick="loopSwitchView('search',this)"><i>🔎</i>Search</div><div onclick="loopSwitchView('library',this)"><i>▤</i>Library</div></div></div>`;
   _insertOverlay(html);
 }
-function showLoopifySearch(){let html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">✕</button><h2>Search</h2><div class="ic"></div></div><div class="srchbox">🔎<input type="text" placeholder="Artists, songs, or albums" oninput="loopFilterSearch(this.value)"></div><div id="loopSearchResults" style="display:none"></div><div class="sect">Browse all</div><div class="ggrid"><div class="gcard" style="background:#8a2a4a">R&B<span class="gem">🎷</span></div><div class="gcard" style="background:#2a6a4a">Afrobeats<span class="gem">🥁</span></div><div class="gcard" style="background:#3d3d8a">Pop<span class="gem">🎤</span></div><div class="gcard" style="background:#8a5a2a">Hip-Hop<span class="gem">🎧</span></div></div><div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div class="on" onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
+function showLoopifySearch(){let html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">←</button><h2>Search</h2><div class="ic"></div></div><div class="srchbox">🔎<input type="text" placeholder="Artists, songs, or albums" oninput="loopFilterSearch(this.value)"></div><div id="loopSearchResults" style="display:none"></div><div class="sect">Browse all</div><div class="ggrid"><div class="gcard" style="background:#8a2a4a">R&B<span class="gem">🎷</span></div><div class="gcard" style="background:#2a6a4a">Afrobeats<span class="gem">🥁</span></div><div class="gcard" style="background:#3d3d8a">Pop<span class="gem">🎤</span></div><div class="gcard" style="background:#8a5a2a">Hip-Hop<span class="gem">🎧</span></div></div><div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div class="on" onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
 function showLoopifyLibrary(){const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));let libraryHTML='';releasedSongs.forEach(song=>{libraryHTML+=`<div class="librow" onclick="loopShowTrack('${song.id}','${S.id}')"><div class="cover">${song.cover||'♫'}</div><div><b>${song.title}</b><span>Song · ${S.name}</span></div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="libhead"><div class="me">${S.name.charAt(0).toUpperCase()}</div><h2>Your Library</h2><span style="font-size:18px;cursor:pointer">＋</span></div><div class="filters"><span class="on">Playlists</span><span>Artists</span><span>Albums</span></div>${releasedSongs.length>0?libraryHTML:'<div style="text-align:center;padding:40px 20px;color:#a7a7a7">No songs released yet</div>'}<div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div class="on" onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
-function showLoopifyArtistProfile(artistId){let player;if(artistId===S.id){const totalStreams=GAME.songs.reduce((sum,s)=>sum+(s.streams||0),0);player={id:S.id,artistName:S.name,bio:GAME.artistProfile?.bio,totalStreams};}else{player=window.allPlayers?.find(p=>p.id===artistId)||null;}if(!player){showToast('Artist not found','error');return;}const songs=(artistId===S.id?GAME.songs:player.gameSongs||[]).filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,10);let popularHTML='';songs.forEach((song,idx)=>{const ls=Math.floor((song.streams||0)*0.42);const lsStr=ls>=1000000?(ls/1000000).toFixed(1)+'M':ls>=1000?Math.floor(ls/1000)+'K':ls.toString();popularHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${artistId}')"><div class="pos">${idx+1}</div><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${lsStr}</span></div><div class="dots">⋮</div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="ahero"><button class="back" onclick="loopSwitchView('home')">←</button><div class="verif">✓ Verified Artist</div><h3>${player.artistName}</h3><div style="font-size:11.5px;color:#d0d0d0;margin-top:2px">${player.totalStreams?(player.totalStreams/1000).toLocaleString()+' monthly listeners':'Coming up'}</div></div><div class="actions"><button class="follow" onclick="loopToggleFollow('${artistId}',this)">Follow</button><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div><div class="sect">Popular</div>${popularHTML}${player.bio?`<div class="aboutcard"><h4>About</h4><p>${player.bio}</p></div>`:''}<div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
+function showLoopifyArtistProfile(artistId){let player;if(artistId===S.id){const totalStreams=GAME.songs.reduce((sum,s)=>sum+(s.streams||0),0);player={id:S.id,artistName:S.name,bio:GAME.artistProfile?.bio,totalStreams};}else{player=window.allPlayers?.find(p=>p.id===artistId)||null;}if(!player){showToast('Artist not found','error');return;}const songs=(artistId===S.id?GAME.songs:(player.gameSongs||player.songs||[])).filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,10);let popularHTML='';songs.forEach((song,idx)=>{const ls=Math.floor((song.streams||0)*0.42);const lsStr=ls>=1000000?(ls/1000000).toFixed(1)+'M':ls>=1000?Math.floor(ls/1000)+'K':ls.toString();popularHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${artistId}')"><div class="pos">${idx+1}</div><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${lsStr}</span></div><div class="dots">⋮</div></div>`;});let html=LOOPIFY_CSS+`<div class="loop"><div class="ahero"><button class="back" onclick="loopSwitchView('home')">←</button><div class="verif">✓ Verified Artist</div><h3>${player.artistName}</h3><div style="font-size:11.5px;color:#d0d0d0;margin-top:2px">${player.totalStreams?(player.totalStreams/1000).toLocaleString()+' monthly listeners':'Coming up'}</div></div><div class="actions"><button class="follow" onclick="loopToggleFollow('${artistId}',this)">Follow</button><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div><div class="sect">Popular</div>${popularHTML}${player.bio?`<div class="aboutcard"><h4>About</h4><p>${player.bio}</p></div>`:''}<div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
 function showLoopifyTrackDetails(songId,artistId){let song,artist;if(artistId===S.id){song=GAME.songs?.find(s=>s.id===songId);artist={id:S.id,name:S.name};}else{const player=window.allPlayers?.find(p=>p.id===artistId);if(!player){showToast('Artist not found','error');return;}song=player.gameSongs?.find(s=>s.id===songId);artist={id:player.id,name:player.artistName};}if(!song){showToast('Song not found','error');return;}const streams=song.streams||0;const chartRank=song.chartPosition||null;const peakRank=song.peakPosition||null;const weeksOnChart=song.weeksOnChart||0;let creditsHTML='';if(song.collabs&&song.collabs.length>0){creditsHTML='<div class="credits"><h4>Credits</h4>';song.collabs.forEach(collab=>{creditsHTML+=`<div class="cr"><b>${collab.artist||'Unknown'}</b><span>${collab.role||'Collaborator'}</span></div>`;});creditsHTML+='</div>';}let html=LOOPIFY_CSS+`<div class="loop"><div class="thero"><button class="back" onclick="loopSwitchView('artist',this)">←</button><div class="cover">${song.cover||'♫'}</div><h3>${song.title}</h3><div class="a">${artist.name} · Single · 3:42</div></div><div class="actions"><span style="font-size:18px;cursor:pointer" onclick="this.textContent=this.textContent==='♡'?'💚':'♡'">♡</span><span style="font-size:17px;cursor:pointer">⤴</span><span class="dots">⋮</span><span class="shuf">🔀</span><button class="play" onclick="togglePlay(this)">▶</button></div>${song.lyrics?`<div class="lyr" onclick="this.classList.toggle('open')"><h4>LYRICS · TAP TO EXPAND</h4><p>${song.lyrics.split('\n')[0]}</p><p class="more">${song.lyrics}</p></div>`:''}${creditsHTML}<div class="credits"><h4>Stats</h4><div class="cr"><b>${streams.toLocaleString()}</b><span>All-time streams</span></div><div class="cr"><b>${chartRank?'#'+chartRank:'—'}</b><span>Peak — Top 50</span></div><div class="cr"><b>${weeksOnChart}</b><span>On chart</span></div></div><div class="bnav"><div onclick="loopSwitchView('home',this)">⌂ Home</div><div onclick="loopSwitchView('search',this)">🔎 Search</div><div onclick="loopSwitchView('library',this)">▤ Your Library</div></div></div>`;_insertOverlay(html);}
 function loopSwitchView(view,navEl){GAME.loopifyView=view;if(navEl){navEl.parentElement.querySelectorAll('div').forEach(d=>d.classList.remove('on'));navEl.classList.add('on');}showLoopifyUI();}
 function loopShowTrack(songId,artistId){GAME.loopifyView='track';GAME.loopifyTrackId=songId;GAME.loopifyTrackArtistId=artistId;showLoopifyUI();}
@@ -20056,7 +20056,7 @@ function showOrangeBrowse(){
   if(!topSongsHTML)topSongsHTML='<div style="text-align:center;padding:30px;color:#86868b">No songs released yet</div>';
   const initials=(S.name||'?').charAt(0).toUpperCase();
   const html=ORANGE_CSS+`<div class="org"><div class="scroll">
-    <div class="head"><h2>Browse</h2><div class="me">${initials}</div></div>
+    <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Browse</h2><div class="me">${initials}</div></div>
     <div class="card2"><div class="tag">FEATURED PLAYLIST</div><h3>Top Orange Picks</h3><p>The hottest releases, refreshed every game week.</p><button class="pl" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button></div>
     <div class="sect">New Releases <a href="#">See All</a></div>
     <div class="hrow">${newRelHTML}</div>
@@ -20076,7 +20076,7 @@ function showOrangeRadio(){
   GAME.orangeView='radio';
   const initials=(S.name||'?').charAt(0).toUpperCase();
   const html=ORANGE_CSS+`<div class="org"><div class="scroll">
-    <div class="head"><h2>Radio</h2><div class="me">${initials}</div></div>
+    <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Radio</h2><div class="me">${initials}</div></div>
     <div class="radiohero"><span class="live">● LIVE</span><h3>Orange Radio 1</h3><p>Now: the hottest player releases, all hour.</p></div>
     <div class="radiohero" style="background:linear-gradient(135deg,#5a1d3a,#2a0e1c)"><span class="live" style="background:#0071e3">SHOW</span><h3>Chart Show Weekly</h3><p>Counting down the Top 10, every game Sunday.</p></div>
     <div class="radiohero" style="background:linear-gradient(135deg,#1d3a5a,#0e1c2a)"><span class="live" style="background:#30b0c7">EXCLUSIVE</span><h3>${S.name||'Artist'} Radio</h3><p>Songs in the style of ${S.name||'your sound'} and more.</p></div>
@@ -20103,7 +20103,7 @@ function showOrangeLibrary(){
   });
   const initials=(S.name||'?').charAt(0).toUpperCase();
   const html=ORANGE_CSS+`<div class="org"><div class="scroll">
-    <div class="head"><h2>Library</h2><div class="me">${initials}</div></div>
+    <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Library</h2><div class="me">${initials}</div></div>
     <div class="librow2"><i>♪</i>Songs<s>›</s></div>
     <div class="librow2"><i>▦</i>Albums<s>›</s></div>
     <div class="librow2"><i>👤</i>Artists<s>›</s></div>
@@ -20329,7 +20329,7 @@ function showYourtubeHome(){
   if(!videoFeedHTML)videoFeedHTML=`<div style="text-align:center;padding:40px 20px;color:#aaa"><div style="font-size:48px;margin-bottom:12px">▶</div><div>No releases yet</div></div>`;
 
   html=YOURTUBE_CSS+`<div class="yt"><div class="scroll">
-    <div class="head"><div class="logo">▶</div><h2>Yourtube</h2><div class="ic">📡 🔔 🔎</div></div>
+    <div class="head"><button onclick="closeYourtubeMusicToStreaming()" style="background:none;border:none;color:#f1f1f1;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><div class="logo">▶</div><h2>Yourtube</h2><div class="ic">📡 🔔 🔎</div></div>
     <div class="chiprow"><span class="on">All</span><span>Music</span><span>Music Videos</span><span>Live</span><span>New</span></div>
     ${videoFeedHTML}
   </div>
@@ -20350,6 +20350,7 @@ function showYourtubeShorts(){
   const likes=topSong?Math.floor((topSong.streams||0)/20):0;
   const html=YOURTUBE_CSS+`<div class="yt"><div class="scroll" style="padding:0">
     <div class="sthumb">${cover}
+      <button onclick="closeYourtubeMusicToStreaming()" style="position:absolute;top:14px;left:14px;background:rgba(0,0,0,0.6);border:none;border-radius:50%;width:34px;height:34px;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10">←</button>
       <div class="sside">
         <div onclick="this.querySelector('i').style.color='#4c9df3'"><i style="font-style:normal;display:block;font-size:24px">👍</i>${likes>0?Math.floor(likes/1000)+'K':0}</div>
         <div><i style="font-style:normal;display:block;font-size:24px">💬</i>${topSong?Math.floor((topSong.streams||0)/500):0}</div>
@@ -20383,7 +20384,7 @@ function showYourtubeSubs(){
   }
   if(!subFeedHTML)subFeedHTML='<div style="text-align:center;padding:40px 20px;color:#aaa">No subscriptions yet</div>';
   const html=YOURTUBE_CSS+`<div class="yt"><div class="scroll">
-    <div class="head"><div class="logo">▶</div><h2 style="font-size:16px">Subscriptions</h2></div>
+    <div class="head"><button onclick="closeYourtubeMusicToStreaming()" style="background:none;border:none;color:#f1f1f1;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><div class="logo">▶</div><h2 style="font-size:16px">Subscriptions</h2></div>
     <div class="chiprow"><span class="on">All</span><span>Today</span><span>Continue</span></div>
     ${subFeedHTML}
   </div>
@@ -20460,7 +20461,7 @@ function showSaharaHome(){
   if(!trendHTML)trendHTML='<div style="text-align:center;padding:30px;color:#7c8a99">No songs released yet</div>';
   const topSong=allSongs[0];
   const html=SAHARA_CSS+`<div class="sa"><div class="scroll">
-    <div class="head"><h2>sahara <i>music</i></h2><span>Prime included ✓</span></div>
+    <div class="head"><button onclick="closeSahara()" style="background:none;border:none;color:#f2f4f6;font-size:20px;cursor:pointer;padding:0 10px 0 0;line-height:1">←</button><h2>sahara <i>music</i></h2><span>Prime included ✓</span></div>
     <div class="search2">🔎 <input placeholder="Search artists, songs, albums…" oninput=""></div>
     <div class="rowchips">
       <span class="on" onclick="saharaSwitch('home',this)">Home</span>
@@ -20498,7 +20499,7 @@ function showSaharaCharts(){
   if(!chartHTML)chartHTML='<div style="text-align:center;padding:30px;color:#7c8a99">No songs on chart yet</div>';
   const topSong=allSongs[0];
   const html=SAHARA_CSS+`<div class="sa"><div class="scroll">
-    <div class="head"><h2>sahara <i>charts</i></h2><span>Updated weekly</span></div>
+    <div class="head"><button onclick="closeSahara()" style="background:none;border:none;color:#f2f4f6;font-size:20px;cursor:pointer;padding:0 10px 0 0;line-height:1">←</button><h2>sahara <i>charts</i></h2><span>Updated weekly</span></div>
     <div class="rowchips" style="padding-top:12px">
       <span onclick="saharaSwitch('home',this)">Home</span>
       <span class="on" onclick="saharaSwitch('charts',this)">Charts</span>
@@ -20602,7 +20603,7 @@ function showSoundPuffStream(){
   });
   if(!tracksHTML)tracksHTML='<div style="text-align:center;padding:40px;color:#999">No tracks yet. Release your first song!</div>';
   const html=SOUNDPUFF_CSS+`<div class="sp">
-    <div class="head"><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
+    <div class="head"><button onclick="closeSoundPuff()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
     <div class="stab">
       <span class="on" onclick="spSwitch('stream',this)">Stream</span>
       <span onclick="spSwitch('trend',this)">Trending</span>
@@ -20635,7 +20636,7 @@ function showSoundPuffTrending(){
   });
   if(!trendHTML)trendHTML='<div style="text-align:center;padding:40px;color:#999">No trending tracks yet</div>';
   const html=SOUNDPUFF_CSS+`<div class="sp">
-    <div class="head"><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
+    <div class="head"><button onclick="closeSoundPuff()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
     <div class="stab">
       <span onclick="spSwitch('stream',this)">Stream</span>
       <span class="on" onclick="spSwitch('trend',this)">Trending</span>
@@ -20664,7 +20665,7 @@ function showSoundPuffYou(){
   const picStyle=GAME.artistProfile&&GAME.artistProfile.profilePicType==='image'?`background-image:url('${GAME.artistProfile.profilePic}');background-size:cover;background-position:center`:'';
   const handle=(S.name||'artist').toLowerCase().replace(/\s+/g,'');
   const html=SOUNDPUFF_CSS+`<div class="sp">
-    <div class="head"><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
+    <div class="head"><button onclick="closeSoundPuff()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><div class="cloud">☁</div><h2>SoundPuff</h2><button class="up2">↑ Upload</button></div>
     <div class="stab">
       <span onclick="spSwitch('stream',this)">Stream</span>
       <span onclick="spSwitch('trend',this)">Trending</span>
@@ -20682,6 +20683,7 @@ function showSoundPuffYou(){
 function spSwitch(view,el){GAME.soundpuffView=view;showSoundCloudUI();}
 function spufLike(el){if(el.dataset.l)return;el.dataset.l=1;el.style.color='#ff5500';const m=el.textContent.match(/([\d.]+)(K?)/);if(m){el.textContent='♥ '+(m[2]?(parseFloat(m[1])+0.1).toFixed(1)+'K':(parseInt(m[1])+1));}}
 function closeSoundCloud(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
+function closeSoundPuff(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
 
 // ════════════════════════════════════════════════════════════════════════════
 // iMUSIC — iTunes Store-style (blueprint v3)
@@ -20757,7 +20759,7 @@ function showiTunesUI(){
     albumsHTML+=`<div class="alb2" onclick="showReleaseStats(${rel.id},'itunes')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.name}</span><div class="pr">$7.99</div></div>`;
   });
   const html=IMUSIC_CSS+`<div class="im"><div class="scroll">
-    <div class="head"><h2>iMusic Store</h2><span>Balance: $<b id="imBal">${playerBalance.toFixed(2)}</b></span></div>
+    <div class="head"><button onclick="closeiTunes()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 10px 0 0;line-height:1">←</button><h2>iMusic Store</h2><span>Balance: $<b id="imBal">${playerBalance.toFixed(2)}</b></span></div>
     <div class="seg"><span class="on">Songs</span><span>Albums</span><span>Music Videos</span></div>
     ${bannerHTML}
     ${topSongsHTML}
