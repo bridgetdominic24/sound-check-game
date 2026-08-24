@@ -8457,89 +8457,18 @@ function showPromoManager(songId){
     historyHTML += completedCampaigns.map(c => `<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-weight:600;color:var(--txt)">${c.typeName||c.type}</span><span style="font-size:11px;padding:2px 8px;background:var(--bg);color:var(--mut);border:1px solid var(--bord);border-radius:10px">DONE</span></div><div style="font-size:12px;color:var(--mut)">$${(c.budget||0).toLocaleString()}/wk · ${c.duration} weeks · ${(c.listenersGained||0).toLocaleString()} listeners</div></div>`).join('');
   }
 
-  const html = `<div style="padding:20px 0 80px"><div style="max-width:500px;margin:0 auto;padding:0 16px"><div style="display:flex;align-items:center;gap:12px;margin-bottom:24px"><button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--acc);font-size:28px;cursor:pointer;padding:0">←</button><div><h2 style="font-size:18px;color:var(--txt);margin-bottom:4px">${song.title}</h2><p style="font-size:12px;color:var(--mut)">Released • ${(song.streams||0).toLocaleString()} streams</p></div></div><div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--bord)"><button onclick="switchPromoTab(event,'active',${songId})" data-tab="active" style="flex:1;padding:14px;background:none;border:none;color:var(--acc);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--acc);margin-bottom:-2px">Active ${song.campaigns.filter(c=>c.status==='active').length>0?'('+song.campaigns.filter(c=>c.status==='active').length+')':''}</button><button onclick="switchPromoTab(event,'history',${songId})" data-tab="history" style="flex:1;padding:14px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s">History ${completedCampaigns.length>0?'('+completedCampaigns.length+')':''}</button><button onclick="switchPromoTab(event,'new',${songId})" data-tab="new" style="flex:1;padding:14px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s">New</button></div><div data-promo-tab="active" style="display:block">${song.campaigns.filter(c=>c.status==='active').length>0?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px"><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px">Total Spent</div><div style="font-size:18px;font-weight:700;color:var(--acc)">$${totalSpent.toLocaleString()}</div></div><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px">New Listeners</div><div style="font-size:18px;font-weight:700;color:var(--acc)">${totalListeners.toLocaleString()}</div></div></div>`:''}${activeCampaignsHTML || '<div style="text-align:center;padding:40px 20px"><p style="color:var(--mut)">No active campaigns</p></div>'}</div><div data-promo-tab="history" style="display:none">${historyHTML}</div><div data-promo-tab="new" style="display:none"><div style="font-size:12px;color:var(--mut);margin-bottom:16px;padding:12px;background:var(--acc-bg);border-left:3px solid var(--acc);border-radius:6px">Click promo types below to select them. Budget controls appear inline under each selected option. Click the budget buttons to adjust. Then click Start Campaign to launch all selected campaigns at once!</div>${promoOptionsHTML}<button id="launchBtn-${songId}" onclick="launchPromoCampaign(${songId})" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:calc(100% - 40px);max-width:500px;padding:14px;background:linear-gradient(135deg,var(--acc),#764ba2);color:white;border:none;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 20px rgba(102,126,234,0.3)">Start Campaign</button></div></div></div></div>`;
+  const html = `<div style="padding:20px 0 80px"><div style="max-width:500px;margin:0 auto;padding:0 16px"><div style="display:flex;align-items:center;gap:12px;margin-bottom:24px"><button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--acc);font-size:28px;cursor:pointer;padding:0">←</button><div><h2 style="font-size:18px;color:var(--txt);margin-bottom:4px">${song.title}</h2><p style="font-size:12px;color:var(--mut)">Released • ${(song.streams||0).toLocaleString()} streams</p></div></div><div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--bord)"><button onclick="switchPromoTab(event,'active',${songId})" data-tab="active" style="flex:1;padding:14px;background:none;border:none;color:var(--acc);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--acc);margin-bottom:-2px">Active ${song.campaigns.filter(c=>c.status==='active').length>0?'('+song.campaigns.filter(c=>c.status==='active').length+')':''}</button><button onclick="switchPromoTab(event,'history',${songId})" data-tab="history" style="flex:1;padding:14px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s">History ${completedCampaigns.length>0?'('+completedCampaigns.length+')':''}</button><button onclick="switchPromoTab(event,'new',${songId})" data-tab="new" style="flex:1;padding:14px;background:none;border:none;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s">New</button></div><div data-promo-tab="active" style="display:block">${song.campaigns.filter(c=>c.status==='active').length>0?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px"><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px">Total Spent</div><div style="font-size:18px;font-weight:700;color:var(--acc)">$${totalSpent.toLocaleString()}</div></div><div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--mut);text-transform:uppercase;margin-bottom:6px">New Listeners</div><div style="font-size:18px;font-weight:700;color:var(--acc)">${totalListeners.toLocaleString()}</div></div></div>`:''}${activeCampaignsHTML || '<div style="text-align:center;padding:40px 20px"><p style="color:var(--mut)">No active campaigns</p></div>'}</div><div data-promo-tab="history" style="display:none">${historyHTML}</div><div data-promo-tab="new" style="display:none"><div style="font-size:12px;color:var(--mut);margin-bottom:16px;padding:12px;background:var(--acc-bg);border-left:3px solid var(--acc);border-radius:6px">Tap a promo type to select it. Set budget and duration in the panel that appears, then tap Start Campaign.</div><div class="promo-options-list">${promoOptionsHTML}</div><button id="launchBtn-${songId}" onclick="launchPromoCampaign(${songId})" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:calc(100% - 40px);max-width:500px;padding:14px;background:linear-gradient(135deg,var(--acc),#764ba2);color:white;border:none;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 20px rgba(102,126,234,0.3)">Start Campaign</button></div></div></div></div>`;
   
   _insertOverlay(html);
   window.currentPromoSong = {id: songId, selectedPromos: {}};
 }
 
 function selectPromoOption(element, promoKey, songId){
-  // Remove selection from all
-  document.querySelectorAll('[data-promo]').forEach(el => {
-    el.style.borderColor = 'var(--bord)';
-    el.style.background = 'var(--surf)';
-    el.style.boxShadow = 'none';
-  });
-
-  // Remove any existing budget panels
-  document.querySelectorAll('[data-budget-panel]').forEach(el => el.remove());
-
-  // Select this one
-  element.style.borderColor = 'var(--acc)';
-  element.style.background = 'rgba(102,126,234,0.1)';
-  element.style.boxShadow = '0 0 20px rgba(102,126,234,0.15)';
-
-  window.currentPromoSong.selectedPromo = promoKey;
-
+  if(!window.currentPromoSong) window.currentPromoSong = {id: songId, selectedPromos: {}};
+  if(!window.currentPromoSong.selectedPromos) window.currentPromoSong.selectedPromos = {};
+  const existingPanel = document.querySelector('[data-budget-panel="'+promoKey+'"]');
   const promo = PROMO_TYPES[promoKey];
-
-  // Create an inline budget panel right after the selected promo
-  const inlineBudgetHTML = `<div data-budget-panel="true" style="background:var(--bg);border:1.5px solid var(--acc);border-radius:12px;padding:16px;margin-bottom:12px;margin-left:0">
-    <div style="font-size:12px;color:var(--acc);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:700">⚙️ Campaign Setup</div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      <div>
-        <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Weekly Budget</label>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="color:var(--mut);font-weight:700">$</span>
-          <input type="number" id="budgetInput-${songId}" placeholder="${promo.minBudget}" min="${promo.minBudget}" max="${promo.maxBudget}" step="100" value="${promo.minBudget}" style="flex:1;padding:10px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--txt);font-size:13px;font-weight:600" oninput="updatePromoEstimate(${songId})">
-        </div>
-        <div style="font-size:9px;color:var(--mut);margin-top:4px">Min: $${promo.minBudget.toLocaleString()} - Max: $${promo.maxBudget.toLocaleString()}</div>
-      </div>
-
-      <div>
-        <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Duration</label>
-        <div style="display:flex;gap:4px;flex-wrap:wrap">
-          <button onclick="selectDurationPill(event,1)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">1w</button>
-          <button onclick="selectDurationPill(event,2)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">2w</button>
-          <button onclick="selectDurationPill(event,4)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">4w</button>
-          <button onclick="selectDurationPill(event,8)" class="duration-pill" style="flex:1;min-width:40px;padding:8px 6px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:11px;cursor:pointer;transition:all 0.2s;font-weight:600">8w</button>
-        </div>
-      </div>
-    </div>
-
-    <div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:12px;margin-bottom:12px;font-size:11px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
-        <span>Cost per Listener:</span>
-        <span style="color:var(--acc);font-weight:700" id="costPer-${songId}">$${promo.costPerListener.toFixed(2)}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
-        <span>Expected Listeners/Week:</span>
-        <span style="color:var(--acc);font-weight:700" id="listeners-${songId}">—</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px;color:var(--mut)">
-        <span>Campaign Duration:</span>
-        <span style="color:var(--acc);font-weight:700" id="durationShow-${songId}">Select duration</span>
-      </div>
-      <div style="border-top:1px solid var(--bord);padding-top:8px;margin-top:8px;display:flex;justify-content:space-between;color:var(--txt);font-weight:700">
-        <span>💰 Total Campaign Cost:</span>
-        <span style="font-size:13px;color:var(--acc)" id="totalShow-${songId}">$0</span>
-      </div>
-    </div>
-
-    <button id="launchBtn-${songId}" onclick="launchPromoCampaign(${songId})" style="width:100%;padding:11px;background:linear-gradient(135deg,var(--acc),#764ba2);color:white;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;transition:all 0.2s" disabled>
-      🚀 Start Campaign
-    </button>
-  </div>`;
-
-  // Insert the inline budget panel right after the selected promo element
-  element.insertAdjacentHTML('afterend', inlineBudgetHTML);
-
-  // Focus on the budget input for easier editing
-  setTimeout(() => {
-    const budgetInput = document.getElementById('budgetInput-'+songId);
-    if(budgetInput) budgetInput.focus();
-  }, 100);
+  if(!promo) return;
 
   if(existingPanel){
     // Panel exists - remove it (deselect)
@@ -8615,6 +8544,14 @@ function selectPromoOption(element, promoKey, songId){
   }
 }
 
+function selectDurationPill(event,weeks){
+  // Called from old-style inlineBudgetHTML pills — find the promoKey from context
+  event.stopPropagation();
+  var panel=event.target.closest('[data-budget-panel]');
+  var promoKey=panel?panel.getAttribute('data-budget-panel'):null;
+  if(promoKey&&promoKey!=='true')setPromoDuration(promoKey,weeks,event.target,window.currentPromoSong?window.currentPromoSong.id:0);
+}
+function updatePromoEstimate(songId){updatePromoMultiEstimate(songId);}
 function setPromoDuration(promoKey, weeks, buttonEl, songId){
   if(!window.currentPromoSong.selectedPromos) window.currentPromoSong.selectedPromos = {};
   window.currentPromoSong.selectedPromos[promoKey].duration = weeks;
@@ -19836,7 +19773,7 @@ function getSVG(name, size='16px') {
 const LOOPIFY_CSS = `
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900&display=swap');
-.loop { background: #121212; color: #fff; min-height: 100%; display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans', 'Circular Std', ui-sans-serif, -apple-system, sans-serif; }
+.loop { background: #121212; color: #fff; min-height: 100%; display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans', 'Circular Std', ui-sans-serif, -apple-system, sans-serif; padding-bottom: 112px; }
 .loop .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; }
 .loop .topbar h2 { font-size: 22px; font-weight: 800; flex: 1; text-align: center; }
 .loop .topbar .ic { display: flex; gap: 16px; font-size: 20px; color: #e0e0e0; cursor: pointer; }
@@ -19906,7 +19843,7 @@ const LOOPIFY_CSS = `
 .loop .librow .cover { width: 56px; height: 56px; font-size: 22px; display: flex; align-items: center; justify-content: center; background: #333; border-radius: 6px; }
 .loop .librow b { display: block; font-size: 14.5px; font-weight: 600; }
 .loop .librow span { font-size: 12px; color: #a7a7a7; }
-.loop .foot { margin-top: auto; position: sticky; bottom: 0; }
+.loop .foot { flex-shrink: 0; background: #121212; }
 .loop .npbar { margin: 0 8px; background: #3d2a4a; border-radius: 8px; display: flex; align-items: center; gap: 10px; padding: 7px 10px; box-shadow: 0 4px 14px rgba(0,0,0,.5); z-index: 5; cursor: pointer; }
 .loop .npbar .cover { width: 38px; height: 38px; font-size: 16px; background: #5a3d6e; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
 .loop .npbar .ti b { font-size: 12.5px; }
@@ -19926,7 +19863,7 @@ const LOOPIFY_CSS = `
 </style>
 `;
 
-function showLoopifyUI(){if(!GAME||!GAME.songs){showToast('Loading...','purple');return;}if(!GAME.loopifyView)GAME.loopifyView='home';switch(GAME.loopifyView){case'home':showLoopifyHome();break;case'search':showLoopifySearch();break;case'library':showLoopifyLibrary();break;case'artist':showLoopifyArtistProfile(GAME.loopifyArtistId||currentUser?.id);break;case'track':showLoopifyTrackDetails(GAME.loopifyTrackId,GAME.loopifyTrackArtistId||currentUser?.id);break;default:showLoopifyHome();}}
+function showLoopifyUI(){if(!GAME||!GAME.songs){showToast('Loading...','purple');return;}if(!GAME.loopifyView)GAME.loopifyView='home';switch(GAME.loopifyView){case'home':showLoopifyHome();break;case'search':showLoopifySearch();break;case'library':showLoopifyLibrary();break;case'artist':showLoopifyArtistProfile(GAME.loopifyArtistId||currentUser?.id);break;case'track':if(!GAME.loopifyTrackId){GAME.loopifyView='home';showLoopifyHome();}else{showLoopifyTrackDetails(GAME.loopifyTrackId,GAME.loopifyTrackArtistId||currentUser?.id);}break;default:showLoopifyHome();}}
 function showSpotifyUI(){showLoopifyUI();}
 function showLoopifyHome(){
   const releasedSongs=GAME.songs.filter(s=>s.released);
@@ -19966,7 +19903,7 @@ function showLoopifyHome(){
     });
   }
   const hr=new Date().getHours();const tod=hr<12?'morning':hr<18?'afternoon':'evening';
-  const html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">←</button><h2>Good ${tod}</h2><div class="ic"><span onclick="" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center">${getSVG('bell','20px')}</span><span onclick="" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center">${getSVG('settings','18px')}</span></div></div><div class="filters"><span class="on">All</span><span>Music</span><span>Charts</span></div><div class="sect">Top 50 — Global <a href="#">See chart</a></div>${chartHTML}<div class="sect">Popular artists</div><div class="hrow">${popularArtistsHTML}</div><div class="foot"><div class="npbar" onclick="loopShowTrack()"><div class="cover" style="display:flex;align-items:center;justify-content:center;font-size:16px">&#9834;</div><div class="ti" style="flex:1"><b>Your Track</b><span>Artist</span></div><div class="ctrl" style="display:flex;gap:10px;font-size:18px">&#9654;</div><div class="prog"><i id="lprog"></i></div></div><div class="bnav"><div class="on" onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;
+  const html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">←</button><h2>Good ${tod}</h2><div class="ic"><span onclick="" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center">${getSVG('bell','20px')}</span><span onclick="" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center">${getSVG('settings','18px')}</span></div></div><div class="filters"><span class="on">All</span><span>Music</span><span>Charts</span></div><div class="sect">Top 50 — Global <a href="#">See chart</a></div>${chartHTML}<div class="sect">Popular artists</div><div class="hrow">${popularArtistsHTML}</div><div class="foot"><div class="npbar"><div class="cover" style="display:flex;align-items:center;justify-content:center;font-size:16px">&#9834;</div><div class="ti" style="flex:1"><b>Your Track</b><span>Artist</span></div><div class="ctrl" style="display:flex;gap:10px;font-size:18px">&#9654;</div><div class="prog"><i id="lprog"></i></div></div><div class="bnav"><div class="on" onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;
   _insertOverlay(html);
 }
 function showLoopifySearch(){let html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">←</button><h2>Search</h2><div class="ic"></div></div><div class="srchbox">${getSVG('search','18px')}<input type="text" placeholder="Artists, songs, or albums" oninput="loopFilterSearch(this.value)"></div><div id="loopSearchResults" style="display:none"></div><div class="sect">Browse all</div><div class="ggrid"><div class="gcard" style="background:#8a2a4a">R&amp;B</div><div class="gcard" style="background:#2a6a4a">Afrobeats</div><div class="gcard" style="background:#3d3d8a">Pop</div><div class="gcard" style="background:#8a5a2a">Hip-Hop</div><div class="gcard" style="background:#2a3a6a">Dance</div><div class="gcard" style="background:#4a2a6a">Alternative</div></div><div class="foot"><div class="bnav"><div onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div class="on" onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;_insertOverlay(html);}
@@ -20050,40 +19987,41 @@ function showOrangeBrowse(){
   const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.platforms&&b.platforms.apple||0)-(a.platforms&&a.platforms.apple||0));
   let allSongs=[];
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown',platform:'apple'}))).concat(releasedSongs.map(s=>({...s,artistName:S.artistName}))).sort((a,b)=>(b.platforms&&b.platforms.apple||0)-(a.platforms&&a.platforms.apple||0)).slice(0,20);
+    allSongs=window.allPlayers.flatMap(p=>(p.gameSongs||[]).filter(s=>s.released).map(s=>({...s,artistName:p.artistName||p.name||'Unknown',ownerId:p.id,platform:'apple'}))).concat(releasedSongs.map(s=>({...s,artistName:S.artistName,ownerId:currentUser?.id}))).sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,20);
   }else{
-    allSongs=releasedSongs.slice(0,20).map(s=>({...s,artistName:S.artistName}));
+    allSongs=releasedSongs.slice(0,20).map(s=>({...s,artistName:S.artistName,ownerId:currentUser?.id}));
   }
   let newRelHTML='';
   const recentRels=(GAME.releases||[]).filter(r=>r.songs&&r.songs.length>0).sort((a,b)=>b.releaseDay-a.releaseDay).slice(0,5);
   recentRels.forEach(rel=>{
     const fs=rel.songs[0];
-    const cover=fs&&fs.cover?fs.cover:'🎵';
+    const cover=fs&&fs.cover?fs.cover:'&#9834;';
     const coverStyle=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
     newRelHTML+=`<div class="alb" onclick="showReleaseStats(${rel.id},'apple')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.artistName}</span></div>`;
   });
   if(!newRelHTML)newRelHTML='<div style="padding:16px;color:#86868b;font-size:13px">No releases yet</div>';
   let topSongsHTML='';
   allSongs.slice(0,10).forEach((song,i)=>{
-    const cover=song.cover||'🎵';
+    const cover=song.cover||'&#9834;';
     const coverStyle=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
-    topSongsHTML+=`<div class="chartrow"><div class="pos">${i+1}</div><div class="cover sm" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><button class="add" onclick="event.stopPropagation();this.textContent=this.textContent==='＋'?'✓':'＋';this.style.color=this.textContent==='✓'?'#4cc98a':'#fa4b2a'">＋</button></div>`;
+    const orgOwnerId = song.ownerId || currentUser?.id;
+    topSongsHTML+=`<div class="chartrow" onclick="showOrangeSongDetail('${song.id}','${orgOwnerId}')" style="cursor:pointer"><div class="pos">${i+1}</div><div class="cover sm" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><button class="add" onclick="event.stopPropagation();this.textContent=this.textContent==='++'?'✓':'++';this.style.color=this.textContent==='✓'?'#4cc98a':'#fa4b2a'">+</button></div>`;
   });
   if(!topSongsHTML)topSongsHTML='<div style="text-align:center;padding:30px;color:#86868b">No songs released yet</div>';
   const initials=(S.artistName||'?').charAt(0).toUpperCase();
   const html=ORANGE_CSS+`<div class="org"><div class="scroll">
-    <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Browse</h2><div class="me">${initials}</div></div>
+    <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Browse</h2><div class="me" onclick="showOrangeProfile()" style="cursor:pointer">${initials}</div></div>
     <div class="card2"><div class="tag">FEATURED PLAYLIST</div><h3>Top Orange Picks</h3><p>The hottest releases, refreshed every game week.</p><button class="pl" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button></div>
     <div class="sect">New Releases <a href="#">See All</a></div>
     <div class="hrow">${newRelHTML}</div>
     <div class="sect">Top Songs</div>
     ${topSongsHTML}
   </div>
-  <div class="npbar"><div class="cover">🎵</div><b>${allSongs[0]?allSongs[0].title:'No songs yet'}</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
+  <div class="npbar"><div class="cover">&#9834;</div><b>${allSongs[0]?allSongs[0].title:'No songs yet'}</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
   <div class="bnav">
-    <div onclick="orgSwitch('radio',this)"><i>📻</i>Radio</div>
-    <div class="on" onclick="orgSwitch('browse',this)"><i>▦</i>Browse</div>
-    <div onclick="orgSwitch('library',this)"><i>▤</i>Library</div>
+    <div onclick="orgSwitch('radio',this)"><i style="font-style:normal">&#9112;</i>Radio</div>
+    <div class="on" onclick="orgSwitch('browse',this)"><i style="font-style:normal">&#8942;</i>Browse</div>
+    <div onclick="orgSwitch('library',this)"><i style="font-style:normal">&#9783;</i>Library</div>
   </div></div>`;
   _insertOverlay(html);
 }
@@ -20092,16 +20030,16 @@ function showOrangeRadio(){
   GAME.orangeView='radio';
   const initials=(S.artistName||'?').charAt(0).toUpperCase();
   const html=ORANGE_CSS+`<div class="org"><div class="scroll">
-    <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Radio</h2><div class="me">${initials}</div></div>
+    <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Radio</h2><div class="me" onclick="showOrangeProfile()" style="cursor:pointer">${initials}</div></div>
     <div class="radiohero"><span class="live">● LIVE</span><h3>Orange Radio 1</h3><p>Now: the hottest player releases, all hour.</p></div>
     <div class="radiohero" style="background:linear-gradient(135deg,#5a1d3a,#2a0e1c)"><span class="live" style="background:#0071e3">SHOW</span><h3>Chart Show Weekly</h3><p>Counting down the Top 10, every game Sunday.</p></div>
     <div class="radiohero" style="background:linear-gradient(135deg,#1d3a5a,#0e1c2a)"><span class="live" style="background:#30b0c7">EXCLUSIVE</span><h3>${S.artistName||'Artist'} Radio</h3><p>Songs in the style of ${S.artistName||'your sound'} and more.</p></div>
   </div>
-  <div class="npbar"><div class="cover">📻</div><b>Orange Radio 1</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
+  <div class="npbar"><div class="cover">&#9112;</div><b>Orange Radio 1</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
   <div class="bnav">
-    <div class="on" onclick="orgSwitch('radio',this)"><i>📻</i>Radio</div>
-    <div onclick="orgSwitch('browse',this)"><i>▦</i>Browse</div>
-    <div onclick="orgSwitch('library',this)"><i>▤</i>Library</div>
+    <div class="on" onclick="orgSwitch('radio',this)"><i style="font-style:normal">&#9112;</i>Radio</div>
+    <div onclick="orgSwitch('browse',this)"><i style="font-style:normal">&#8942;</i>Browse</div>
+    <div onclick="orgSwitch('library',this)"><i style="font-style:normal">&#9783;</i>Library</div>
   </div></div>`;
   _insertOverlay(html);
 }
@@ -20113,30 +20051,117 @@ function showOrangeLibrary(){
   const recentRels=(GAME.releases||[]).filter(r=>r.songs&&r.songs.length>0).sort((a,b)=>b.releaseDay-a.releaseDay).slice(0,5);
   recentRels.forEach(rel=>{
     const fs=rel.songs[0];
-    const cover=fs&&fs.cover?fs.cover:'🎵';
+    const cover=fs&&fs.cover?fs.cover:'&#9834;';
     const coverStyle=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
     recentHTML+=`<div class="alb" onclick="showReleaseStats(${rel.id},'apple')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.artistName}</span></div>`;
   });
   const initials=(S.artistName||'?').charAt(0).toUpperCase();
   const html=ORANGE_CSS+`<div class="org"><div class="scroll">
-    <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Library</h2><div class="me">${initials}</div></div>
-    <div class="librow2"><i>♪</i>Songs<s>›</s></div>
-    <div class="librow2"><i>▦</i>Albums<s>›</s></div>
-    <div class="librow2"><i>👤</i>Artists<s>›</s></div>
-    <div class="librow2"><i>▤</i>Playlists<s>›</s></div>
-    <div class="librow2"><i>⬇</i>Downloaded<s>›</s></div>
+    <div class="head"><button onclick="closeOrangeMusic()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Library</h2><div class="me" onclick="showOrangeProfile()" style="cursor:pointer">${initials}</div></div>
+    <div class="librow2" onclick="showOrangeLibrarySongs()" style="cursor:pointer"><i style="font-style:normal">&#9834;</i>Songs<s>›</s></div>
+    <div class="librow2" style="cursor:pointer"><i style="font-style:normal">&#9783;</i>Albums<s>›</s></div>
+    <div class="librow2" onclick="showOrangeArtistsList()" style="cursor:pointer"><i style="font-style:normal">&#128100;</i>Artists<s>›</s></div>
+    <div class="librow2" style="cursor:pointer"><i style="font-style:normal">&#9776;</i>Playlists<s>›</s></div>
+    <div class="librow2" style="cursor:pointer"><i style="font-style:normal">&#8595;</i>Downloaded<s>›</s></div>
     ${recentHTML?`<div class="sect">Recently Added</div><div class="hrow">${recentHTML}</div>`:''}
   </div>
-  <div class="npbar"><div class="cover">🎵</div><b>Your Music</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
+  <div class="npbar"><div class="cover">&#9834;</div><b>Your Music</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</span><span>⏭</span></div></div>
   <div class="bnav">
-    <div onclick="orgSwitch('radio',this)"><i>📻</i>Radio</div>
-    <div onclick="orgSwitch('browse',this)"><i>▦</i>Browse</div>
-    <div class="on" onclick="orgSwitch('library',this)"><i>▤</i>Library</div>
+    <div onclick="orgSwitch('radio',this)"><i style="font-style:normal">&#9112;</i>Radio</div>
+    <div onclick="orgSwitch('browse',this)"><i style="font-style:normal">&#8942;</i>Browse</div>
+    <div class="on" onclick="orgSwitch('library',this)"><i style="font-style:normal">&#9783;</i>Library</div>
   </div></div>`;
   _insertOverlay(html);
 }
 
 function orgSwitch(view,el){GAME.orangeView=view;showOrangeMusicUI();}
+
+
+function showOrangeProfile(){
+  const initials=(S.artistName||'?').charAt(0).toUpperCase();
+  const totalStreams=GAME.songs.reduce((s,sg)=>s+(sg.streams||0),0);
+  const ytStr=totalStreams>=1000000?(totalStreams/1000000).toFixed(1)+'M':totalStreams>=1000?Math.round(totalStreams/1000)+'K':totalStreams.toString();
+  const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));
+  let songsHTML='';
+  releasedSongs.slice(0,8).forEach((song,i)=>{
+    const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
+    songsHTML+=`<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer" onclick="showOrangeSongDetail('${song.id}','${currentUser?.id}')"><div style="width:44px;height:44px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden;${cs}">${song.coverImage?'':'&#9834;'}</div><div style="flex:1;min-width:0"><b style="display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${song.title}</b><span style="font-size:11px;color:#86868b">${(song.streams||0).toLocaleString()} plays</span></div></div>`;
+  });
+  const html=ORANGE_CSS+`<div class="org"><div class="scroll"><div class="head"><button onclick="showOrangeMusicUI()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>My Profile</h2></div><div style="padding:16px;display:flex;align-items:center;gap:14px"><div style="width:64px;height:64px;border-radius:50%;background:#fa4b2a;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#fff">${initials}</div><div><div style="font-size:18px;font-weight:600;color:#1d1d1f">${S.artistName||'Artist'}</div><div style="font-size:12px;color:#86868b;margin-top:2px">${ytStr} total plays</div></div></div><div style="padding:0 16px 16px;display:flex;gap:10px"><div style="flex:1;background:#f5f5f7;border-radius:10px;padding:12px;text-align:center"><div style="font-size:18px;font-weight:700;color:#1d1d1f">${releasedSongs.length}</div><div style="font-size:10px;color:#86868b;text-transform:uppercase;margin-top:2px">Songs</div></div><div style="flex:1;background:#f5f5f7;border-radius:10px;padding:12px;text-align:center"><div style="font-size:18px;font-weight:700;color:#1d1d1f">${(GAME.releases||[]).length}</div><div style="font-size:10px;color:#86868b;text-transform:uppercase;margin-top:2px">Releases</div></div></div><div style="padding:0 16px 8px;font-size:16px;font-weight:600;color:#1d1d1f">My Songs</div>${songsHTML||'<div style="padding:20px 16px;color:#86868b;font-size:13px">No songs released yet</div>'}</div><div class="npbar"><div class="cover">&#9834;</div><b>${S.artistName||'Artist'}</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='&#9654;'?'&#9646;&#9646;':'&#9654;'">&#9654;</span><span>&#9677;</span></div></div><div class="bnav"><div onclick="orgSwitch('radio',this)"><i style="font-style:normal">&#9112;</i>Radio</div><div onclick="orgSwitch('browse',this)" class="on"><i style="font-style:normal">&#8942;</i>Browse</div><div onclick="orgSwitch('library',this)"><i style="font-style:normal">&#9783;</i>Library</div></div></div>`;
+  _insertOverlay(html);
+}
+
+function showOrangeSongDetail(songId, ownerId){
+  let song, ownerName;
+  if(ownerId===currentUser?.id){
+    song=GAME.songs?.find(s=>s.id===songId);
+    ownerName=S.artistName||'You';
+  }else{
+    const player=window.allPlayers?.find(p=>p.id===ownerId);
+    if(!player){showToast('Artist not found','error');return;}
+    song=(player.gameSongs||[]).find(s=>s.id===songId);
+    ownerName=player.artistName||'Artist';
+  }
+  if(!song){showToast('Song not found','error');return;}
+  const streams=song.streams||0;
+  const appleStreams=Math.floor(streams*0.25);
+  const appleStr=appleStreams>=1000000?(appleStreams/1000000).toFixed(1)+'M':appleStreams>=1000?Math.round(appleStreams/1000)+'K':appleStreams.toString();
+  const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'background:linear-gradient(135deg,#fa4b2a,#ff8c00)';
+  let creditsHTML='<div style="margin:0 16px 12px"><div style="font-size:11px;font-weight:700;color:#1d1d1f;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Credits</div><div style="font-size:13px;color:#1d1d1f;display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0"><span>${ownerName}</span><span style="color:#86868b">Main Artist</span></div>';
+  if(song.collabs&&song.collabs.length>0){song.collabs.forEach(c=>{creditsHTML+=`<div style="font-size:13px;color:#1d1d1f;display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0"><span>${c.artist||'Unknown'}</span><span style="color:#86868b">${c.role||'Collaborator'}</span></div>`;});}
+  creditsHTML+='</div>';
+  let lyrHTML='';
+  if(song.lyrics){lyrHTML=`<div style="margin:0 16px 12px;background:#f5f5f7;border-radius:12px;padding:14px;cursor:pointer" onclick="this.style.webkitLineClamp=this.style.webkitLineClamp?'':'3'"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;color:#86868b">Lyrics</div><div style="font-size:13px;line-height:1.7;color:#1d1d1f;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical">${song.lyrics.replace(/\n/g,'<br>')}</div></div>`;}
+  const html=ORANGE_CSS+`<div class="org"><div class="scroll"><div style="padding:12px 16px;display:flex;align-items:center;gap:10px"><button onclick="showOrangeMusicUI()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0;line-height:1">←</button><span style="font-size:13px;color:#86868b">Now playing</span></div><div style="padding:0 16px 16px;text-align:center"><div style="width:180px;height:180px;border-radius:16px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:64px;box-shadow:0 10px 40px rgba(0,0,0,.2);${cs}">${song.coverImage?'':'&#9834;'}</div><div style="font-size:20px;font-weight:700;color:#1d1d1f;margin-bottom:4px">${song.title}</div><div style="font-size:14px;color:#fa4b2a;cursor:pointer;font-weight:500" onclick="showOrangeArtist('${ownerId}')">${ownerName}</div></div><div style="display:flex;align-items:center;justify-content:space-around;padding:10px 24px 16px"><span style="cursor:pointer;font-size:22px;color:#86868b" onclick="this.style.color=this.style.color==='#fa4b2a'?'#86868b':'#fa4b2a'">&#9825;</span><span style="cursor:pointer;font-size:32px;color:#1d1d1f" onclick="this.textContent=this.textContent==='&#9654;'?'&#9646;&#9646;':'&#9654;'">&#9654;</span><span style="cursor:pointer;font-size:20px;color:#86868b">&#8599;</span></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:0 16px 16px"><div style="background:#f5f5f7;border-radius:10px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:700;color:#1d1d1f">${appleStr}</div><div style="font-size:10px;color:#86868b;margin-top:2px">Orange plays</div></div><div style="background:#f5f5f7;border-radius:10px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:700;color:#1d1d1f">${song.chartPosition?'#'+song.chartPosition:'—'}</div><div style="font-size:10px;color:#86868b;margin-top:2px">Chart rank</div></div><div style="background:#f5f5f7;border-radius:10px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:700;color:#1d1d1f">${song.weeksOnChart||0}</div><div style="font-size:10px;color:#86868b;margin-top:2px">Weeks</div></div></div>${lyrHTML}${creditsHTML}</div><div class="npbar"><div class="cover" style="display:flex;align-items:center;justify-content:center;font-size:16px">&#9834;</div><b>${song.title}</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='&#9654;'?'&#9646;&#9646;':'&#9654;'">&#9654;</span><span>&#9677;</span></div></div><div class="bnav"><div onclick="orgSwitch('radio',this)"><i style="font-style:normal">&#9112;</i>Radio</div><div class="on" onclick="orgSwitch('browse',this)"><i style="font-style:normal">&#8942;</i>Browse</div><div onclick="orgSwitch('library',this)"><i style="font-style:normal">&#9783;</i>Library</div></div></div>`;
+  _insertOverlay(html);
+}
+
+function showOrangeArtist(artistId){
+  let player;
+  if(artistId===currentUser?.id){
+    const totalStreams=GAME.songs.reduce((s,sg)=>s+(sg.streams||0),0);
+    player={id:currentUser?.id,artistName:S.artistName,bio:GAME.artistProfile?.bio||'',totalStreams,gameSongs:null};
+  }else{
+    player=window.allPlayers?.find(p=>p.id===artistId);
+    if(!player){showToast('Artist not found','error');return;}
+  }
+  const songs=(artistId===currentUser?.id?GAME.songs:(player.gameSongs||[])).filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,10);
+  const ts=player.totalStreams||songs.reduce((s,sg)=>s+(sg.streams||0),0);
+  const appleStr=Math.round(ts*0.25).toLocaleString();
+  let songsHTML='';
+  songs.forEach((song,i)=>{
+    const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
+    songsHTML+=`<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer" onclick="showOrangeSongDetail('${song.id}','${artistId}')"><div style="width:44px;height:44px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden;${cs}">${song.coverImage?'':'&#9834;'}</div><div style="flex:1;min-width:0"><b style="display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${song.title}</b><span style="font-size:11px;color:#86868b">${(song.streams||0).toLocaleString()} plays</span></div></div>`;
+  });
+  const following=GAME.loopifyFollowing?.[artistId]||false;
+  const html=ORANGE_CSS+`<div class="org"><div class="scroll"><div class="head"><button onclick="showOrangeMusicUI()" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>${player.artistName}</h2><button onclick="loopToggleFollow('${artistId}',this)" style="background:${following?'#fa4b2a':'none'};border:1.5px solid ${following?'#fa4b2a':'#1d1d1f'};color:${following?'#fff':'#1d1d1f'};border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer">${following?'Following':'Follow'}</button></div><div style="padding:12px 16px 16px;display:flex;align-items:center;gap:14px"><div style="width:64px;height:64px;border-radius:50%;background:#fa4b2a;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#fff">${(player.artistName||'?').charAt(0).toUpperCase()}</div><div><div style="font-size:18px;font-weight:600;color:#1d1d1f">${player.artistName}</div><div style="font-size:12px;color:#86868b;margin-top:2px">${appleStr} Orange plays</div>${player.bio?`<div style="font-size:12px;color:#86868b;margin-top:4px">${player.bio}</div>`:''}</div></div><div style="padding:0 16px 8px;font-size:16px;font-weight:600;color:#1d1d1f">Songs</div>${songsHTML||'<div style="padding:20px 16px;color:#86868b;font-size:13px">No songs released yet</div>'}</div><div class="npbar"><div class="cover">&#9834;</div><b>${player.artistName}</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='&#9654;'?'&#9646;&#9646;':'&#9654;'">&#9654;</span><span>&#9677;</span></div></div><div class="bnav"><div onclick="orgSwitch('radio',this)"><i style="font-style:normal">&#9112;</i>Radio</div><div class="on" onclick="orgSwitch('browse',this)"><i style="font-style:normal">&#8942;</i>Browse</div><div onclick="orgSwitch('library',this)"><i style="font-style:normal">&#9783;</i>Library</div></div></div>`;
+  _insertOverlay(html);
+}
+
+function showOrangeLibrarySongs(){
+  const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));
+  let songsHTML='';
+  releasedSongs.forEach(song=>{
+    const cs=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
+    songsHTML+=`<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer" onclick="showOrangeSongDetail('${song.id}','${currentUser?.id}')"><div style="width:44px;height:44px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden;${cs}">${song.coverImage?'':'&#9834;'}</div><div style="flex:1;min-width:0"><b style="display:block;font-size:13px;font-weight:500">${song.title}</b><span style="font-size:11px;color:#86868b">${S.artistName}</span></div></div>`;
+  });
+  const html=ORANGE_CSS+`<div class="org"><div class="scroll"><div class="head"><button onclick="orgSwitch('library',null)" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Songs</h2></div>${songsHTML||'<div style="padding:40px 16px;text-align:center;color:#86868b">No songs released yet</div>'}</div><div class="npbar"><div class="cover">&#9834;</div><b>Your Music</b><div class="ctrl"><span onclick="this.textContent=this.textContent==='&#9654;'?'&#9646;&#9646;':'&#9654;'">&#9654;</span><span>&#9677;</span></div></div><div class="bnav"><div onclick="orgSwitch('radio',this)"><i style="font-style:normal">&#9112;</i>Radio</div><div onclick="orgSwitch('browse',this)"><i style="font-style:normal">&#8942;</i>Browse</div><div class="on" onclick="orgSwitch('library',this)"><i style="font-style:normal">&#9783;</i>Library</div></div></div>`;
+  _insertOverlay(html);
+}
+
+function showOrangeArtistsList(){
+  let artistsHTML='';
+  if(window.allPlayers&&Array.isArray(window.allPlayers)){
+    window.allPlayers.slice(0,20).forEach(p=>{
+      const ts=p.totalStreams||0;
+      const tStr=ts>=1000000?(ts/1000000).toFixed(1)+'M':ts>=1000?Math.round(ts/1000)+'K':ts.toString();
+      const init=(p.artistName||'?').charAt(0).toUpperCase();
+      artistsHTML+=`<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer" onclick="showOrangeArtist('${p.id}')"><div style="width:48px;height:48px;border-radius:50%;background:#fa4b2a;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;flex-shrink:0">${init}</div><div style="flex:1;min-width:0"><b style="display:block;font-size:14px;font-weight:500">${p.artistName||'Unknown'}</b><span style="font-size:11px;color:#86868b">${tStr} plays</span></div></div>`;
+    });
+  }
+  const html=ORANGE_CSS+`<div class="org"><div class="scroll"><div class="head"><button onclick="orgSwitch('library',null)" style="background:none;border:none;color:#1d1d1f;font-size:20px;cursor:pointer;padding:0 8px 0 0;line-height:1">←</button><h2>Artists</h2></div>${artistsHTML||'<div style="padding:40px 16px;text-align:center;color:#86868b">No artists found</div>'}</div><div class="npbar"><div class="cover">&#9834;</div><b>Artists</b><div class="ctrl"><span>&#9654;</span></div></div><div class="bnav"><div onclick="orgSwitch('radio',this)"><i style="font-style:normal">&#9112;</i>Radio</div><div onclick="orgSwitch('browse',this)"><i style="font-style:normal">&#8942;</i>Browse</div><div class="on" onclick="orgSwitch('library',this)"><i style="font-style:normal">&#9783;</i>Library</div></div></div>`;
+  _insertOverlay(html);
+}
 
 function closeOrangeMusic(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
 function editOrangeMusicProfile(){}
@@ -20146,7 +20171,7 @@ function editOrangeMusicProfile(){}
 // ════════════════════════════════════════════════════════════════════════════
 const YOURTUBE_CSS=`<style>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
-.ytm{background:#0f0f0f;color:#fff;min-height:100%;display:flex;flex-direction:column;font-family:Roboto,'Arial',sans-serif;}.ytm .foot{margin-top:auto;position:sticky;bottom:0;}
+.ytm{background:#0f0f0f;color:#fff;min-height:100%;display:flex;flex-direction:column;font-family:Roboto,'Arial',sans-serif;padding-bottom:112px;}.ytm .foot{flex-shrink:0;background:#0f0f0f;}
 .ytm .head{display:flex;align-items:center;gap:10px;padding:14px 16px 8px;}
 .ytm .head .back{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;line-height:1;}
 .ytm .head .logo{display:flex;align-items:center;gap:4px;flex:1;}
@@ -20456,7 +20481,7 @@ function showSaharaHome(){
   }
   let trendHTML='';
   allSongs.slice(0,6).forEach((song,i)=>{
-    const cover=song.cover||'🎵';
+    const cover=song.cover||'&#9834;';
     const coverStyle=song.coverImage?`style="background-image:url('${song.coverImage}');background-size:cover;background-position:center"`:'';
     trendHTML+=`<div class="chartrow" onclick="showReleaseStats(${song.id},'amazon')"><div class="pos">${i+1}</div><div class="cover sm" ${coverStyle}>${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><div class="x">HD</div></div>`;
   });
@@ -20494,7 +20519,7 @@ function showSaharaCharts(){
     let mvText='— steady',mvClass='';
     if(typeof prev==='number'){if(prev>i){mvText='▲'+(prev-i)+' this week';mvClass='style="color:#4cc98a"';}else if(prev<i){mvText='▼'+(i-prev)+' this week';mvClass='style="color:#e06666"';}}
     else if(!prev){mvText='NEW ENTRY';mvClass='style="color:#2dd4bf;font-weight:800"';}
-    const cover=song.cover||'🎵';
+    const cover=song.cover||'&#9834;';
     const coverStyle=song.coverImage?`style="background-image:url('${song.coverImage}');background-size:cover;background-position:center"`:'';
     chartHTML+=`<div class="chartrow" onclick="showReleaseStats(${song.id},'amazon')"><div class="pos">${i+1}</div><div class="cover sm" ${coverStyle}>${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span>${song.artistName} · <i ${mvClass} style="font-style:normal">${mvText}</i></span></div><div class="x">HD</div></div>`;
   });
@@ -20588,7 +20613,7 @@ function showSoundPuffStream(){
     const streams=song.platforms&&song.platforms.soundcloud?song.platforms.soundcloud:Math.floor((song.streams||0)*0.05);
     const streamsStr=streams>=1000?Math.floor(streams/1000)+'K':streams;
     const tags=song.genre?`<span class="tg"># ${(song.genre||'').toLowerCase()}</span>`:'';
-    const cover=song.cover||'🎵';
+    const cover=song.cover||'&#9834;';
     const coverStyle=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
     // Random waveform bars
     const bars=Array.from({length:15},(_,i)=>{
@@ -20629,7 +20654,7 @@ function showSoundPuffTrending(){
     const streams=song.platforms&&song.platforms.soundcloud?song.platforms.soundcloud:Math.floor((song.streams||0)*0.05);
     const streamsStr=streams>=1000?Math.floor(streams/1000)+'K this week':streams+' this week';
     const reposts=Math.floor(streams/20)||0;
-    const cover=song.cover||'🎵';
+    const cover=song.cover||'&#9834;';
     const coverStyle=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'';
     trendHTML+=`<div class="track">
       <div class="trow"><div class="cover" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti2"><div class="a">#${i+1} Trending · ${song.artistName}</div><b>${song.title}</b></div><button class="pl2" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button></div>
@@ -20658,7 +20683,7 @@ function showSoundPuffYou(){
   let myTracksHTML='';
   releasedSongs.slice(0,5).forEach(song=>{
     const streams=song.platforms&&song.platforms.soundcloud?song.platforms.soundcloud:Math.floor((song.streams||0)*0.05);
-    const cover=song.cover||'🎵';
+    const cover=song.cover||'&#9834;';
     const coverStyle=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'background:linear-gradient(135deg,#ff5500,#ff8800)';
     myTracksHTML+=`<div class="track"><div class="trow"><div class="cover" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti2"><div class="a">You · ${song.weeksOnChart||1} week${(song.weeksOnChart||1)===1?'':'s'} ago</div><b>${song.title}</b></div><button class="pl2" onclick="this.textContent=this.textContent==='▶'?'⏸':'▶'">▶</button></div><div class="sstats"><span>▶ ${streams>=1000?Math.floor(streams/1000)+'K':streams}</span><span>♥ ${Math.floor(streams/20)||0}</span></div></div>`;
   });
@@ -20746,7 +20771,7 @@ function showiTunesUI(){
   allSongs.slice(0,10).forEach((song,i)=>{
     const sold=song.platforms&&song.platforms.itunes?Math.floor(song.platforms.itunes/10):0;
     const price=(0.99+Math.floor(Math.random()*2)*0.30).toFixed(2);
-    const cover=song.cover||'🎵';
+    const cover=song.cover||'&#9834;';
     const coverStyle=song.coverImage?`background-image:url('${song.coverImage}');background-size:cover;background-position:center`:'background:#e5e5ea';
     topSongsHTML+=`<div class="buyrow"><div class="pos">${i+1}</div><div class="cover sm" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span>${song.artistName} · ${sold>=1000?Math.floor(sold/1000)+'K':sold} sold</span></div><button class="price" onclick="imBuy(this,${price})">$${price}</button></div>`;
   });
@@ -20756,7 +20781,7 @@ function showiTunesUI(){
   let albumsHTML='';
   albumRels.slice(0,4).forEach(rel=>{
     const fs=rel.songs[0];
-    const cover=fs&&fs.cover?fs.cover:'🎵';
+    const cover=fs&&fs.cover?fs.cover:'&#9834;';
     const coverStyle=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'background:linear-gradient(135deg,#2a4a7e,#1a2a4e)';
     albumsHTML+=`<div class="alb2" onclick="showReleaseStats(${rel.id},'itunes')"><div class="cover" style="${coverStyle}">${fs&&fs.coverImage?'':cover}</div><b>${rel.title}</b><span>${S.artistName}</span><div class="pr">$7.99</div></div>`;
   });
