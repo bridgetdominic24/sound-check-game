@@ -18329,57 +18329,372 @@ function _ahRetireMerch(idx){
   editCollabProfile();_ahTab('merch');
 }
 
+// ── Merch Designer (canvas-based) ────────────────────────────────────────────
+var _amdState  = null;
+var _amdImgCache = {};
+var _amdDrag   = {active:false,startX:0,startY:0,origX:0,origY:0};
+var _amdPinch  = {active:false,lastDist:0,lastAngle:0,lastScale:1,lastRot:0};
+
+var _AMD_ITEMS = [
+  {id:'tshirt',     label:'👕 T-Shirt',     url:'tshirt.png',        zone:[.50,.52,.40,.34]},
+  {id:'hoodie',     label:'🧥 Hoodie',       url:'hoodie.png',        zone:[.50,.52,.36,.28]},
+  {id:'mug',        label:'☕ Mug',           url:'mug.png',           zone:[.44,.54,.38,.30]},
+  {id:'tote',       label:'👜 Tote Bag',     url:'tote%20bag.png',    zone:[.50,.60,.40,.34]},
+  {id:'poster',     label:'🖼 Tour Poster',  url:'tourposter.png',    zone:[.50,.50,.60,.65]},
+  {id:'bottle',     label:'💧 Water Bottle', url:'water%20bottle.png',zone:[.50,.48,.28,.42]},
+];
+var _AMD_BASE = 'https://pvxrciebegirmrrrzkor.supabase.co/storage/v1/object/public/merch-mockups/';
+var _AMD_COLORS = [
+  {hex:'#ffffff',name:'White'},{hex:'#1a1a1a',name:'Black'},{hex:'#2b4a7a',name:'Navy'},
+  {hex:'#7a2b2b',name:'Crimson'},{hex:'#2b7a4a',name:'Forest'},{hex:'#c8a84b',name:'Gold'},
+  {hex:'#6b3fa0',name:'Purple'},{hex:'#d4845a',name:'Rust'},{hex:'#4a7a7a',name:'Teal'},
+  {hex:'#b0b0b0',name:'Heather'},
+];
+
+function _amdInit(){
+  var wrap = document.getElementById('amd-canvas-wrap');
+  var canvas = document.getElementById('amd-canvas');
+  if(!wrap || !canvas) return;
+  var dpr = window.devicePixelRatio || 1;
+  var r = wrap.getBoundingClientRect();
+  var cw = r.width, ch = r.height;
+  canvas.width  = cw * dpr;
+  canvas.height = ch * dpr;
+  canvas.style.width  = cw + 'px';
+  canvas.style.height = ch + 'px';
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  _amdState = _amdState || {itemIdx:0, tintColor:'#ffffff', tintStrength:0.6, design:{src:null,img:null,x:0,y:0,scale:1,rotation:0,opacity:1}};
+  _amdLoadItem(0);
+
+  // Touch drag/pinch
+  canvas.addEventListener('touchstart', function(e){
+    if(!_amdState.design.img) return;
+    e.preventDefault();
+    if(e.touches.length===2){
+      _amdPinch.active=true; _amdDrag.active=false;
+      _amdPinch.lastDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      _amdPinch.lastAngle=Math.atan2(e.touches[1].clientY-e.touches[0].clientY,e.touches[1].clientX-e.touches[0].clientX)*180/Math.PI;
+      _amdPinch.lastScale=_amdState.design.scale; _amdPinch.lastRot=_amdState.design.rotation;
+    } else {
+      _amdDrag.active=true;
+      _amdDrag.startX=e.touches[0].clientX; _amdDrag.startY=e.touches[0].clientY;
+      _amdDrag.origX=_amdState.design.x; _amdDrag.origY=_amdState.design.y;
+    }
+  },{passive:false});
+  canvas.addEventListener('touchmove', function(e){
+    if(!_amdState.design.img) return;
+    e.preventDefault();
+    var item=_AMD_ITEMS[_amdState.itemIdx];
+    var rr=canvas.getBoundingClientRect();
+    var cw2=rr.width, ch2=rr.height;
+    if(_amdPinch.active&&e.touches.length===2){
+      var d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      var a=Math.atan2(e.touches[1].clientY-e.touches[0].clientY,e.touches[1].clientX-e.touches[0].clientX)*180/Math.PI;
+      _amdState.design.scale=Math.max(0.1,Math.min(3,_amdPinch.lastScale*(d/_amdPinch.lastDist)));
+      _amdState.design.rotation=_amdPinch.lastRot+(a-_amdPinch.lastAngle);
+      _amdSyncSliders(); _amdRedraw();
+    } else if(_amdDrag.active&&e.touches.length===1){
+      var hw=item.zone[2]*cw2/2, hh=item.zone[3]*ch2/2;
+      _amdState.design.x=Math.max(-hw,Math.min(hw,_amdDrag.origX+e.touches[0].clientX-_amdDrag.startX));
+      _amdState.design.y=Math.max(-hh,Math.min(hh,_amdDrag.origY+e.touches[0].clientY-_amdDrag.startY));
+      _amdRedraw();
+    }
+  },{passive:false});
+  canvas.addEventListener('touchend', function(e){
+    if(e.touches.length<2) _amdPinch.active=false;
+    if(e.touches.length===0) _amdDrag.active=false;
+  });
+  // Mouse drag
+  canvas.addEventListener('mousedown', function(e){
+    if(!_amdState.design.img) return;
+    _amdDrag.active=true;
+    _amdDrag.startX=e.clientX; _amdDrag.startY=e.clientY;
+    _amdDrag.origX=_amdState.design.x; _amdDrag.origY=_amdState.design.y;
+  });
+  document.addEventListener('mousemove', function(e){
+    if(!_amdDrag.active||!_amdState) return;
+    var item=_AMD_ITEMS[_amdState.itemIdx];
+    var rr=canvas.getBoundingClientRect();
+    var hw=item.zone[2]*rr.width/2, hh=item.zone[3]*rr.height/2;
+    _amdState.design.x=Math.max(-hw,Math.min(hw,_amdDrag.origX+e.clientX-_amdDrag.startX));
+    _amdState.design.y=Math.max(-hh,Math.min(hh,_amdDrag.origY+e.clientY-_amdDrag.startY));
+    _amdRedraw();
+  });
+  document.addEventListener('mouseup', function(){ _amdDrag.active=false; });
+}
+
+function _amdRedraw(){
+  var canvas=document.getElementById('amd-canvas'); if(!canvas||!_amdState) return;
+  var ctx=canvas.getContext('2d');
+  var dpr=window.devicePixelRatio||1;
+  var cw=canvas.width/dpr, ch=canvas.height/dpr;
+  ctx.clearRect(0,0,cw,ch);
+  var item=_AMD_ITEMS[_amdState.itemIdx];
+  var img=_amdImgCache[item.id];
+  if(!img) return;
+  // Draw mockup with optional tint
+  if(_amdState.tintColor&&_amdState.tintStrength>0&&_amdState.tintColor!=='#ffffff'){
+    var off=document.createElement('canvas');
+    off.width=canvas.width; off.height=canvas.height;
+    var oc=off.getContext('2d'); oc.scale(dpr,dpr);
+    oc.drawImage(img,0,0,cw,ch);
+    oc.globalCompositeOperation='multiply'; oc.fillStyle=_amdState.tintColor; oc.fillRect(0,0,cw,ch);
+    oc.globalCompositeOperation='destination-in'; oc.drawImage(img,0,0,cw,ch);
+    ctx.drawImage(img,0,0,cw,ch);
+    ctx.save(); ctx.globalAlpha=_amdState.tintStrength;
+    ctx.drawImage(off,0,0,off.width,off.height,0,0,cw,ch);
+    ctx.restore();
+  } else {
+    ctx.drawImage(img,0,0,cw,ch);
+  }
+  // Draw design
+  if(_amdState.design.img){
+    var z=item.zone, zx=z[0]*cw, zy=z[1]*ch, zw=z[2]*cw, zh=z[3]*ch;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(zx-zw/2,zy-zh/2,zw,zh); ctx.clip();
+    var di=_amdState.design.img;
+    var fit=Math.min(zw/di.naturalWidth,zh/di.naturalHeight);
+    var dw=di.naturalWidth*fit*_amdState.design.scale, dh=di.naturalHeight*fit*_amdState.design.scale;
+    ctx.globalAlpha=_amdState.design.opacity;
+    ctx.translate(zx+_amdState.design.x, zy+_amdState.design.y);
+    ctx.rotate(_amdState.design.rotation*Math.PI/180);
+    ctx.drawImage(di,-dw/2,-dh/2,dw,dh);
+    ctx.restore();
+    // Print zone border
+    ctx.save(); ctx.strokeStyle='rgba(200,168,75,0.65)'; ctx.lineWidth=1.5; ctx.setLineDash([5,4]);
+    ctx.strokeRect(zx-zw/2,zy-zh/2,zw,zh); ctx.restore();
+  }
+}
+
+function _amdLoadItem(idx){
+  if(!_AMD_ITEMS[idx]) return;
+  var item=_AMD_ITEMS[idx];
+  var loading=document.getElementById('amd-loading');
+  var errEl=document.getElementById('amd-error');
+  if(loading) loading.style.display='flex';
+  if(errEl) errEl.style.display='none';
+  if(_amdImgCache[item.id]){
+    if(loading) loading.style.display='none';
+    _amdRedraw(); return;
+  }
+  fetch(_AMD_BASE+item.url)
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.blob(); })
+    .then(function(blob){
+      var url=URL.createObjectURL(blob);
+      var img=new Image();
+      img.onload=function(){
+        _amdImgCache[item.id]=img;
+        if(loading) loading.style.display='none';
+        _amdRedraw();
+      };
+      img.onerror=function(){
+        if(loading) loading.style.display='none';
+        if(errEl){ errEl.style.display='flex'; }
+      };
+      img.src=url;
+    })
+    .catch(function(){
+      if(loading) loading.style.display='none';
+      if(errEl){ errEl.style.display='flex'; }
+    });
+}
+
+function _amdSelectItem(idx){
+  if(!_amdState) return;
+  _amdState.itemIdx=idx;
+  _amdLoadItem(idx);
+}
+
+function _amdSetColor(hex, el){
+  if(!_amdState) return;
+  _amdState.tintColor=hex;
+  document.querySelectorAll('.amd-swatch').forEach(function(s){s.style.borderColor='transparent';});
+  if(el&&el.classList&&el.classList.contains('amd-swatch')) el.style.borderColor='var(--acc)';
+  _amdRedraw();
+}
+
+function _amdSyncSliders(){
+  var ss=document.getElementById('amd-size'); if(ss&&_amdState){ss.value=Math.round(_amdState.design.scale*100);document.getElementById('amd-size-val').textContent=ss.value+'%';}
+  var rs=document.getElementById('amd-rot'); if(rs&&_amdState){rs.value=Math.round(_amdState.design.rotation);document.getElementById('amd-rot-val').textContent=rs.value+'°';}
+}
+
+function _amdUploadDesign(e){
+  var file=e.target.files[0]; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var img=new Image();
+    img.onload=function(){
+      _amdState.design.img=img; _amdState.design.src=ev.target.result;
+      _amdState.design.x=0; _amdState.design.y=0;
+      _amdState.design.scale=1; _amdState.design.rotation=0; _amdState.design.opacity=1;
+      _amdSyncSliders();
+      var dc=document.getElementById('amd-design-ctrls'); if(dc) dc.style.display='block';
+      var hint=document.getElementById('amd-hint'); if(hint) hint.textContent='Drag to reposition · Pinch to resize & rotate';
+      _amdRedraw();
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function _amdCenterDesign(){
+  if(!_amdState) return;
+  _amdState.design.x=0; _amdState.design.y=0;
+  _amdRedraw();
+}
+
+function _amdRemoveDesign(){
+  if(!_amdState) return;
+  _amdState.design={src:null,img:null,x:0,y:0,scale:1,rotation:0,opacity:1};
+  var dc=document.getElementById('amd-design-ctrls'); if(dc) dc.style.display='none';
+  var hint=document.getElementById('amd-hint'); if(hint) hint.textContent='Choose a color tint or upload your artwork';
+  _amdRedraw();
+}
+
+function _amdRenderThumb(){
+  var off=document.createElement('canvas'); off.width=300; off.height=300;
+  var c=off.getContext('2d');
+  var item=_AMD_ITEMS[_amdState.itemIdx];
+  var img=_amdImgCache[item.id];
+  c.clearRect(0,0,300,300);
+  if(img){
+    if(_amdState.tintColor&&_amdState.tintStrength>0&&_amdState.tintColor!=='#ffffff'){
+      var toff=document.createElement('canvas'); toff.width=300; toff.height=300;
+      var tc=toff.getContext('2d');
+      tc.drawImage(img,0,0,300,300); tc.globalCompositeOperation='multiply'; tc.fillStyle=_amdState.tintColor; tc.fillRect(0,0,300,300);
+      tc.globalCompositeOperation='destination-in'; tc.drawImage(img,0,0,300,300);
+      c.drawImage(img,0,0,300,300); c.save(); c.globalAlpha=_amdState.tintStrength; c.drawImage(toff,0,0,300,300); c.restore();
+    } else { c.drawImage(img,0,0,300,300); }
+  }
+  if(_amdState.design.img){
+    var canvas=document.getElementById('amd-canvas');
+    var dpr=window.devicePixelRatio||1;
+    var cw=canvas?canvas.width/dpr:300, ch=canvas?canvas.height/dpr:300;
+    var z=item.zone, zx=z[0]*300, zy=z[1]*300, zw=z[2]*300, zh=z[3]*300;
+    c.save(); c.beginPath(); c.rect(zx-zw/2,zy-zh/2,zw,zh); c.clip();
+    var di=_amdState.design.img;
+    var fit=Math.min(zw/di.naturalWidth,zh/di.naturalHeight);
+    var dw=di.naturalWidth*fit*_amdState.design.scale, dh=di.naturalHeight*fit*_amdState.design.scale;
+    var dx=zx+_amdState.design.x*(300/cw), dy=zy+_amdState.design.y*(300/ch);
+    c.globalAlpha=_amdState.design.opacity; c.translate(dx,dy);
+    c.rotate(_amdState.design.rotation*Math.PI/180);
+    c.drawImage(di,-dw/2,-dh/2,dw,dh); c.restore();
+  }
+  return off.toDataURL('image/png');
+}
+
+function _amdSave(){
+  if(!GAME.artistHub)GAME.artistHub={};
+  if(!GAME.artistHub.merch)GAME.artistHub.merch=[];
+  var name=(document.getElementById('amd-name')||{}).value||'';
+  if(!name.trim()){showToast('Enter a product name','red');return;}
+  var price=parseFloat((document.getElementById('amd-price')||{}).value)||0;
+  var stock=parseInt((document.getElementById('amd-stock')||{}).value)||0;
+  var limited=!!(document.getElementById('amd-limited')||{}).checked;
+  var item=_AMD_ITEMS[(_amdState&&_amdState.itemIdx)||0];
+  var color=(_amdState&&_amdState.tintColor)||'#ffffff';
+  var thumb=_amdState&&_amdImgCache[item.id]?_amdRenderThumb():null;
+  var launched=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  GAME.artistHub.merch.push({
+    id:Date.now(), name:name.trim(), type:item.label.replace(/[^a-zA-Z ]/g,'').trim(),
+    price:price, stock:stock, color:color, limited:limited,
+    unitsSold:0, launched:launched, active:true, thumb:thumb
+  });
+  if(typeof saveToCloud==='function')saveToCloud(true);
+  showToast('"'+name.trim()+'" added to your store ✓','green');
+  _amdState=null;
+  editCollabProfile(); _ahTab('merch');
+}
+
 function _ahAddMerch(){
   if(!GAME.artistHub)GAME.artistHub={};
   if(!GAME.artistHub.merch)GAME.artistHub.merch=[];
-  var TYPES=['Hoodie','T-Shirt','Hat','Jacket','Vinyl','Poster','Bag','Phone Case','Sticker Pack','Mystery Box'];
-  var html='<div data-app-overlay style="position:fixed;inset:0;background:var(--bg);z-index:200005;overflow-y:auto;padding:0 0 80px">'
-    +'<div style="background:var(--surf);border-bottom:1px solid var(--bord);padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">'
-    +'<button onclick="editCollabProfile();_ahTab(\'merch\')" style="background:var(--surf2,var(--surf));border:none;color:var(--mut);width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">←</button>'
-    +'<div style="font-size:15px;font-weight:800;color:var(--txt)">🛍️ Add Merch Item</div></div>'
-    +'<div style="padding:16px">'
-    +'<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Type</div>'
-    +'<select id="ahm-type" style="width:100%;padding:11px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:13px;margin-bottom:14px;outline:none">'
-    +TYPES.map(t=>'<option value="'+t.toLowerCase().replace(/ /g,'-')+'">'+t+'</option>').join('')
-    +'</select>'
-    +'<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Name</div>'
-    +'<input id="ahm-name" placeholder="e.g. Midnight Tour Hoodie" style="width:100%;padding:11px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:13px;box-sizing:border-box;margin-bottom:14px;outline:none">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
-    +'<div><div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Price ($)</div>'
-    +'<input id="ahm-price" type="number" min="1" max="500" value="35" style="width:100%;padding:11px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:13px;box-sizing:border-box;outline:none"></div>'
-    +'<div><div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Stock Units</div>'
-    +'<input id="ahm-stock" type="number" min="1" max="10000" value="100" style="width:100%;padding:11px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:13px;box-sizing:border-box;outline:none"></div>'
-    +'</div>'
-    +'<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Color / Variant</div>'
-    +'<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'
-    +['#000000','#ffffff','#1a1a2e','#e63946','#2ec4b6','#ff9f1c','#6a0dad','#228b22'].map((c,i)=>`<div onclick="this.parentElement.querySelectorAll('.ahm-col').forEach(e=>e.style.outline='none');this.style.outline='3px solid var(--acc)';document.getElementById('ahm-color').value='${c}'" class="ahm-col" style="width:32px;height:32px;border-radius:50%;background:${c};border:2px solid var(--bord);cursor:pointer;${i===0?'outline:3px solid var(--acc)':''}"></div>`).join('')
-    +'<input id="ahm-color" type="hidden" value="#000000"></div>'
-    +'<label style="display:flex;align-items:center;justify-content:space-between;background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:13px 14px;cursor:pointer;margin-bottom:14px">'
-    +'<div><div style="font-size:13px;font-weight:700;color:var(--txt)">⭐ Limited Edition</div><div style="font-size:11px;color:var(--mut)">Creates urgency, sells faster</div></div>'
-    +'<input id="ahm-limited" type="checkbox" style="width:20px;height:20px;accent-color:var(--acc)"></label>'
-    +'</div>'
-    +'<div style="position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--bord);padding:12px 16px">'
-    +'<button onclick="_ahSaveMerch()" style="width:100%;padding:14px;background:var(--acc);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb)">✅ Add to Store</button></div>'
-    +'</div>';
-  _insertOverlay(html);
-}
+  _amdState={itemIdx:0,tintColor:'#ffffff',tintStrength:0.6,design:{src:null,img:null,x:0,y:0,scale:1,rotation:0,opacity:1}};
 
-function _ahSaveMerch(){
-  if(!GAME.artistHub)GAME.artistHub={};
-  if(!GAME.artistHub.merch)GAME.artistHub.merch=[];
-  var name=(document.getElementById('ahm-name')||{}).value||'';
-  if(!name.trim()){showToast('Enter a product name','error');return;}
-  var price=parseFloat((document.getElementById('ahm-price')||{}).value)||0;
-  var stock=parseInt((document.getElementById('ahm-stock')||{}).value)||0;
-  var type=(document.getElementById('ahm-type')||{}).value||'merch';
-  var color=(document.getElementById('ahm-color')||{}).value||'#000';
-  var limited=!!(document.getElementById('ahm-limited')||{}).checked;
-  var today=new Date();
-  var launched=today.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-  GAME.artistHub.merch.push({id:Date.now(),name:name.trim(),type,price,stock,color,limited,unitsSold:0,launched,active:true});
-  if(typeof saveToCloud==='function')saveToCloud(true);
-  showToast('"'+name.trim()+'" added to your store ✓','success');
-  editCollabProfile();_ahTab('merch');
+  var swHtml=_AMD_COLORS.map(function(c,i){
+    return '<div class="amd-swatch" onclick="_amdSetColor(\''+c.hex+'\',this)" title="'+c.name+'" style="width:32px;height:32px;border-radius:50%;background:'+c.hex+';border:3px solid transparent;cursor:pointer;flex-shrink:0;box-shadow:'+(c.hex==='#ffffff'?'inset 0 0 0 1.5px #999':'none')+';transition:border-color .15s"></div>';
+  }).join('');
+
+  var html='<div data-app-overlay style="position:fixed;inset:0;background:var(--bg);z-index:200005;overflow-y:auto;padding-bottom:80px">'
+    +'<style>@keyframes amdSpin{to{transform:rotate(360deg)}} input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--acc);cursor:pointer;border:3px solid var(--bg)}</style>'
+    // Header
+    +'<div style="background:var(--surf);border-bottom:1px solid var(--bord);padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">'
+    +'<button onclick="_amdState=null;editCollabProfile();_ahTab(\'merch\')" style="background:var(--surf2,var(--surf));border:none;color:var(--mut);width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer">←</button>'
+    +'<div style="flex:1"><div style="font-size:15px;font-weight:800;color:var(--txt)">🛍️ Merch Designer</div><div style="font-size:10px;color:var(--mut)">Design your item, then add to store</div></div>'
+    +'</div>'
+    // Product type dropdown
+    +'<div style="padding:12px 16px 0">'
+    +'<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Product Type</div>'
+    +'<select id="amd-type-select" onchange="_amdSelectItem(this.selectedIndex)" style="width:100%;padding:11px 13px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:14px;font-weight:600;outline:none;cursor:pointer">'
+    +_AMD_ITEMS.map(function(it){return '<option value="'+it.id+'">'+it.label+'</option>';}).join('')
+    +'</select>'
+    +'</div>'
+    // Canvas
+    +'<div style="padding:12px 16px 0;display:flex;justify-content:center">'
+    +'<div id="amd-canvas-wrap" style="position:relative;width:100%;max-width:360px;aspect-ratio:1/1;border-radius:12px;background:var(--surf2);border:1px solid var(--bord);overflow:hidden;touch-action:none">'
+    +'<canvas id="amd-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>'
+    +'<div id="amd-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;pointer-events:none">'
+    +'<div style="width:26px;height:26px;border:3px solid var(--bord);border-top-color:var(--acc);border-radius:50%;animation:amdSpin .7s linear infinite"></div>'
+    +'<div style="font-size:11px;color:var(--mut)">Loading mockup…</div></div>'
+    +'<div id="amd-error" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:6px;text-align:center;padding:20px;font-size:12px;color:var(--mut)">⚠️<br>Couldn\'t load mockup.<br>Check your connection.</div>'
+    +'</div></div>'
+    +'<div id="amd-hint" style="text-align:center;font-size:11px;color:var(--mut);padding:6px 16px 0;min-height:1.2em">Choose a color tint or upload your artwork</div>'
+    // Controls
+    +'<div style="padding:10px 16px;display:flex;flex-direction:column;gap:10px">'
+    // Color card
+    +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:14px">'
+    +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:10px">Product Color</div>'
+    +'<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">'+swHtml
+    +'<label style="width:32px;height:32px;border-radius:50%;border:2px dashed var(--bord);background:var(--surf2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;position:relative" title="Custom color">🎨<input type="color" value="#c8a84b" style="position:absolute;opacity:0;width:0;height:0" oninput="_amdSetColor(this.value,null);_amdRedraw()"></label>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-top:10px">'
+    +'<span style="font-size:11px;color:var(--mut);white-space:nowrap">Tint strength</span>'
+    +'<input type="range" id="amd-tint-str" min="0" max="100" value="60" oninput="_amdState.tintStrength=this.value/100;document.getElementById(\'amd-tint-val\').textContent=this.value+\'%\';_amdRedraw()" style="flex:1;height:6px;border-radius:3px;-webkit-appearance:none;background:var(--bord);outline:none">'
+    +'<span id="amd-tint-val" style="font-size:11px;font-weight:700;color:var(--txt);min-width:30px;text-align:right">60%</span>'
+    +'</div></div>'
+    // Artwork upload card
+    +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:14px">'
+    +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:10px">Your Artwork / Logo</div>'
+    +'<label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:var(--surf2);border:1.5px dashed var(--bord);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--mut)">🖼 Upload Design<input type="file" accept="image/*" id="amd-upload" style="display:none" onchange="_amdUploadDesign(event)"></label>'
+    +'</div>'
+    // Design controls (hidden until upload)
+    +'<div id="amd-design-ctrls" style="display:none;background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:14px">'
+    +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:10px">Design Controls</div>'
+    +'<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:4px"><span>Size</span><span id="amd-size-val" style="font-weight:700;color:var(--txt)">100%</span></div>'
+    +'<input type="range" id="amd-size" min="10" max="200" value="100" oninput="_amdState.design.scale=this.value/100;document.getElementById(\'amd-size-val\').textContent=this.value+\'%\';_amdRedraw()" style="width:100%;height:6px;border-radius:3px;-webkit-appearance:none;background:var(--bord);outline:none"></div>'
+    +'<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:4px"><span>Rotate</span><span id="amd-rot-val" style="font-weight:700;color:var(--txt)">0°</span></div>'
+    +'<input type="range" id="amd-rot" min="-180" max="180" value="0" oninput="_amdState.design.rotation=parseInt(this.value);document.getElementById(\'amd-rot-val\').textContent=this.value+\'°\';_amdRedraw()" style="width:100%;height:6px;border-radius:3px;-webkit-appearance:none;background:var(--bord);outline:none"></div>'
+    +'<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:4px"><span>Opacity</span><span id="amd-opa-val" style="font-weight:700;color:var(--txt)">100%</span></div>'
+    +'<input type="range" id="amd-opa" min="10" max="100" value="100" oninput="_amdState.design.opacity=this.value/100;document.getElementById(\'amd-opa-val\').textContent=this.value+\'%\';_amdRedraw()" style="width:100%;height:6px;border-radius:3px;-webkit-appearance:none;background:var(--bord);outline:none"></div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="_amdCenterDesign()" style="flex:1;padding:10px;background:transparent;border:1px solid var(--bord);border-radius:8px;color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--fb)">⊙ Center</button>'
+    +'<button onclick="_amdRemoveDesign()" style="flex:1;padding:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#f87171;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--fb)">🗑 Remove</button>'
+    +'</div></div>'
+    // Item details card
+    +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:14px">'
+    +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:10px">Item Details</div>'
+    +'<div style="font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Name</div>'
+    +'<input id="amd-name" placeholder="e.g. Midnight Tour Hoodie" style="width:100%;padding:11px;background:var(--bg);border:1.5px solid var(--bord);border-radius:8px;color:var(--txt);font-family:var(--fb);font-size:13px;box-sizing:border-box;outline:none;margin-bottom:10px" onfocus="this.style.borderColor=\'var(--acc)\'" onblur="this.style.borderColor=\'var(--bord)\'">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+    +'<div><div style="font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Price ($)</div>'
+    +'<input id="amd-price" type="number" value="28" min="1" max="999" style="width:100%;padding:11px;background:var(--bg);border:1.5px solid var(--bord);border-radius:8px;color:var(--txt);font-family:var(--fb);font-size:13px;box-sizing:border-box;outline:none" onfocus="this.style.borderColor=\'var(--acc)\'" onblur="this.style.borderColor=\'var(--bord)\'"></div>'
+    +'<div><div style="font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Stock Units</div>'
+    +'<input id="amd-stock" type="number" value="50" min="1" max="10000" style="width:100%;padding:11px;background:var(--bg);border:1.5px solid var(--bord);border-radius:8px;color:var(--txt);font-family:var(--fb);font-size:13px;box-sizing:border-box;outline:none" onfocus="this.style.borderColor=\'var(--acc)\'" onblur="this.style.borderColor=\'var(--bord)\'"></div>'
+    +'</div>'
+    +'<label style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:var(--bg);border:1px solid var(--bord);border-radius:8px;cursor:pointer">'
+    +'<div><div style="font-size:13px;font-weight:700;color:var(--txt)">⭐ Limited Edition</div><div style="font-size:11px;color:var(--mut)">Creates urgency, sells faster</div></div>'
+    +'<input type="checkbox" id="amd-limited" style="width:18px;height:18px;accent-color:var(--acc)"></label>'
+    +'</div>'
+    +'</div>' // end controls
+    +'</div>' // end outer
+    // Sticky save footer (fixed)
+    +'<div style="position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--bord);padding:12px 16px;z-index:200006">'
+    +'<button onclick="_amdSave()" style="width:100%;padding:14px;background:var(--acc);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb)">✅ Add to Store</button>'
+    +'</div>';
+
+  _insertOverlay(html);
+  setTimeout(_amdInit, 80);
 }
 
 function _renderArtistHubPage(gameData, viewerUserId, isPreview){
@@ -18472,7 +18787,6 @@ function _renderArtistHubPage(gameData, viewerUserId, isPreview){
       ${rookieF>0?`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">📱</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(rookieF)}</span><span style="font-size:10px;color:${mut}">Rookie</span></div>`:''}
       ${yF>0?`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">𝕐</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(yF)}</span><span style="font-size:10px;color:${mut}">Y</span></div>`:''}
       <div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">🎵</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(totalStreams)}</span><span style="font-size:10px;color:${mut}">streams</span></div>
-      ${showFans?`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">👥</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(totalFans)}</span><span style="font-size:10px;color:${mut}">fans</span></div>`:''}
     </div>
   </nav>`;
 
