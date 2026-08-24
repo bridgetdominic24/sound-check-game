@@ -18269,6 +18269,119 @@ function showContractDetails(contractJson){
 }
 
 // ── Artist Hub renderer — used by viewer, preview, and Find Players ──────────
+function _ahSwitch(cid, page){
+  ['home','music','merch','shows','about'].forEach(function(n){
+    var el=document.getElementById(cid+n);
+    if(el) el.style.display=n===page?'block':'none';
+    var tb=document.getElementById(cid+'tb'+n);
+    if(tb){
+      var hub=document.getElementById(cid+'hub');
+      var acc2=hub?hub.dataset.acc:'#8b5cf6';
+      var mut2=hub?hub.dataset.mut:'#888';
+      tb.style.color=n===page?acc2:mut2;
+      tb.style.borderBottomColor=n===page?acc2:'transparent';
+    }
+  });
+}
+
+function _ahMerchPanel(itemJson, idx){
+  var item; try{item=JSON.parse(itemJson);}catch(e){return;}
+  var rev=((item.unitsSold||0)*(item.price||0)).toFixed(0);
+  var html='<div style="position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:200010;display:flex;align-items:flex-end" onclick="this.remove()">'
+    +'<div onclick="event.stopPropagation()" style="background:var(--surf);border-radius:20px 20px 0 0;padding:20px;width:100%;box-sizing:border-box;max-height:82vh;overflow-y:auto">'
+    +'<div style="width:40px;height:4px;background:var(--bord);border-radius:2px;margin:0 auto 16px"></div>'
+    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">'
+    +(item.thumb?'<img src="'+item.thumb+'" style="width:56px;height:56px;border-radius:12px;object-fit:cover;flex-shrink:0">':'<div style="width:56px;height:56px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">👕</div>')
+    +'<div><div style="font-size:16px;font-weight:800;color:var(--txt)">'+item.name+'</div>'
+    +'<div style="font-size:12px;color:var(--mut);margin-top:3px">'+(item.type||'Merch')+' · $'+item.price+'</div>'
+    +(item.limited?'<div style="display:inline-block;background:#ef444420;color:#ef4444;font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;margin-top:4px;letter-spacing:1px">LIMITED ED.</div>':'')
+    +'</div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">'
+    +'<div style="background:var(--card);border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:900;color:var(--txt)">'+(item.unitsSold||0)+'</div><div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Sold</div></div>'
+    +'<div style="background:var(--card);border-radius:12px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:900;color:var(--txt)">'+(item.stock===undefined?'∞':(item.stock||0))+'</div><div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Stock</div></div>'
+    +'<div style="background:var(--card);border-radius:12px;padding:12px;text-align:center"><div style="font-size:18px;font-weight:900;color:var(--txt)">$'+rev+'</div><div style="font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Revenue</div></div>'
+    +'</div>'
+    +(item.launched?'<div style="font-size:12px;color:var(--mut);margin-bottom:14px">📅 Launched '+item.launched+'</div>':'')
+    +'<div style="display:flex;gap:10px">'
+    +'<button onclick="_ahRestockMerch('+idx+');this.closest(\'[style*=fixed]\').remove()" style="flex:1;background:var(--acc);color:var(--acc-txt,#fff);border:none;border-radius:10px;padding:13px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb)">📦 Restock</button>'
+    +'<button onclick="_ahRetireMerch('+idx+');this.closest(\'[style*=fixed]\').remove()" style="flex:1;background:var(--surf);border:1.5px solid var(--bord);color:var(--mut);border-radius:10px;padding:13px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb)">🚫 Retire</button>'
+    +'</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+function _ahRestockMerch(idx){
+  var allMerch=(GAME.artistHub&&GAME.artistHub.merch)||GAME.merch||[];
+  var item=allMerch[idx]; if(!item){showToast('Item not found','error');return;}
+  var qty=parseInt(prompt('Restock "'+item.name+'"\nCurrent stock: '+(item.stock||0)+'\nAdd how many units?','50'));
+  if(isNaN(qty)||qty<=0)return;
+  item.stock=(item.stock||0)+qty;
+  if(typeof saveToCloud==='function')saveToCloud(true);
+  showToast('Restocked '+qty+' units ✓','success');
+}
+
+function _ahRetireMerch(idx){
+  var allMerch=(GAME.artistHub&&GAME.artistHub.merch)||GAME.merch||[];
+  var item=allMerch[idx]; if(!item)return;
+  if(!confirm('Retire "'+item.name+'"? It will be removed from your store.'))return;
+  item.active=false;
+  if(typeof saveToCloud==='function')saveToCloud(true);
+  showToast('"'+item.name+'" retired','success');
+  editCollabProfile();_ahTab('merch');
+}
+
+function _ahAddMerch(){
+  if(!GAME.artistHub)GAME.artistHub={};
+  if(!GAME.artistHub.merch)GAME.artistHub.merch=[];
+  var TYPES=['Hoodie','T-Shirt','Hat','Jacket','Vinyl','Poster','Bag','Phone Case','Sticker Pack','Mystery Box'];
+  var html='<div data-app-overlay style="position:fixed;inset:0;background:var(--bg);z-index:200005;overflow-y:auto;padding:0 0 80px">'
+    +'<div style="background:var(--surf);border-bottom:1px solid var(--bord);padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">'
+    +'<button onclick="editCollabProfile();_ahTab(\'merch\')" style="background:var(--surf2,var(--surf));border:none;color:var(--mut);width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">←</button>'
+    +'<div style="font-size:15px;font-weight:800;color:var(--txt)">🛍️ Add Merch Item</div></div>'
+    +'<div style="padding:16px">'
+    +'<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Type</div>'
+    +'<select id="ahm-type" style="width:100%;padding:11px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:13px;margin-bottom:14px;outline:none">'
+    +TYPES.map(t=>'<option value="'+t.toLowerCase().replace(/ /g,'-')+'">'+t+'</option>').join('')
+    +'</select>'
+    +'<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Name</div>'
+    +'<input id="ahm-name" placeholder="e.g. Midnight Tour Hoodie" style="width:100%;padding:11px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:13px;box-sizing:border-box;margin-bottom:14px;outline:none">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'
+    +'<div><div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Price ($)</div>'
+    +'<input id="ahm-price" type="number" min="1" max="500" value="35" style="width:100%;padding:11px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:13px;box-sizing:border-box;outline:none"></div>'
+    +'<div><div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Stock Units</div>'
+    +'<input id="ahm-stock" type="number" min="1" max="10000" value="100" style="width:100%;padding:11px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--txt);font-family:var(--fb);font-size:13px;box-sizing:border-box;outline:none"></div>'
+    +'</div>'
+    +'<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Color / Variant</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'
+    +['#000000','#ffffff','#1a1a2e','#e63946','#2ec4b6','#ff9f1c','#6a0dad','#228b22'].map((c,i)=>`<div onclick="this.parentElement.querySelectorAll('.ahm-col').forEach(e=>e.style.outline='none');this.style.outline='3px solid var(--acc)';document.getElementById('ahm-color').value='${c}'" class="ahm-col" style="width:32px;height:32px;border-radius:50%;background:${c};border:2px solid var(--bord);cursor:pointer;${i===0?'outline:3px solid var(--acc)':''}"></div>`).join('')
+    +'<input id="ahm-color" type="hidden" value="#000000"></div>'
+    +'<label style="display:flex;align-items:center;justify-content:space-between;background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:13px 14px;cursor:pointer;margin-bottom:14px">'
+    +'<div><div style="font-size:13px;font-weight:700;color:var(--txt)">⭐ Limited Edition</div><div style="font-size:11px;color:var(--mut)">Creates urgency, sells faster</div></div>'
+    +'<input id="ahm-limited" type="checkbox" style="width:20px;height:20px;accent-color:var(--acc)"></label>'
+    +'</div>'
+    +'<div style="position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--bord);padding:12px 16px">'
+    +'<button onclick="_ahSaveMerch()" style="width:100%;padding:14px;background:var(--acc);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb)">✅ Add to Store</button></div>'
+    +'</div>';
+  _insertOverlay(html);
+}
+
+function _ahSaveMerch(){
+  if(!GAME.artistHub)GAME.artistHub={};
+  if(!GAME.artistHub.merch)GAME.artistHub.merch=[];
+  var name=(document.getElementById('ahm-name')||{}).value||'';
+  if(!name.trim()){showToast('Enter a product name','error');return;}
+  var price=parseFloat((document.getElementById('ahm-price')||{}).value)||0;
+  var stock=parseInt((document.getElementById('ahm-stock')||{}).value)||0;
+  var type=(document.getElementById('ahm-type')||{}).value||'merch';
+  var color=(document.getElementById('ahm-color')||{}).value||'#000';
+  var limited=!!(document.getElementById('ahm-limited')||{}).checked;
+  var today=new Date();
+  var launched=today.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  GAME.artistHub.merch.push({id:Date.now(),name:name.trim(),type,price,stock,color,limited,unitsSold:0,launched,active:true});
+  if(typeof saveToCloud==='function')saveToCloud(true);
+  showToast('"'+name.trim()+'" added to your store ✓','success');
+  editCollabProfile();_ahTab('merch');
+}
+
 function _renderArtistHubPage(gameData, viewerUserId, isPreview){
   const H = gameData.artistHub || {};
   const bgType = H.bgType || 'solid';
@@ -18283,12 +18396,19 @@ function _renderArtistHubPage(gameData, viewerUserId, isPreview){
   const avail  = H.availability || 'open';
   const gallery= H.gallery || [];
   const isOwner= !!(gameData.currentUserId && viewerUserId && gameData.currentUserId === viewerUserId);
+  const showFans = H.showFanCount !== false;
 
   const totalFans   = Object.values(gameData.fansByRegion||{}).reduce((a,b)=>a+b,0);
   const totalStreams = (gameData.songs||[]).reduce((a,s)=>a+(s.streams||0),0);
   const releasedSongs=(gameData.songs||[]).filter(s=>s.released);
   const fmt = n => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':String(n||0);
   const slug = name.toLowerCase().replace(/[^a-z0-9]/g,'')||'artist';
+  const cid  = 'ahw'+slug.slice(0,8);
+
+  // Social follower counts (tries multiple storage paths)
+  const pentaF = (gameData.socialMedia||{}).pentagram?.followers||(gameData.social||{}).pentagram?.followers||(gameData.pentagram||{}).followers||gameData.pentagramFollowers||0;
+  const rookieF= (gameData.socialMedia||{}).rookie?.followers||(gameData.social||{}).rookie?.followers||(gameData.rookie||{}).followers||gameData.rookieFollowers||0;
+  const yF     = (gameData.socialMedia||{}).y?.followers||(gameData.social||{}).y?.followers||(gameData.y||{}).followers||gameData.yFollowers||0;
 
   // Color helpers
   const mix=(a,b,t)=>{
@@ -18317,100 +18437,172 @@ function _renderArtistHubPage(gameData, viewerUserId, isPreview){
   else if(bgType==='pattern'&&H.bgPattern) pageBgStyle=`background:${bg};background-image:${PATTERNS[H.bgPattern]||PATTERNS.dots}`;
   else if(bgType==='photo'&&H.bgPhoto)     pageBgStyle=`background:${bg} url('${H.bgPhoto}') center/cover`;
 
-  // Website nav bar (sticky, frosted glass)
-  const hasMusic = H.showMusic!==false && releasedSongs.length>0;
-  const hasPhotos = gallery.length>0;
-  const hasCollab = H.showCollab!==false && avail!=='closed' && !isOwner;
-  const navBar = `<nav style="position:sticky;top:0;z-index:100;background:${bg}dd;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid ${bord}">
-    <div style="display:flex;align-items:center;justify-content:space-between;height:50px;padding:0 18px">
-      <div style="font-size:15px;font-weight:900;color:${txt};letter-spacing:-0.5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
-      <div style="display:flex;gap:14px;align-items:center;flex-shrink:0">
-        ${hasMusic?`<span onclick="(function(){var el=document.getElementById('sc-music-'+${JSON.stringify(slug)});if(el)el.scrollIntoView({behavior:'smooth'});})()" style="font-size:12px;font-weight:600;color:${mut};cursor:pointer">Music</span>`:''}
-        ${hasPhotos?`<span onclick="(function(){var el=document.getElementById('sc-photos-'+${JSON.stringify(slug)});if(el)el.scrollIntoView({behavior:'smooth'});})()" style="font-size:12px;font-weight:600;color:${mut};cursor:pointer">Photos</span>`:''}
-        ${hasCollab?`<button onclick="window._hubCollabTarget&&_startHubCollab(window._hubCollabTarget)" style="background:${acc};color:#fff;border:none;border-radius:20px;padding:7px 13px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:0.3px;font-family:inherit">Collab ✦</button>`:''}
+  // Animated background (CSS particles)
+  let animCss='', animOverlay='';
+  if(bgType==='animated'&&H.bgAnimType){
+    const atype=H.bgAnimType||'stars';
+    const astyle=H.bgAnimStyle||'drift';
+    const seed=slug.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
+    const icon=atype==='notes'?['♩','♪','♫','♬']:atype==='shapes'?['◆','●','▲','■']:atype==='dots'?['•','·','○']:['★','✦','✧','☆'];
+    const particles=Array.from({length:22},(_,i)=>({lx:((seed*17+i*137)%100),ly:((seed*31+i*97)%100),delay:((seed*7+i*23)%40)/10,dur:3+((seed*11+i*43)%4),sz:10+((seed*5+i*19)%14),ic:icon[i%4]}));
+    const animName=astyle==='pulse'?'ahPulse'+cid:astyle==='blink'?'ahBlink'+cid:'ahDrift'+cid;
+    animCss=`@keyframes ahDrift${cid}{0%{transform:translateY(0) rotate(0deg);opacity:0.18;}60%{opacity:0.38;}100%{transform:translateY(-130px) rotate(25deg);opacity:0;}} @keyframes ahPulse${cid}{0%,100%{opacity:0.08;transform:scale(0.7);}50%{opacity:0.32;transform:scale(1.3);}} @keyframes ahBlink${cid}{0%,100%{opacity:0;}45%,55%{opacity:0.36;}}`;
+    animOverlay=`<div style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0">${particles.map(p=>`<span style="position:absolute;left:${p.lx}%;top:${p.ly}%;font-size:${p.sz}px;color:${acc};animation:${animName} ${p.dur}s ${p.delay}s infinite linear;will-change:transform,opacity">${p.ic}</span>`).join('')}</div>`;
+  }
+
+  // Data
+  const allMerch=(gameData.artistHub?.merch||gameData.merch||[]).filter(m=>m&&m.name&&m.active!==false);
+  const hasCollab=H.showCollab!==false&&avail!=='closed'&&!isOwner;
+  const hasMerch=H.showMerch!==false&&allMerch.length>0;
+  const scheduledShows=(gameData.concerts||gameData.shows||gameData.gigs||[]).filter(s=>s&&(s.upcoming||s.scheduled||s.status==='upcoming'));
+  const announcedSongs=(gameData.songs||[]).filter(s=>s&&!s.released&&s.releaseDate);
+  const hasShows=scheduledShows.length>0||announcedSongs.length>0;
+
+  // Website nav with page tabs + social/stats strip
+  const PAGES=[['home','Home'],['music','Music'],...(hasMerch?[['merch','Merch']]:[]),...(hasShows?[['shows','Shows']]:[]),['about','About']];
+  const navBar=`<nav style="position:sticky;top:0;z-index:100;background:${bg}ee;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid ${bord}">
+    <div style="display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 14px">
+      <div style="font-size:14px;font-weight:900;color:${txt};max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+      <div style="display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+        ${PAGES.map(([p,l])=>`<button id="${cid}tb${p}" onclick="_ahSwitch('${cid}','${p}')" style="background:none;border:none;border-bottom:2px solid ${p==='home'?acc:'transparent'};color:${p==='home'?acc:mut};font-size:11px;font-weight:700;padding:0 10px;height:48px;cursor:pointer;white-space:nowrap;font-family:inherit;letter-spacing:0.5px">${l}</button>`).join('')}
       </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;padding:4px 14px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-top:1px solid ${bord}">
+      ${pentaF>0?`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">📸</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(pentaF)}</span><span style="font-size:10px;color:${mut}">Pentagram</span></div>`:''}
+      ${rookieF>0?`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">📱</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(rookieF)}</span><span style="font-size:10px;color:${mut}">Rookie</span></div>`:''}
+      ${yF>0?`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">𝕐</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(yF)}</span><span style="font-size:10px;color:${mut}">Y</span></div>`:''}
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">🎵</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(totalStreams)}</span><span style="font-size:10px;color:${mut}">streams</span></div>
+      ${showFans?`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">👥</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(totalFans)}</span><span style="font-size:10px;color:${mut}">fans</span></div>`:''}
     </div>
   </nav>`;
 
-  // Hero — full-bleed with avatar/gallery photo as background, stats overlaid
-  const heroSection=`<div style="position:relative;height:290px;overflow:hidden;flex-shrink:0">
-    ${avatarType==='image'&&avatar
-      ?`<img src="${avatar}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`
-      :`<div style="position:absolute;inset:0;background:${bgType==='gradient'&&H.bgGradient?H.bgGradient:'linear-gradient(135deg,'+acc+','+mix(acc,bg,.4)+')'};"></div>`
-    }
+  // ── HOME PAGE ──────────────────────────────────────────────────
+  const heroHtml=`<div style="position:relative;height:260px;overflow:hidden;flex-shrink:0">
+    ${avatarType==='image'&&avatar?`<img src="${avatar}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`:`<div style="position:absolute;inset:0;background:${bgType==='gradient'&&H.bgGradient?H.bgGradient:'linear-gradient(135deg,'+acc+','+mix(acc,bg,.4)+')'};"></div>`}
     ${gallery.length>0?`<img src="${gallery[0]}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.28">`:''}
-    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 15%,rgba(0,0,0,0.72) 65%,rgba(0,0,0,0.95) 100%)"></div>
-    <div style="position:absolute;bottom:0;left:0;right:0;padding:16px 20px 22px">
-      <div style="font-size:29px;font-weight:900;color:#fff;letter-spacing:-0.5px;line-height:1.1;text-shadow:0 2px 12px rgba(0,0,0,0.5)">${name.toUpperCase()}</div>
-      ${genre?`<div style="font-size:10px;color:rgba(255,255,255,0.6);letter-spacing:3px;text-transform:uppercase;margin-top:5px;font-weight:600">${genre}</div>`:''}
-      ${gameData.signedLabel?`<div style="margin-top:6px"><span style="display:inline-block;background:rgba(255,255,255,0.14);color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:5px;cursor:pointer;border:1px solid rgba(255,255,255,0.22)" onclick="showLabelPublicPage('${gameData.signedLabel.labelId}','${(gameData.signedLabel.labelName||'').replace(/"/g,'').replace(/'/g,'')}')">🏷 ${gameData.signedLabel.labelName}</span></div>`:''}
-      <div style="display:flex;align-items:flex-end;gap:20px;margin-top:12px">
-        <div><div style="font-size:16px;font-weight:900;color:#fff;line-height:1">${fmt(totalFans)}</div><div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px">Fans</div></div>
-        <div style="width:1px;height:28px;background:rgba(255,255,255,0.18)"></div>
-        <div><div style="font-size:16px;font-weight:900;color:#fff;line-height:1">${fmt(totalStreams)}</div><div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px">Streams</div></div>
-        <div style="width:1px;height:28px;background:rgba(255,255,255,0.18)"></div>
-        <div><div style="font-size:16px;font-weight:900;color:#fff;line-height:1">${releasedSongs.length}</div><div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px">Releases</div></div>
-      </div>
-      ${avail!=='closed'?`<div style="display:inline-block;margin-top:10px;background:${avail==='open'?'#22c55e':'#f59e0b'};color:#000;font-size:9px;font-weight:800;padding:3px 10px;border-radius:20px;letter-spacing:1.2px;text-transform:uppercase">${avail==='open'?'✦ Open to Collabs':'◆ Selective'}</div>`:''}
+    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 10%,rgba(0,0,0,0.72) 62%,rgba(0,0,0,0.95) 100%)"></div>
+    <div style="position:absolute;bottom:0;left:0;right:0;padding:16px 18px 20px">
+      <div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:-0.5px;line-height:1.1;text-shadow:0 2px 12px rgba(0,0,0,0.5)">${name.toUpperCase()}</div>
+      ${genre?`<div style="font-size:10px;color:rgba(255,255,255,0.6);letter-spacing:3px;text-transform:uppercase;margin-top:4px;font-weight:600">${genre}</div>`:''}
+      ${gameData.signedLabel?`<div style="margin-top:5px"><span style="display:inline-block;background:rgba(255,255,255,0.14);color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:5px;cursor:pointer;border:1px solid rgba(255,255,255,0.22)" onclick="showLabelPublicPage('${gameData.signedLabel.labelId}','${(gameData.signedLabel.labelName||'').replace(/"/g,'').replace(/'/g,'')}')">🏷 ${gameData.signedLabel.labelName}</span></div>`:''}
+      ${showFans?`<div style="display:flex;align-items:flex-end;gap:18px;margin-top:10px">
+        <div><div style="font-size:15px;font-weight:900;color:#fff;line-height:1">${fmt(totalFans)}</div><div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px">Fans</div></div>
+        <div style="width:1px;height:26px;background:rgba(255,255,255,0.18)"></div>
+        <div><div style="font-size:15px;font-weight:900;color:#fff;line-height:1">${fmt(totalStreams)}</div><div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px">Streams</div></div>
+        <div style="width:1px;height:26px;background:rgba(255,255,255,0.18)"></div>
+        <div><div style="font-size:15px;font-weight:900;color:#fff;line-height:1">${releasedSongs.length}</div><div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px">Releases</div></div>
+      </div>`:``}
+      ${avail!=='closed'?`<div style="display:inline-block;margin-top:8px;background:${avail==='open'?'#22c55e':'#f59e0b'};color:#000;font-size:9px;font-weight:800;padding:3px 10px;border-radius:20px;letter-spacing:1.2px;text-transform:uppercase">${avail==='open'?'✦ Open to Collabs':'◆ Selective'}</div>`:''}
     </div>
   </div>`;
-
-  // Bio
-  const bioSection=bio?`<div style="padding:22px 20px 18px;border-bottom:1px solid ${bord}">
-    <div style="font-size:13px;color:${txt};line-height:1.75;opacity:0.82;font-style:italic">"${bio}"</div>
+  const bioHtml=bio?`<div style="padding:18px 18px 14px;border-bottom:1px solid ${bord}"><div style="font-size:13px;color:${txt};line-height:1.75;opacity:0.82;font-style:italic">"${bio}"</div></div>`:'';
+  const latestSong=releasedSongs[0];
+  const latestHtml=latestSong?`<div style="padding:16px 18px;border-bottom:1px solid ${bord}">
+    <div style="font-size:10px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;color:${acc};margin-bottom:10px">Latest Release</div>
+    <div style="background:${surf};border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;border:1px solid ${bord}">
+      <div style="width:50px;height:50px;background:${acc}33;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden">${latestSong.coverImage?`<img src="${latestSong.coverImage}" style="width:100%;height:100%;object-fit:cover;border-radius:10px">`:(latestSong.cover||'🎵')}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:800;color:${txt};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${latestSong.title}</div><div style="font-size:11px;color:${mut};margin-top:2px">${latestSong.genre||''} · ${fmt(latestSong.streams||0)} streams</div></div>
+      <div style="width:32px;height:32px;border-radius:50%;background:${acc};display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:#fff;font-size:12px;margin-left:2px">▶</span></div>
+    </div>
   </div>`:'';
+  const galleryStripHtml=gallery.length>0?`<div style="padding:16px 18px;border-bottom:1px solid ${bord}">
+    <div style="font-size:10px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;color:${acc};margin-bottom:10px">Photos</div>
+    <div style="display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px">
+      ${gallery.slice(0,6).map(url=>`<div style="flex-shrink:0;width:80px;height:80px;border-radius:10px;overflow:hidden;border:1px solid ${bord}"><img src="${url}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
+    </div>
+  </div>`:'';
+  const collabHomeHtml=hasCollab?`<div style="padding:16px 18px;border-bottom:1px solid ${bord}"><button onclick="window._hubCollabTarget&&_startHubCollab(window._hubCollabTarget)" style="width:100%;background:${acc};color:#fff;border:none;border-radius:12px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">🤝 Book a Collab with ${name}</button></div>`:'';
+  const homePage=heroHtml+bioHtml+latestHtml+galleryStripHtml+collabHomeHtml;
 
-  // Music / Discography
-  const musicSection=hasMusic?`<div id="sc-music-${slug}" style="padding:22px 20px;border-bottom:1px solid ${bord}">
-    <div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:16px">Discography</div>
-    ${releasedSongs.slice(0,6).map((s,i)=>`<div style="background:${surf};border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;border:1px solid ${bord};margin-bottom:8px">
-      <div style="flex-shrink:0;font-size:12px;font-weight:700;color:${mut};width:16px;text-align:right">${i+1}</div>
+  // ── MUSIC PAGE ────────────────────────────────────────────────
+  const musicPage=`<div style="padding:18px">
+    <div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:16px">Discography · ${releasedSongs.length} release${releasedSongs.length!==1?'s':''}</div>
+    ${releasedSongs.length===0?`<div style="text-align:center;padding:40px;color:${mut}">No releases yet.</div>`:''}
+    ${releasedSongs.map((s,i)=>`<div style="background:${surf};border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;border:1px solid ${bord};margin-bottom:8px">
+      <div style="flex-shrink:0;font-size:12px;font-weight:700;color:${mut};width:18px;text-align:right">${i+1}</div>
       <div style="width:44px;height:44px;background:${acc}33;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;overflow:hidden">${s.coverImage?`<img src="${s.coverImage}" style="width:100%;height:100%;object-fit:cover;border-radius:10px">`:(s.cover||'🎵')}</div>
       <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:${txt};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.title}</div><div style="font-size:11px;color:${mut};margin-top:2px">${s.genre||''} · ${fmt(s.streams||0)} streams</div></div>
       <div style="width:30px;height:30px;border-radius:50%;background:${acc}20;border:1.5px solid ${acc}55;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="color:${acc};font-size:11px;margin-left:2px">▶</span></div>
     </div>`).join('')}
-    ${releasedSongs.length>6?`<div style="text-align:center;font-size:12px;color:${acc};font-weight:700;padding:8px 0;letter-spacing:0.5px">+ ${releasedSongs.length-6} more releases</div>`:''}
-  </div>`:'' ;
-
-  // Gallery — first photo is wide, rest in a 2-col grid
-  const gallerySection=hasPhotos?`<div id="sc-photos-${slug}" style="padding:22px 20px;border-bottom:1px solid ${bord}">
-    <div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:16px">Photos</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      ${gallery.slice(0,6).map((url,i)=>{const st=i===0?'grid-column:1/-1;aspect-ratio:16/9':'aspect-ratio:1';return `<div style="${st};border-radius:12px;overflow:hidden;border:1px solid ${bord}"><img src="${url}" style="width:100%;height:100%;object-fit:cover"></div>`;}).join('')}
-    </div>
-  </div>`:'';
-
-  // Merch (window shopping)
-  const merch=(gameData.artistHub?.merch||gameData.merch||[]).filter(m=>m&&m.name);
-  const merchSection=(H.showMerch!==false&&merch.length>0)?`<div style="padding:22px 20px;border-bottom:1px solid ${bord}">
-    <div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:16px">Merch</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      ${merch.slice(0,4).map(item=>`<div style="background:${surf};border:1px solid ${bord};border-radius:14px;overflow:hidden">
-        <div style="height:90px;background:${mix(bg,'#ffffff',.03)};display:flex;align-items:center;justify-content:center">${item.thumb?`<img src="${item.thumb}" style="width:76px;height:76px;object-fit:contain">`:'<span style="font-size:30px">👕</span>'}</div>
-        <div style="padding:10px 12px"><div style="font-size:12px;font-weight:700;color:${txt};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div><div style="font-size:13px;font-weight:800;color:${acc};margin-top:4px">$${item.price}</div></div>
-      </div>`).join('')}
-    </div>
-  </div>`:'' ;
-
-  // Collab CTA — card style
-  const collabSection=hasCollab?`<div style="padding:22px 20px;border-bottom:1px solid ${bord}">
-    <div style="background:${surf};border:1px solid ${bord};border-radius:18px;padding:24px 20px;text-align:center">
-      <div style="font-size:20px;font-weight:900;color:${txt};margin-bottom:8px">Work With ${name}</div>
-      <div style="font-size:13px;color:${mut};margin-bottom:18px;line-height:1.55">${avail==='open'?'Available for all collaboration types — reach out to start the conversation.':'Accepting selective collaborations based on mutual fit.'}</div>
-      <button onclick="window._hubCollabTarget&&_startHubCollab(window._hubCollabTarget)" style="background:${acc};color:#fff;border:none;border-radius:12px;padding:15px 30px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;width:100%;letter-spacing:0.3px">🤝 Send Collab Request</button>
-    </div>
-  </div>`:'';
-
-  // Footer
-  const footer=`<div style="padding:28px 20px;text-align:center">
-    <div style="font-size:14px;font-weight:900;color:${txt};letter-spacing:-0.3px;margin-bottom:4px">${name}</div>
-    <div style="font-size:11px;color:${mut};margin-bottom:16px">soundcheck.gg/${slug}</div>
-    <div style="width:36px;height:1px;background:${bord};margin:0 auto 14px"></div>
-    <div style="font-size:10px;color:${mix(txt,bg,.62)}">© ${new Date().getFullYear()} · All rights reserved</div>
   </div>`;
 
-  return `<div style="${pageBgStyle};min-height:100%;font-family:system-ui,-apple-system,sans-serif;color:${txt}">
-    ${navBar}${heroSection}${bioSection}${musicSection}${gallerySection}${merchSection}${collabSection}${footer}
+  // ── MERCH PAGE ────────────────────────────────────────────────
+  const merchPage=hasMerch?`<div style="padding:18px">
+    <div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:16px">Merch Store</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      ${allMerch.map((item,idx)=>{
+        const isLimited=item.limited&&(item.stock||0)<20;
+        const soldOut=(item.stock||0)===0&&item.stock!==undefined;
+        const clickFn=isOwner?`_ahMerchPanel(${JSON.stringify(JSON.stringify(item))},${idx})`:'';
+        return `<div style="background:${surf};border:1px solid ${bord};border-radius:14px;overflow:hidden;position:relative${isOwner?';cursor:pointer':''}" ${isOwner?`onclick="${clickFn}"`:''}>
+          ${isLimited&&!soldOut?`<div style="position:absolute;top:8px;left:8px;background:#ef4444;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:4px;letter-spacing:1px;z-index:1">LIMITED</div>`:''}
+          ${soldOut?`<div style="position:absolute;top:8px;left:8px;background:#555;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:4px;z-index:1">SOLD OUT</div>`:''}
+          ${isOwner?`<div style="position:absolute;top:8px;right:8px;background:${acc}33;color:${acc};font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;z-index:1">✏️ Manage</div>`:''}
+          <div style="height:88px;background:${mix(bg,'#ffffff',.03)};display:flex;align-items:center;justify-content:center">${item.thumb?`<img src="${item.thumb}" style="width:74px;height:74px;object-fit:contain">`:'<span style="font-size:28px">👕</span>'}</div>
+          <div style="padding:10px 12px">
+            <div style="font-size:12px;font-weight:700;color:${txt};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
+            ${item.type?`<div style="font-size:10px;color:${mut};margin-top:1px;text-transform:capitalize">${item.type.replace(/-/g,' ')}</div>`:''}
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:5px">
+              <div style="font-size:13px;font-weight:800;color:${acc}">$${item.price}</div>
+              ${item.stock!==undefined?`<div style="font-size:10px;color:${mut}">${item.stock} left</div>`:''}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`:hasMerch?'':`<div style="padding:40px 18px;text-align:center;color:${mut}">No merch available.</div>`;
+
+  // ── SHOWS PAGE ───────────────────────────────────────────────
+  const showsPage=`<div style="padding:18px">
+    ${announcedSongs.length>0?`<div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:14px">Coming Soon</div>
+      ${announcedSongs.map(s=>`<div style="background:${surf};border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;border:1px solid ${bord};margin-bottom:8px">
+        <div style="width:40px;height:40px;background:${acc}33;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🎵</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700;color:${txt}">${s.title}</div><div style="font-size:11px;color:${mut};margin-top:2px">Releasing ${s.releaseDate||'soon'}</div></div>
+        <div style="font-size:10px;font-weight:700;color:${acc};text-transform:uppercase;letter-spacing:0.5px">Announced</div>
+      </div>`).join('')}`:''}
+    ${scheduledShows.length>0?`<div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:14px;${announcedSongs.length>0?'margin-top:18px':''}">Upcoming Shows</div>
+      ${scheduledShows.map(show=>`<div style="background:${surf};border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;border:1px solid ${bord};margin-bottom:8px">
+        <div style="width:40px;height:40px;background:${acc}33;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🎤</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700;color:${txt}">${show.venue||show.name||'Show'}</div><div style="font-size:11px;color:${mut};margin-top:2px">${show.date||show.city||''}</div></div>
+        <div style="font-size:10px;font-weight:700;color:${acc};text-transform:uppercase">Live</div>
+      </div>`).join('')}`:''}
+    ${scheduledShows.length===0&&announcedSongs.length===0?`<div style="text-align:center;padding:40px 0;color:${mut}">No upcoming shows or releases announced.</div>`:''}
+  </div>`;
+
+  // ── ABOUT PAGE ────────────────────────────────────────────────
+  const achievements=gameData.achievements||gameData.awards||[];
+  const aboutPage=`<div style="padding:18px">
+    ${bio?`<div style="margin-bottom:18px"><div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:10px">Bio</div><div style="font-size:13px;color:${txt};line-height:1.75;opacity:0.85">${bio}</div></div>`:''}
+    <div style="margin-bottom:18px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:10px">Stats</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${showFans?`<div style="background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px;font-weight:900;color:${txt}">${fmt(totalFans)}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Fans</div></div>`:''}
+        <div style="background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px;font-weight:900;color:${txt}">${fmt(totalStreams)}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Streams</div></div>
+        <div style="background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px;font-weight:900;color:${txt}">${releasedSongs.length}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Releases</div></div>
+        <div style="background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:14px;font-weight:900;color:${txt}">${gameData.genre||'—'}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Genre</div></div>
+      </div>
+    </div>
+    ${achievements.length>0?`<div style="margin-bottom:18px"><div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:10px">Achievements</div>${achievements.slice(0,6).map(a=>`<div style="background:${surf};border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;border:1px solid ${bord};margin-bottom:6px"><span style="font-size:20px">${a.icon||'🏆'}</span><div style="flex:1"><div style="font-size:12px;font-weight:700;color:${txt}">${a.name||a.title||String(a)}</div>${a.desc?`<div style="font-size:11px;color:${mut};margin-top:1px">${a.desc}</div>`:''}</div></div>`).join('')}</div>`:''}
+    ${hasCollab?`<div style="background:${surf};border:1px solid ${bord};border-radius:18px;padding:22px 18px;text-align:center;margin-bottom:18px"><div style="font-size:18px;font-weight:900;color:${txt};margin-bottom:8px">Work With ${name}</div><div style="font-size:13px;color:${mut};margin-bottom:16px;line-height:1.55">${avail==='open'?'Available for all collaboration types.':'Accepting selective collaborations.'}</div><button onclick="window._hubCollabTarget&&_startHubCollab(window._hubCollabTarget)" style="background:${acc};color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;width:100%">🤝 Send Collab Request</button></div>`:''}
+    <div style="text-align:center;padding-top:8px;padding-bottom:16px">
+      <div style="font-size:13px;font-weight:900;color:${txt};margin-bottom:4px">${name}</div>
+      <div style="font-size:11px;color:${mut};margin-bottom:10px">soundcheck.gg/${slug}</div>
+      <div style="font-size:10px;color:${mix(txt,bg,.62)}">© ${new Date().getFullYear()} · All rights reserved</div>
+    </div>
+  </div>`;
+
+  const animStyleBlock=animCss?`<style>${animCss}</style>`:'';
+
+  return `<div id="${cid}hub" data-acc="${acc}" data-mut="${mut}" style="${pageBgStyle};min-height:100%;font-family:system-ui,-apple-system,sans-serif;color:${txt};position:relative">
+    ${animStyleBlock}${animOverlay}
+    <div style="position:relative;z-index:1">
+      ${navBar}
+      <div id="${cid}home">${homePage}</div>
+      <div id="${cid}music" style="display:none">${musicPage}</div>
+      ${hasMerch?`<div id="${cid}merch" style="display:none">${merchPage}</div>`:''}
+      ${hasShows?`<div id="${cid}shows" style="display:none">${showsPage}</div>`:''}
+      <div id="${cid}about" style="display:none">${aboutPage}</div>
+    </div>
   </div>`;
 }
 
@@ -29597,6 +29789,8 @@ function editCollabProfile(){
   if(!H.showMerch) H.showMerch = true;
   if(!H.showCollab) H.showCollab = true;
   if(!H.availability) H.availability = 'open';
+  if(H.showFanCount === undefined) H.showFanCount = true;
+  if(!H.merch) H.merch = [];
 
   const PRESETS = {
     dark:    {bg:'#111118',txt:'#f0f0f5',acc:'#8b5cf6'},
@@ -29625,6 +29819,7 @@ function editCollabProfile(){
       <div id="ahtab-profile" onclick="_ahTab('profile')" style="flex:1;padding:11px 6px;text-align:center;font-size:11px;font-weight:700;color:var(--acc);border-bottom:2px solid var(--acc);letter-spacing:.6px;text-transform:uppercase;cursor:pointer">Profile</div>
       <div id="ahtab-site" onclick="_ahTab('site')" style="flex:1;padding:11px 6px;text-align:center;font-size:11px;font-weight:700;color:var(--mut);border-bottom:2px solid transparent;letter-spacing:.6px;text-transform:uppercase;cursor:pointer">Site Design</div>
       <div id="ahtab-gallery" onclick="_ahTab('gallery')" style="flex:1;padding:11px 6px;text-align:center;font-size:11px;font-weight:700;color:var(--mut);border-bottom:2px solid transparent;letter-spacing:.6px;text-transform:uppercase;cursor:pointer">Gallery</div>
+      <div id="ahtab-merch" onclick="_ahTab('merch')" style="flex:1;padding:11px 6px;text-align:center;font-size:11px;font-weight:700;color:var(--mut);border-bottom:2px solid transparent;letter-spacing:.6px;text-transform:uppercase;cursor:pointer">Merch</div>
     </div>
 
     <!-- PROFILE PANE -->
@@ -29675,6 +29870,17 @@ function editCollabProfile(){
           <input type="checkbox" id="${id}" ${H[key]?'checked':''} style="width:18px;height:18px;accent-color:var(--acc)">
         </label>`).join('')}
       </div>
+
+      <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Fan Count Visibility</div>
+      <div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;overflow:hidden;margin-bottom:16px">
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--txt)">👥 Show fan count publicly</div>
+            <div style="font-size:11px;color:var(--mut);margin-top:2px">Visitors can see your total fan number</div>
+          </div>
+          <input type="checkbox" id="ah-showFanCount" ${H.showFanCount!==false?'checked':''} style="width:18px;height:18px;accent-color:var(--acc);flex-shrink:0;margin-left:12px">
+        </label>
+      </div>
     </div>
 
     <!-- SITE DESIGN PANE -->
@@ -29721,10 +29927,11 @@ function editCollabProfile(){
       <div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Background Type</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
         ${[
-          ['solid',    '■ Solid Color',   ''],
-          ['gradient', '▨ Gradient',      ''],
-          ['pattern',  '⊞ Pattern',       ''],
-          ['photo',    '🖼 Photo',         ''],
+          ['solid',    '■ Solid Color'],
+          ['gradient', '▨ Gradient'],
+          ['pattern',  '⊞ Pattern'],
+          ['photo',    '🖼 Photo'],
+          ['animated', '✨ Animated'],
         ].map(([v,l])=>`
         <div onclick="_ahBgType('${v}')" id="ah-bgtype-${v}" style="padding:10px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${(H.bgType||'solid')===v?'var(--acc)':'var(--bord)'};background:${(H.bgType||'solid')===v?'var(--acc-bg)':'var(--surf)'};color:${(H.bgType||'solid')===v?'var(--acc)':'var(--mut)'}">${l}</div>`).join('')}
       </div>
@@ -29764,6 +29971,20 @@ function editCollabProfile(){
           <input type="file" accept="image/*" style="display:none" onchange="_ahUploadBgPhoto(event)">
         </label>
       </div>
+
+      <!-- ANIMATED background -->
+      <div id="ah-animated-opts" style="display:${(H.bgType||'solid')==='animated'?'block':'none'};margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;color:var(--mut);margin-bottom:6px">Pattern Type</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+          ${[['stars','⭐ Stars'],['notes','🎵 Notes'],['dots','· Dots'],['shapes','◆ Shapes']].map(([v,l])=>`
+          <div onclick="_ahAnimType('${v}')" id="ah-anim-type-${v}" style="padding:9px;text-align:center;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid ${(H.bgAnimType||'stars')===v?'var(--acc)':'var(--bord)'};background:${(H.bgAnimType||'stars')===v?'var(--acc-bg)':'var(--surf)'};color:${(H.bgAnimType||'stars')===v?'var(--acc)':'var(--mut)'}">${l}</div>`).join('')}
+        </div>
+        <div style="font-size:10px;font-weight:700;color:var(--mut);margin-bottom:6px">Animation Style</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+          ${[['drift','🌊 Drift'],['pulse','💫 Pulse'],['blink','✦ Blink']].map(([v,l])=>`
+          <div onclick="_ahAnimStyle('${v}')" id="ah-anim-style-${v}" style="padding:9px;text-align:center;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid ${(H.bgAnimStyle||'drift')===v?'var(--acc)':'var(--bord)'};background:${(H.bgAnimStyle||'drift')===v?'var(--acc-bg)':'var(--surf)'};color:${(H.bgAnimStyle||'drift')===v?'var(--acc)':'var(--mut)'}">${l}</div>`).join('')}
+        </div>
+      </div>
     </div>
 
     <!-- GALLERY PANE -->
@@ -29787,6 +30008,32 @@ function editCollabProfile(){
       ${H.gallery.length === 0 ? `<div style="text-align:center;padding:30px;color:var(--mut);font-size:13px">No photos yet.<br>Add up to 6 to your gallery.</div>` : ''}
     </div>
 
+    <!-- MERCH PANE -->
+    <div id="ahpane-merch" style="padding:16px;display:none">
+      <div style="background:var(--acc-bg);border:1px solid var(--acc);border-radius:10px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:var(--acc);line-height:1.5">
+        🛍️ Add merch items to sell on your hub. Sales happen automatically each game week based on your fans and hype.
+      </div>
+      ${H.merch.length===0 ? `<div style="text-align:center;padding:30px 16px;color:var(--mut);font-size:13px">No merch yet.<br>Add your first item below.</div>` : `
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+        ${H.merch.map((item,i)=>`
+        <div onclick="_ahMerchPanel(${JSON.stringify(JSON.stringify(item))},${i})" style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:12px">
+          <div style="width:44px;height:44px;border-radius:8px;background:${item.color||'var(--surf2)'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;border:1px solid var(--bord)">
+            ${item.type==='Hoodie'?'🧥':item.type==='T-Shirt'?'👕':item.type==='Hat'?'🧢':item.type==='Vinyl'?'💿':item.type==='Poster'?'🖼':item.type==='Tote Bag'?'👜':item.type==='Keychain'?'🔑':item.type==='Phone Case'?'📱':item.type==='Mug'?'☕':item.type==='Sticker Pack'?'✨':item.type==='Mystery Box'?'📦':'🎁'}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
+            <div style="font-size:11px;color:var(--mut);margin-top:2px">${item.type} · $${(item.price||0).toFixed(2)} · Stock: ${item.stock||0}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+            ${item.limited?'<span style="font-size:9px;font-weight:800;color:#f59e0b;background:rgba(245,158,11,0.15);padding:2px 6px;border-radius:4px;letter-spacing:.5px">LIMITED</span>':''}
+            ${(item.stock||0)===0?'<span style="font-size:9px;font-weight:800;color:#ef4444;background:rgba(239,68,68,0.15);padding:2px 6px;border-radius:4px">SOLD OUT</span>':''}
+            <span style="font-size:10px;color:var(--mut)">✏️ Manage</span>
+          </div>
+        </div>`).join('')}
+      </div>`}
+      <button onclick="_ahAddMerch()" style="width:100%;padding:13px;background:transparent;border:2px dashed var(--bord);border-radius:10px;color:var(--mut);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb)">＋ Add Merch Item</button>
+    </div>
+
   </div>
 
   <!-- Sticky save footer -->
@@ -29808,7 +30055,7 @@ function editCollabProfile(){
 
 // ── Artist Hub helper functions ──────────────────────────────────
 function _ahTab(name){
-  ['profile','site','gallery'].forEach(t=>{
+  ['profile','site','gallery','merch'].forEach(t=>{
     const tab = document.getElementById('ahtab-'+t);
     const pane = document.getElementById('ahpane-'+t);
     const active = t === name;
@@ -29850,7 +30097,7 @@ function _ahPreset(bg, txt, acc){
 function _ahBgType(val){
   if(!GAME.artistHub) GAME.artistHub={};
   GAME.artistHub.bgType = val;
-  ['solid','gradient','pattern','photo'].forEach(v=>{
+  ['solid','gradient','pattern','photo','animated'].forEach(v=>{
     const el=document.getElementById('ah-bgtype-'+v);
     if(!el) return;
     const active=v===val;
@@ -29859,9 +30106,27 @@ function _ahBgType(val){
     el.style.color=active?'var(--acc)':'var(--mut)';
   });
   // Show/hide option panels
-  ['gradient','pattern','photo'].forEach(v=>{
+  ['gradient','pattern','photo','animated'].forEach(v=>{
     const el=document.getElementById('ah-'+v+'-opts');
     if(el) el.style.display=v===val?'block':'none';
+  });
+}
+
+function _ahAnimType(val){
+  if(!GAME.artistHub) GAME.artistHub={};
+  GAME.artistHub.bgAnimType = val;
+  ['stars','notes','dots','shapes'].forEach(v=>{
+    const el=document.getElementById('ah-anim-type-'+v);
+    if(el){el.style.borderColor=v===val?'var(--acc)':'var(--bord)';el.style.background=v===val?'var(--acc-bg)':'var(--surf)';el.style.color=v===val?'var(--acc)':'var(--mut)';}
+  });
+}
+
+function _ahAnimStyle(val){
+  if(!GAME.artistHub) GAME.artistHub={};
+  GAME.artistHub.bgAnimStyle = val;
+  ['drift','pulse','blink'].forEach(v=>{
+    const el=document.getElementById('ah-anim-style-'+v);
+    if(el){el.style.borderColor=v===val?'var(--acc)':'var(--bord)';el.style.background=v===val?'var(--acc-bg)':'var(--surf)';el.style.color=v===val?'var(--acc)':'var(--mut)';}
   });
 }
 
@@ -30003,6 +30268,8 @@ function _ahSave(){
   H.showMusic = document.getElementById('ah-showMusic')?.checked ?? true;
   H.showMerch = document.getElementById('ah-showMerch')?.checked ?? true;
   H.showCollab = document.getElementById('ah-showCollab')?.checked ?? true;
+  const fanToggle = document.getElementById('ah-showFanCount');
+  if(fanToggle) H.showFanCount = fanToggle.checked;
   // Sync bio to artistProfile too
   if(!GAME.artistProfile) GAME.artistProfile = {};
   GAME.artistProfile.bio = H.bio;
@@ -30022,6 +30289,8 @@ function _previewArtistHub(){
   H.showMusic = document.getElementById('ah-showMusic')?.checked ?? true;
   H.showMerch = document.getElementById('ah-showMerch')?.checked ?? true;
   H.showCollab = document.getElementById('ah-showCollab')?.checked ?? true;
+  const fanToggle2 = document.getElementById('ah-showFanCount');
+  if(fanToggle2) H.showFanCount = fanToggle2.checked;
 
   // Pass own userId as both viewer and artist so collab button is hidden (self-view)
   const myId = currentUser?.id || 'self';
