@@ -20221,6 +20221,28 @@ const YOURTUBE_CSS=`<style>
 .ytm .lrow .ti{flex:1;min-width:0;}
 .ytm .lrow .ti b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400;}
 .ytm .lrow .ti span{font-size:12px;color:#aaa;}
+.ytm .carouter{overflow:hidden;}
+.ytm .carinner{display:flex;overflow-x:scroll;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;}
+.ytm .carinner::-webkit-scrollbar{display:none;}
+.ytm .carpage{scroll-snap-align:start;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;min-width:100%;flex-shrink:0;padding:0 16px 10px;box-sizing:border-box;}
+.ytm .carcard{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1;cursor:pointer;background:#212121;display:flex;align-items:center;justify-content:center;font-size:32px;}
+.ytm .carcard .clab{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.85));padding:14px 7px 7px;font-size:11px;font-weight:600;line-height:1.3;color:#fff;}
+.ytm .cdots{display:flex;gap:6px;justify-content:center;padding:10px 0 6px;}
+.ytm .cdots span{width:8px;height:8px;border-radius:50%;background:#555;transition:background .3s;}
+.ytm .cdots span.on{background:#fff;}
+.ytm .hqpicks{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 16px 16px;scrollbar-width:none;}
+.ytm .hqpicks::-webkit-scrollbar{display:none;}
+.ytm .qcol{display:flex;flex-direction:column;flex-shrink:0;width:285px;}
+.ytm .qrow2{display:flex;align-items:center;gap:12px;padding:7px 10px 7px 0;cursor:pointer;}
+.ytm .qrow2 .cov2{width:56px;height:56px;border-radius:4px;background:#212121;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden;}
+.ytm .qrow2 .ti{flex:1;min-width:0;}
+.ytm .qrow2 .ti b{display:block;font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ytm .qrow2 .ti span{display:block;font-size:11.5px;color:#aaa;}
+.ytm .qrow2 .more3{font-size:18px;color:#aaa;padding-left:4px;cursor:pointer;flex-shrink:0;}
+.ytm .disccard{flex:none;width:155px;cursor:pointer;}
+.ytm .disccov{width:155px;height:155px;border-radius:8px;background:#212121;display:flex;align-items:center;justify-content:center;font-size:40px;margin-bottom:8px;overflow:hidden;}
+.ytm .disccard b{display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ytm .disccard span{display:block;font-size:11px;color:#aaa;}
 </style>`;
 
 function showYourtubeMusicUI(){
@@ -20238,61 +20260,60 @@ function showYourtubeMusicUI(){
 function showYourtubeHome(){
   GAME.yourtubeMusicView='home';
   const releasedSongs=GAME.songs.filter(s=>s.released).sort((a,b)=>(b.streams||0)-(a.streams||0));
-  const topSong=releasedSongs[0];
-  // Build mixed "Listen again" from own + other players
   const allReleasedForYT=[];
   releasedSongs.forEach(song=>allReleasedForYT.push({...song,ownerName:S.artistName||'You',ownerId:currentUser?.id}));
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    window.allPlayers.forEach(p=>{
-      (p.gameSongs||[]).forEach(song=>allReleasedForYT.push({...song,ownerName:p.artistName||'Artist',ownerId:p.id}));
-    });
+    window.allPlayers.forEach(p=>{(p.gameSongs||[]).forEach(song=>allReleasedForYT.push({...song,ownerName:p.artistName||'Artist',ownerId:p.id}));});
   }
   allReleasedForYT.sort((a,b)=>(b.streams||0)-(a.streams||0));
-  // "Listen again" — horizontal cards
-  let listenHTML='';
-  if(allReleasedForYT.length===0){
-    listenHTML='<div style="padding:0 16px 18px;color:#aaa;font-size:13px">Release your first song to see it here.</div>';
-  }else{
-    allReleasedForYT.slice(0,10).forEach(song=>{
-      const totV2=song.streams||0;
-      const viewStr=totV2>=1000000?(totV2/1000000).toFixed(1)+'M':totV2>=1000?Math.round(totV2/1000)+'K':String(totV2||0);
-      const cs=song.coverImage?`background:url('${song.coverImage}') center/cover`:'background:#212121';
-      listenHTML+=`<div class="mcard" onclick="ytShowTrack('${song.id}','${song.ownerId}')"><div class="cov" style="${cs}">${song.coverImage?'':'&#9834;'}</div><b>${song.title}</b><span>${song.ownerName} · ${viewStr} plays</span></div>`;
-    });
-    listenHTML=`<div class="hrow">${listenHTML}</div>`;
+  // Carousel — paginated 3-column grid
+  const carSongs=allReleasedForYT.slice(0,18);
+  const carPages=[];
+  for(let i=0;i<carSongs.length;i+=6){carPages.push(carSongs.slice(i,i+6));}
+  if(!carPages.length)carPages.push([]);
+  const pagesHTML=carPages.map(page=>{
+    const cardsHTML=page.map(song=>{
+      const cs=song.coverImage?`background:url('${song.coverImage}') center/cover;background-size:cover`:'background:#212121';
+      return`<div class="carcard" style="${cs}" onclick="ytShowTrack('${song.id}','${song.ownerId}')"><div class="clab">${song.title}</div></div>`;
+    }).join('');
+    if(!cardsHTML)return'<div class="carpage"><div style="padding:30px;color:#aaa;font-size:13px;grid-column:1/-1">Release music to see it here.</div></div>';
+    return`<div class="carpage">${cardsHTML}</div>`;
+  }).join('');
+  const dotsHTML=carPages.length>1?`<div class="cdots" id="ytCDots">${carPages.map((_,i)=>`<span${i===0?' class="on"':''}></span>`).join('')}</div>`:'<div style="height:8px"></div>';
+  // Quick picks — horizontal 2-row columns
+  const qpSongs=allReleasedForYT.slice(0,12);
+  let qpHTML='';
+  for(let i=0;i<qpSongs.length;i+=2){
+    const pair=qpSongs.slice(i,i+2);
+    const colRows=pair.map(song=>{
+      const cs2=song.coverImage?`background:url('${song.coverImage}') center/cover;background-size:cover`:'background:#212121';
+      const v=song.streams||0;const vs=v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?Math.round(v/1000)+'K':String(v||'—');
+      return`<div class="qrow2" onclick="ytShowTrack('${song.id}','${song.ownerId}')"><div class="cov2" style="${cs2}">${song.coverImage?'':' &#9834;'}</div><div class="ti"><b>${song.title}</b><span>${song.ownerName} · ${vs} plays</span></div><div class="more3">${getSVG('dots','18px')}</div></div>`;
+    }).join('');
+    qpHTML+=`<div class="qcol">${colRows}</div>`;
   }
-  // "Quick picks" — mixed list
-  let picksHTML='';
-  allReleasedForYT.slice(0,8).forEach(song=>{
-    const totV=song.streams||0;
-    const viewStr=totV>=1000000?(totV/1000000).toFixed(1)+'M':totV>=1000?Math.round(totV/1000)+'K':String(totV||0);
-    const cs=song.coverImage?`background:url('${song.coverImage}') center/cover`:'background:#212121';
-    picksHTML+=`<div class="qrow" onclick="ytShowTrack('${song.id}','${song.ownerId}')"><div class="cov" style="${cs}">${song.coverImage?'':'&#9834;'}</div><div class="ti"><b>${song.title}</b><span>${song.ownerName} · ${viewStr} plays</span></div><div class="more" style="display:inline-flex">${getSVG('dots','18px')}</div></div>`;
-  });
-  if(!picksHTML)picksHTML='<div style="text-align:center;padding:30px;color:#aaa;font-size:13px">No songs yet — release music to fill this in.</div>';
-  // New releases — horizontal album/ep/single cards from releases
-  let newRelHTML='';
-  const recentRels=(GAME.releases||[]).filter(r=>r.songs&&r.songs.length>0).sort((a,b)=>b.releaseDay-a.releaseDay).slice(0,6);
-  recentRels.forEach(rel=>{
-    const fs=rel.songs[0];const relType=rel.type==='ep'||rel.type==='EP'?'EP':rel.type==='album'?'Album':'Single';
-    const cs=fs&&fs.coverImage?`background-image:url('${fs.coverImage}');background-size:cover;background-position:center`:'';
-    newRelHTML+=`<div class="mcard" onclick="showReleaseStats(${rel.id},'youtube')"><div class="cov" style="${cs}">${fs&&fs.coverImage?'':fs&&fs.cover||'♫'}</div><b>${rel.title}</b><span>${relType}</span></div>`;
-  });
-  const npCov=topSong?topSong.cover||'♫':'♫';
-  const npTitle=topSong?topSong.title:'Nothing playing';
+  if(!qpHTML)qpHTML='<div class="qcol"><div style="padding:20px 0;color:#aaa;font-size:13px">No songs yet.</div></div>';
+  // Daily discover — large horizontal cards
+  const discSongs=allReleasedForYT.slice(0,8);
+  const discHTML=discSongs.map(song=>{
+    const cs3=song.coverImage?`background:url('${song.coverImage}') center/cover;background-size:cover`:'background:#212121';
+    return`<div class="disccard" onclick="ytShowTrack('${song.id}','${song.ownerId}')"><div class="disccov" style="${cs3}">${song.coverImage?'':' &#9834;'}</div><b>${song.title}</b><span>${song.ownerName}</span></div>`;
+  }).join('');
+  // Now-playing bar
+  const npCur=GAME.ytCurrentSong||{title:releasedSongs[0]?.title||'Nothing playing',ownerName:S.artistName||'You',coverImage:releasedSongs[0]?.coverImage||null};
+  const npCovStyle=npCur.coverImage?`background:url('${npCur.coverImage}') center/cover;background-size:cover`:'display:flex;align-items:center;justify-content:center;font-size:16px';
   const html=YOURTUBE_CSS+`<div class="ytm">
-    <div class="head"><button class="back" onclick="closeYourtubeMusicToStreaming()">←</button><div class="logo"><span class="yt-icon">&#9654;</span><span class="yt-text"> Music</span></div><div class="ic"><button onclick="ytSwitch('search',this)" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px;display:flex;align-items:center">${getSVG('search','20px')}</button><button onclick="ytShowArtist('${currentUser?.id||''}')" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px;display:flex;align-items:center">${getSVG('profile','20px')}</button></div></div>
+    <div class="head"><button class="back" onclick="closeYourtubeMusicToStreaming()">←</button><div class="logo"><span class="yt-icon">&#9654;</span><span class="yt-text"> Music</span></div><div class="ic"><button onclick="ytSwitch('search',this)" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px;display:flex;align-items:center">${getSVG('search','20px')}</button><button onclick="ytShowArtist('${currentUser?.id||''}' )" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px;display:flex;align-items:center">${getSVG('profile','20px')}</button></div></div>
     <div class="chips"><span class="on">All</span><span>Mixed for you</span><span>Music Videos</span><span>Artists</span><span>New</span></div>
-    <div class="sect">Listen again</div>
-    ${listenHTML}
-    <div class="sect">Quick picks</div>
-    ${picksHTML}
-    ${newRelHTML?`<div class="sect">New releases</div><div class="hrow">${newRelHTML}</div>`:''}
-    <div class="foot"><div class="npbar" onclick="ytOpenCurrentSong()" style="cursor:pointer">${(()=>{const cur=GAME.ytCurrentSong||{title:npTitle,ownerName:S.artistName||'You',coverImage:null};const covStyle=cur.coverImage?'background:'+'url(\''+cur.coverImage+'\') center/cover;background-size:cover':'display:flex;align-items:center;justify-content:center;font-size:16px';return'<div class="cov" style="'+covStyle+'">'+( cur.coverImage?'':' &#9834;')+'</div><div class="ti"><b>'+( cur.title||npTitle)+'</b><span>'+(cur.ownerName||S.artistName||'You')+'</span></div><div class="ctrl"><span style="cursor:pointer;font-size:20px" onclick="event.stopPropagation()">&#9654;</span></div>';})()}</div><div class="bnav"><div class="on" onclick="ytSwitch('home',this)">${getSVG('home','22px')}<span>Home</span></div><div onclick="ytSwitch('shorts',this)">${getSVG('search','22px')}<span>Explore</span></div><div onclick="ytSwitch('subs',this)">${getSVG('library','22px')}<span>Library</span></div></div></div>
+    <div class="carouter"><div class="carinner" id="ytCI" onscroll="ytCarScroll(this,${carPages.length})">${pagesHTML}</div>${dotsHTML}</div>
+    <div class="sect">Quick picks <button onclick="ytPlayAll()" style="background:none;color:#fff;border:1.5px solid #555;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Play all</button></div>
+    <div class="hqpicks">${qpHTML}</div>
+    ${discHTML?`<div class="sect">Your daily discover <button style="background:none;color:#fff;border:1.5px solid #555;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Play all</button></div><div class="hrow">${discHTML}</div>`:''}
+    <div style="height:8px"></div>
+    <div class="foot"><div class="npbar" onclick="ytOpenCurrentSong()" style="cursor:pointer"><div class="cov" style="${npCovStyle}">${npCur.coverImage?'':' &#9834;'}</div><div class="ti"><b>${npCur.title}</b><span>${npCur.ownerName}</span></div><div class="ctrl"><span style="cursor:pointer;font-size:20px" onclick="event.stopPropagation()">&#9654;</span></div></div><div class="bnav"><div class="on" onclick="ytSwitch('home',this)">${getSVG('home','22px')}<span>Home</span></div><div onclick="ytSwitch('shorts',this)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;color:#aaa;cursor:pointer"><span style="font-size:20px;line-height:1">⏭</span><span>Samples</span></div><div onclick="ytSwitch('search',this)">${getSVG('search','22px')}<span>Search</span></div><div onclick="ytSwitch('subs',this)">${getSVG('library','22px')}<span>Library</span></div></div></div>
   </div>`;
   _insertOverlay(html);
 }
-
 function showYourtubeExplore(){
   GAME.yourtubeMusicView='shorts';
   const html=YOURTUBE_CSS+`<div class="ytm">
@@ -20426,6 +20447,8 @@ function ytShowArtist(artistId){
 }
 function ytSwitch(view,el){GAME.yourtubeMusicView=view;if(view==='search'){showYtMusicSearchView();}else{showYourtubeMusicUI();}}
 function ytFollowArtist(btn,artistId){if(!GAME.loopifyFollowing)GAME.loopifyFollowing={};var f=!GAME.loopifyFollowing[artistId];GAME.loopifyFollowing[artistId]=f;btn.textContent=f?'Subscribed':'Subscribe';btn.style.borderColor=f?'#fff':'#aaa';if(typeof saveGame==='function')saveGame();}
+function ytCarScroll(el,total){var idx=Math.round(el.scrollLeft/el.offsetWidth);var dots=document.getElementById('ytCDots');if(dots){dots.querySelectorAll('span').forEach(function(s,i){s.className=i===idx?'on':''});}}
+function ytPlayAll(){var s=(GAME.songs||[]).filter(function(sg){return sg.released;})[0];if(s){ytShowTrack(s.id,currentUser&&currentUser.id);}else{showToast('No songs to play','info');}}
 function ytOpenCurrentSong(){if(GAME.ytCurrentSong&&GAME.ytCurrentSong.id){ytShowTrack(GAME.ytCurrentSong.id,GAME.ytCurrentSong.ownerId);}else{var s=(GAME.songs||[]).filter(function(sg){return sg.released;})[0];if(s){ytShowTrack(s.id,currentUser&&currentUser.id);}else{showToast('No songs playing','info');}}}
 function closeYourtubeMusicToStreaming(){_closeOverlay(document.querySelector('[data-app-overlay]'));}
 function editYourtubeMusicProfile(){}
