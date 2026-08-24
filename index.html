@@ -19877,10 +19877,10 @@ function showLoopifyHome(){
   }else{
     topChartSongs=releasedSongs.slice().sort((a,b)=>(b.streams||0)-(a.streams||0)).slice(0,50).map(s=>({...s,artistId:currentUser?.id,artistName:S.artistName}));
   }
-  // Build chart rows — show Loopify's 42% of total streams
+  // Build chart rows — show platform-specific Loopify plays
   let chartHTML='';
   topChartSongs.forEach((song,idx)=>{
-    const loopifyStreams=Math.floor((song.streams||0)*0.42);
+    const loopifyStreams=(song.platforms&&song.platforms.spotify)?song.platforms.spotify:Math.floor((song.streams||0)*0.42);
     let streamStr;
     if(loopifyStreams>=1000000000){streamStr=(loopifyStreams/1000000000).toFixed(1)+'B';}
     else if(loopifyStreams>=1000000){streamStr=(loopifyStreams/1000000).toFixed(1)+'M';}
@@ -19890,7 +19890,8 @@ function showLoopifyHome(){
     let movement,movementClass;
     if(!prevPos){movement='NEW';movementClass='new';}
     else{const diff=prevPos-(idx+1);if(diff>0){movement='▲'+diff;movementClass='up';}else if(diff<0){movement='▼'+Math.abs(diff);movementClass='down';}else{movement='—';movementClass='same';}}
-    chartHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${song.artistId}')"><div class="pos">${idx+1}</div><div class="mv ${movementClass}">${movement}</div><div class="cover sm">${song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><div class="strm">${streamStr}</div><div class="dots">⋮</div></div>`;
+    const covStyle=song.coverImage?`background:url('${song.coverImage}') center/cover;background-size:cover`:'background:#535353;display:flex;align-items:center;justify-content:center;font-size:14px';
+    chartHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${song.artistId}')"><div class="pos">${idx+1}</div><div class="mv ${movementClass}">${movement}</div><div class="cover sm" style="${covStyle}">${song.coverImage?'':song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><div class="strm">${streamStr}</div><div class="dots">⋮</div></div>`;
   });
   // Popular artists — always show current user first
   const myTotalStreams=GAME.songs.reduce((s,sg)=>s+(sg.streams||0),0);
@@ -19903,7 +19904,17 @@ function showLoopifyHome(){
     });
   }
   const hr=new Date().getHours();const tod=hr<12?'morning':hr<18?'afternoon':'evening';
-  const html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">←</button><h2>Good ${tod}</h2><div class="ic"><span onclick="" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center">${getSVG('bell','20px')}</span><span onclick="" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center">${getSVG('settings','18px')}</span></div></div><div class="filters"><span class="on">All</span><span>Music</span><span>Charts</span></div><div class="sect">Top 50 — Global <a href="#">See chart</a></div>${chartHTML}<div class="sect">Popular artists</div><div class="hrow">${popularArtistsHTML}</div><div class="foot"><div class="npbar"><div class="cover" style="display:flex;align-items:center;justify-content:center;font-size:16px">&#9834;</div><div class="ti" style="flex:1"><b>Your Track</b><span>Artist</span></div><div class="ctrl" style="display:flex;gap:10px;font-size:18px">&#9654;</div><div class="prog"><i id="lprog"></i></div></div><div class="bnav"><div class="on" onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;
+  // Now-playing bar — use last played track, or top song as fallback
+  let npSong=null,npArtist=S.artistName||'You';
+  if(GAME.loopifyTrackId){
+    npSong=GAME.songs?.find(s=>String(s.id)===String(GAME.loopifyTrackId));
+    if(!npSong&&window.allPlayers){const pid=GAME.loopifyTrackArtistId;const p=window.allPlayers.find(pl=>pl.id===pid);if(p){npSong=(p.gameSongs||[]).find(s=>String(s.id)===String(GAME.loopifyTrackId));npArtist=p.artistName||'Artist';}}
+  }
+  if(!npSong)npSong=releasedSongs[0]||null;
+  const npTitle=npSong?npSong.title:'Nothing playing';
+  const npCovStyle=npSong&&npSong.coverImage?`background:url('${npSong.coverImage}') center/cover;background-size:cover`:'background:#333;display:flex;align-items:center;justify-content:center;font-size:16px';
+  const npCovContent=npSong&&npSong.coverImage?'':'&#9834;';
+  const html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">←</button><h2>Good ${tod}</h2><div class="ic"><span onclick="" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center">${getSVG('bell','20px')}</span><span onclick="" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center">${getSVG('settings','18px')}</span></div></div><div class="filters"><span class="on">All</span><span>Music</span><span>Charts</span></div><div class="sect">Top 50 — Global <a href="#">See chart</a></div>${chartHTML}<div class="sect">Popular artists</div><div class="hrow">${popularArtistsHTML}</div><div class="foot"><div class="npbar"${npSong?` onclick="loopShowTrack('${npSong.id}','${GAME.loopifyTrackArtistId||currentUser?.id}')" style="cursor:pointer"`:''} ><div class="cover" style="${npCovStyle}">${npCovContent}</div><div class="ti" style="flex:1"><b>${npTitle}</b><span>${npArtist}</span></div><div class="ctrl" style="display:flex;gap:10px;font-size:18px">&#9654;</div><div class="prog"><i id="lprog"></i></div></div><div class="bnav"><div class="on" onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;
   _insertOverlay(html);
 }
 function showLoopifySearch(){let html=LOOPIFY_CSS+`<div class="loop"><div class="topbar"><button class="loop-close" onclick="closeLoopify()">←</button><h2>Search</h2><div class="ic"></div></div><div class="srchbox">${getSVG('search','18px')}<input type="text" placeholder="Artists, songs, or albums" oninput="loopFilterSearch(this.value)"></div><div id="loopSearchResults" style="display:none"></div><div class="sect">Browse all</div><div class="ggrid"><div class="gcard" style="background:#8a2a4a">R&amp;B</div><div class="gcard" style="background:#2a6a4a">Afrobeats</div><div class="gcard" style="background:#3d3d8a">Pop</div><div class="gcard" style="background:#8a5a2a">Hip-Hop</div><div class="gcard" style="background:#2a3a6a">Dance</div><div class="gcard" style="background:#4a2a6a">Alternative</div></div><div class="foot"><div class="bnav"><div onclick="loopSwitchView('home',this)">${getSVG('home','20px')}<span>Home</span></div><div class="on" onclick="loopSwitchView('search',this)">${getSVG('search','20px')}<span>Search</span></div><div onclick="loopSwitchView('library',this)">${getSVG('library','20px')}<span>Your Library</span></div></div></div></div>`;_insertOverlay(html);}
