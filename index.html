@@ -18459,7 +18459,7 @@ function _amdRedraw(){
     ctx.globalAlpha=_amdState.design.opacity;
     ctx.translate(zx+_amdState.design.x, zy+_amdState.design.y);
     ctx.rotate(_amdState.design.rotation*Math.PI/180);
-    ctx.drawImage(di,-dw/2,-dh/2,dw,dh);
+    _amdDrawWarped(ctx,di,dw,dh,_amdState.warpAngle||0);
     ctx.restore();
     // Print zone border
     ctx.save(); ctx.strokeStyle='rgba(200,168,75,0.65)'; ctx.lineWidth=1.5; ctx.setLineDash([5,4]);
@@ -18538,6 +18538,22 @@ function _amdUploadDesign(e){
   reader.readAsDataURL(file);
 }
 
+function _amdDrawWarped(ctx, img, dw, dh, warp){
+  // Perspective warp: top narrows toward vanishing point
+  // warp: 0 = none, 1 = maximum perspective
+  if(!img||warp<0.01){ ctx.drawImage(img,-dw/2,-dh/2,dw,dh); return; }
+  var rows=Math.max(60,Math.ceil(dh));
+  for(var r=0;r<rows;r++){
+    var t=r/rows; // 0 top → 1 bottom
+    var rowScale=(1-warp)+warp*t; // narrows at top
+    var rowW=dw*rowScale;
+    var rowH=dh/rows+0.5;
+    var srcY=img.naturalHeight*r/rows;
+    var srcH=img.naturalHeight/rows+1;
+    ctx.drawImage(img,0,srcY,img.naturalWidth,srcH,-rowW/2,-dh/2+r*(dh/rows),rowW,rowH);
+  }
+}
+
 function _amdCenterDesign(){
   if(!_amdState) return;
   _amdState.design.x=0; _amdState.design.y=0;
@@ -18579,7 +18595,7 @@ function _amdRenderThumb(){
     var dx=zx+_amdState.design.x*(300/cw), dy=zy+_amdState.design.y*(300/ch);
     c.globalAlpha=_amdState.design.opacity; c.translate(dx,dy);
     c.rotate(_amdState.design.rotation*Math.PI/180);
-    c.drawImage(di,-dw/2,-dh/2,dw,dh); c.restore();
+    _amdDrawWarped(c,di,dw,dh,_amdState.warpAngle||0); c.restore();
   }
   return off.toDataURL('image/png');
 }
@@ -18610,7 +18626,7 @@ function _amdSave(){
 function _ahAddMerch(){
   if(!GAME.artistHub)GAME.artistHub={};
   if(!GAME.artistHub.merch)GAME.artistHub.merch=[];
-  _amdState={itemIdx:0,tintColor:'#ffffff',tintStrength:0.6,design:{src:null,img:null,x:0,y:0,scale:1,rotation:0,opacity:1}};
+  _amdState={itemIdx:0,tintColor:'#ffffff',tintStrength:0.6,warpAngle:0,design:{src:null,img:null,x:0,y:0,scale:1,rotation:0,opacity:1}};
 
   var swHtml=_AMD_COLORS.map(function(c,i){
     return '<div class="amd-swatch" onclick="_amdSetColor(\''+c.hex+'\',this)" title="'+c.name+'" style="width:32px;height:32px;border-radius:50%;background:'+c.hex+';border:3px solid transparent;cursor:pointer;flex-shrink:0;box-shadow:'+(c.hex==='#ffffff'?'inset 0 0 0 1.5px #999':'none')+';transition:border-color .15s"></div>';
@@ -18665,8 +18681,10 @@ function _ahAddMerch(){
     +'<input type="range" id="amd-size" min="10" max="200" value="100" oninput="_amdState.design.scale=this.value/100;document.getElementById(\'amd-size-val\').textContent=this.value+\'%\';_amdRedraw()" style="width:100%;height:6px;border-radius:3px;-webkit-appearance:none;background:var(--bord);outline:none"></div>'
     +'<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:4px"><span>Rotate</span><span id="amd-rot-val" style="font-weight:700;color:var(--txt)">0°</span></div>'
     +'<input type="range" id="amd-rot" min="-180" max="180" value="0" oninput="_amdState.design.rotation=parseInt(this.value);document.getElementById(\'amd-rot-val\').textContent=this.value+\'°\';_amdRedraw()" style="width:100%;height:6px;border-radius:3px;-webkit-appearance:none;background:var(--bord);outline:none"></div>'
-    +'<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:4px"><span>Opacity</span><span id="amd-opa-val" style="font-weight:700;color:var(--txt)">100%</span></div>'
+    +'<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:4px"><span>Opacity</span><span id="amd-opa-val" style="font-weight:700;color:var(--txt)">100%</span></div>'
     +'<input type="range" id="amd-opa" min="10" max="100" value="100" oninput="_amdState.design.opacity=this.value/100;document.getElementById(\'amd-opa-val\').textContent=this.value+\'%\';_amdRedraw()" style="width:100%;height:6px;border-radius:3px;-webkit-appearance:none;background:var(--bord);outline:none"></div>'
+    +'<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:4px"><span>Perspective Warp</span><span id="amd-warp-val" style="font-weight:700;color:var(--txt)">0%</span></div>'
+    +'<input type="range" id="amd-warp" min="0" max="80" value="0" oninput="_amdState.warpAngle=this.value/100;document.getElementById(\'amd-warp-val\').textContent=this.value+\'%\';_amdRedraw()" style="width:100%;height:6px;border-radius:3px;-webkit-appearance:none;background:var(--bord);outline:none"></div>'
     +'<div style="display:flex;gap:8px">'
     +'<button onclick="_amdCenterDesign()" style="flex:1;padding:10px;background:transparent;border:1px solid var(--bord);border-radius:8px;color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--fb)">⊙ Center</button>'
     +'<button onclick="_amdRemoveDesign()" style="flex:1;padding:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;color:#f87171;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--fb)">🗑 Remove</button>'
@@ -18782,12 +18800,6 @@ function _renderArtistHubPage(gameData, viewerUserId, isPreview){
         ${PAGES.map(([p,l])=>`<button id="${cid}tb${p}" onclick="_ahSwitch('${cid}','${p}')" style="background:none;border:none;border-bottom:2px solid ${p==='home'?acc:'transparent'};color:${p==='home'?acc:mut};font-size:11px;font-weight:700;padding:0 10px;height:48px;cursor:pointer;white-space:nowrap;font-family:inherit;letter-spacing:0.5px">${l}</button>`).join('')}
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:14px;padding:4px 14px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-top:1px solid ${bord}">
-      ${pentaF>0?`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">📸</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(pentaF)}</span><span style="font-size:10px;color:${mut}">Pentagram</span></div>`:''}
-      ${rookieF>0?`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">📱</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(rookieF)}</span><span style="font-size:10px;color:${mut}">Rookie</span></div>`:''}
-      ${yF>0?`<div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">𝕐</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(yF)}</span><span style="font-size:10px;color:${mut}">Y</span></div>`:''}
-      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0"><span style="font-size:13px">🎵</span><span style="font-size:12px;font-weight:700;color:${txt}">${fmt(totalStreams)}</span><span style="font-size:10px;color:${mut}">streams</span></div>
-    </div>
   </nav>`;
 
   // ── HOME PAGE ──────────────────────────────────────────────────
@@ -18885,19 +18897,27 @@ function _renderArtistHubPage(gameData, viewerUserId, isPreview){
 
   // ── ABOUT PAGE ────────────────────────────────────────────────
   const achievements=gameData.achievements||gameData.awards||[];
-  const aboutPage=`<div style="padding:18px">
-    ${bio?`<div style="margin-bottom:18px"><div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:10px">Bio</div><div style="font-size:13px;color:${txt};line-height:1.75;opacity:0.85">${bio}</div></div>`:''}
-    <div style="margin-bottom:18px">
-      <div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:10px">Stats</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        ${showFans?`<div style="background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px;font-weight:900;color:${txt}">${fmt(totalFans)}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Fans</div></div>`:''}
-        <div style="background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px;font-weight:900;color:${txt}">${fmt(totalStreams)}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Streams</div></div>
-        <div style="background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:20px;font-weight:900;color:${txt}">${releasedSongs.length}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Releases</div></div>
-        <div style="background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:14px;font-weight:900;color:${txt}">${gameData.genre||'—'}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Genre</div></div>
-      </div>
+  const _ahRow=(icon,iconBg,label,sub,onclick)=>`<div onclick="${onclick}" style="display:flex;align-items:center;gap:13px;background:${surf};border:1px solid ${bord};border-radius:12px;padding:13px 14px;margin-bottom:7px;cursor:pointer;transition:opacity .15s;-webkit-tap-highlight-color:transparent" onmousedown="this.style.opacity='.65'" onmouseup="this.style.opacity='1'" ontouchstart="this.style.opacity='.65'" ontouchend="this.style.opacity='1'"><div style="width:40px;height:40px;border-radius:10px;background:${iconBg};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${icon}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:${txt};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div><div style="font-size:11px;color:${mut};margin-top:1px">${sub}</div></div><div style="color:${mut};font-size:20px;font-weight:300;flex-shrink:0">›</div></div>`;
+  const aboutPage=`<div style="padding:18px;padding-bottom:32px">
+    ${bio?`<div style="margin-bottom:22px"><div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:10px">Bio</div><div style="font-size:13px;color:${txt};line-height:1.75;opacity:0.85">${bio}</div></div>`:''}
+    <div style="margin-bottom:22px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:12px">Social</div>
+      ${_ahRow('📸','linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)','Pentagram',fmt(pentaF)+' followers','showPentagram()')}
+      ${_ahRow('🎵','linear-gradient(135deg,#010101,#69c9d0)','Rookie',fmt(rookieF)+' followers','showRookie()')}
+      ${_ahRow('🐦','linear-gradient(135deg,#1d9bf0,#0a6bbf)','Y',fmt(yF)+' followers',"showY()")}
+      ${_ahRow('▶️','linear-gradient(135deg,#ff0000,#b80000)','Yourtube',fmt(Math.round(totalStreams*.15))+' streams','showYourtube()')}
     </div>
-    ${achievements.length>0?`<div style="margin-bottom:18px"><div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:10px">Achievements</div>${achievements.slice(0,6).map(a=>`<div style="background:${surf};border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;border:1px solid ${bord};margin-bottom:6px"><span style="font-size:20px">${a.icon||'🏆'}</span><div style="flex:1"><div style="font-size:12px;font-weight:700;color:${txt}">${a.name||a.title||String(a)}</div>${a.desc?`<div style="font-size:11px;color:${mut};margin-top:1px">${a.desc}</div>`:''}</div></div>`).join('')}</div>`:''}
-    ${hasCollab?`<div style="background:${surf};border:1px solid ${bord};border-radius:18px;padding:22px 18px;text-align:center;margin-bottom:18px"><div style="font-size:18px;font-weight:900;color:${txt};margin-bottom:8px">Work With ${name}</div><div style="font-size:13px;color:${mut};margin-bottom:16px;line-height:1.55">${avail==='open'?'Available for all collaboration types.':'Accepting selective collaborations.'}</div><button onclick="window._hubCollabTarget&&_startHubCollab(window._hubCollabTarget)" style="background:${acc};color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;width:100%">🤝 Send Collab Request</button></div>`:''}
+    <div style="margin-bottom:22px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:12px">Streaming</div>
+      ${_ahRow('🎶',acc+'44','Loopify',fmt(Math.round(totalStreams*.42))+' streams','showLoopifyUI()')}
+      ${_ahRow('🍊','#ff6a0044','Orange Music',fmt(Math.round(totalStreams*.25))+' streams',"showToast('Find "+name.replace(/'/g,'')+" on Orange Music','purple')")}
+      ${_ahRow('🎵','#fa57c144','iMusic',fmt(Math.round(totalStreams*.07))+' streams',"showToast('Find "+name.replace(/'/g,'')+" on iMusic','purple')")}
+      ${_ahRow('🏝','#f59e0b44','Sahara',fmt(Math.round(totalStreams*.06))+' streams',"showToast('Find "+name.replace(/'/g,'')+" on Sahara','purple')")}
+      ${_ahRow('💨','#06b6d444','SoundPuff',fmt(Math.round(totalStreams*.05))+' streams',"showToast('Find "+name.replace(/'/g,'')+" on SoundPuff','purple')")}
+    </div>
+    ${showFans?`<div style="display:flex;gap:8px;margin-bottom:22px"><div style="flex:1;background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:18px;font-weight:900;color:${txt}">${fmt(totalFans)}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Fans</div></div><div style="flex:1;background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:18px;font-weight:900;color:${txt}">${releasedSongs.length}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Releases</div></div><div style="flex:1;background:${surf};border:1px solid ${bord};border-radius:12px;padding:14px;text-align:center"><div style="font-size:12px;font-weight:900;color:${txt}">${gameData.genre||'—'}</div><div style="font-size:9px;color:${mut};margin-top:3px;text-transform:uppercase;letter-spacing:1px">Genre</div></div></div>`:''}
+    ${achievements.length>0?`<div style="margin-bottom:22px"><div style="font-size:10px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:${acc};margin-bottom:10px">Achievements</div>${achievements.slice(0,6).map(a=>`<div style="background:${surf};border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;border:1px solid ${bord};margin-bottom:6px"><span style="font-size:20px">${a.icon||'🏆'}</span><div style="flex:1"><div style="font-size:12px;font-weight:700;color:${txt}">${a.name||a.title||String(a)}</div>${a.desc?`<div style="font-size:11px;color:${mut};margin-top:1px">${a.desc}</div>`:''}</div></div>`).join('')}</div>`:''}
+    ${hasCollab?`<div style="background:${surf};border:1px solid ${bord};border-radius:18px;padding:22px 18px;text-align:center;margin-bottom:22px"><div style="font-size:18px;font-weight:900;color:${txt};margin-bottom:8px">Work With ${name}</div><div style="font-size:13px;color:${mut};margin-bottom:16px;line-height:1.55">${avail==='open'?'Available for all collaboration types.':'Accepting selective collaborations.'}</div><button onclick="window._hubCollabTarget&&_startHubCollab(window._hubCollabTarget)" style="background:${acc};color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;width:100%">🤝 Send Collab Request</button></div>`:''}
     <div style="text-align:center;padding-top:8px;padding-bottom:16px">
       <div style="font-size:13px;font-weight:900;color:${txt};margin-bottom:4px">${name}</div>
       <div style="font-size:11px;color:${mut};margin-bottom:10px">soundcheck.gg/${slug}</div>
@@ -30331,9 +30351,10 @@ function editCollabProfile(){
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
         ${H.merch.map((item,i)=>`
         <div onclick="_ahMerchPanel(${JSON.stringify(JSON.stringify(item))},${i})" style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:12px">
-          <div style="width:44px;height:44px;border-radius:8px;background:${item.color||'var(--surf2)'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;border:1px solid var(--bord)">
-            ${item.type==='Hoodie'?'🧥':item.type==='T-Shirt'?'👕':item.type==='Hat'?'🧢':item.type==='Vinyl'?'💿':item.type==='Poster'?'🖼':item.type==='Tote Bag'?'👜':item.type==='Keychain'?'🔑':item.type==='Phone Case'?'📱':item.type==='Mug'?'☕':item.type==='Sticker Pack'?'✨':item.type==='Mystery Box'?'📦':'🎁'}
-          </div>
+          ${item.thumb
+            ? `<img src="${item.thumb}" style="width:44px;height:44px;border-radius:8px;object-fit:contain;background:${item.color||'var(--surf2)'};border:1px solid var(--bord);flex-shrink:0">`
+            : `<div style="width:44px;height:44px;border-radius:8px;background:${item.color||'var(--surf2)'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;border:1px solid var(--bord)">${item.type==='Hoodie'?'🧥':item.type==='T-Shirt'?'👕':item.type==='Hat'?'🧢':item.type==='Vinyl'?'💿':item.type==='Poster'?'🖼':item.type==='Tote Bag'?'👜':item.type==='Keychain'?'🔑':item.type==='Phone Case'?'📱':item.type==='Mug'?'☕':item.type==='Sticker Pack'?'✨':item.type==='Mystery Box'?'📦':'🎁'}</div>`
+          }
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
             <div style="font-size:11px;color:var(--mut);margin-top:2px">${item.type} · $${(item.price||0).toFixed(2)} · Stock: ${item.stock||0}</div>
