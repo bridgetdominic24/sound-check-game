@@ -1765,8 +1765,9 @@ function backToLanding(){
 // NOTIFICATION SYSTEM
 // ==============================================
 let notificationPollInterval = null;
-let lastNotificationCheck = Date.now();
+let lastNotificationCheck = 0; // Start at 0 so first-poll notifications ARE evaluated
 let shownNotificationIds = new Set();
+let _notifFirstRun = true; // On first poll, mark existing as seen without toasting
 
 function startNotificationPolling(){
   if(notificationPollInterval) clearInterval(notificationPollInterval);
@@ -1849,13 +1850,17 @@ async function checkForNewNotifications(){
     
     // Show toast for NEW notifications (ones we haven't shown yet)
     notifications.forEach(function(notif){
-      if(notif.timestamp > lastNotificationCheck && !shownNotificationIds.has(notif.id)){
+      if(_notifFirstRun){
+        // First poll: silently mark all existing unread notifs as seen — no toast spam
+        shownNotificationIds.add(notif.id);
+      } else if(!shownNotificationIds.has(notif.id)){
         console.log('🔔 Showing toast for new notification:', notif);
         showNotificationToast(notif);
         shownNotificationIds.add(notif.id);
       }
     });
-    
+    _notifFirstRun = false;
+
     lastNotificationCheck = Date.now();
     
   } catch(e){
@@ -4338,6 +4343,10 @@ function goToHome(){
   // Initialize server time for multiplayer
   if(GAME_MODE === 'multi'){
     initServerTime();
+    // Start notification polling (DMs, tags, likes) — only if not disabled
+    if(GAME.notificationsEnabled !== false){
+      startNotificationPolling();
+    }
   }
   renderActions();
   
@@ -23781,8 +23790,9 @@ async function showY(){
       <button class="yw-nb" id="ynb-explore" onclick="yNav('explore',this)">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       </button>
-      <button class="yw-nb" id="ynb-msgs" onclick="yNav('messages',this)">
+      <button class="yw-nb" id="ynb-msgs" onclick="yNav('messages',this)" style="position:relative">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span id="yDMBadge" style="position:absolute;top:2px;right:2px;background:#1d9bf0;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center"></span>
       </button>
       <button class="yw-nb" id="ynb-notif" onclick="yNav('notifications',this)" style="position:relative">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -23792,8 +23802,8 @@ async function showY(){
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       </button>
       <div style="flex:1"></div>
-      <button class="yw-nb" onclick="closeY()" style="margin-bottom:6px">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      <button onclick="closeY()" title="Close Y" style="width:44px;height:44px;border-radius:50%;background:rgba(239,68,68,0.15);border:1.5px solid rgba(239,68,68,0.35);color:#f87171;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-bottom:6px;flex-shrink:0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>
     <div class="yw-pane" id="y-pane"></div>
@@ -35212,11 +35222,12 @@ async function updateDMBadges(){
     console.log('📱 Instagram badge:', instagramNotifs);
   }
   
-  // Update Pentagram APP ICON badge (on SOCIAL tab)
+  // Update Pentagram APP ICON badge (on SOCIAL tab) — includes DMs
   var pentagramAppBadge = document.getElementById('pentagramAppBadge');
   if(pentagramAppBadge) {
-    pentagramAppBadge.style.display = instagramNotifs > 0 ? 'block' : 'none';
-    pentagramAppBadge.textContent = instagramNotifs > 0 ? instagramNotifs : '';
+    var igTotal = instagramNotifs + instagramDMs;
+    pentagramAppBadge.style.display = igTotal > 0 ? 'block' : 'none';
+    pentagramAppBadge.textContent = igTotal > 0 ? igTotal : '';
   }
   
   // Update TikTok badge (for future TikTok-specific notifications)
@@ -35228,12 +35239,13 @@ async function updateDMBadges(){
   } else {
   }
   
-  // Update Rookie APP ICON badge (on SOCIAL tab)
+  // Update Rookie APP ICON badge (on SOCIAL tab) — includes DMs
   var rookieAppBadge = document.getElementById('rookieAppBadge');
   if(rookieAppBadge) {
-    rookieAppBadge.style.display = tiktokNotifs > 0 ? 'block' : 'none';
-    rookieAppBadge.textContent = tiktokNotifs > 0 ? tiktokNotifs : '';
-    console.log('🔔 BADGE UPDATE - TikTok app icon badge:', tiktokNotifs, 'element exists:', !!rookieAppBadge);
+    var rkTotal = tiktokNotifs + tiktokDMs;
+    rookieAppBadge.style.display = rkTotal > 0 ? 'block' : 'none';
+    rookieAppBadge.textContent = rkTotal > 0 ? rkTotal : '';
+    console.log('🔔 BADGE UPDATE - TikTok app icon badge:', rkTotal, 'element exists:', !!rookieAppBadge);
   } else {
   }
   
@@ -35244,12 +35256,13 @@ async function updateDMBadges(){
     yBadge.textContent = twitterNotifs > 0 ? twitterNotifs : '';
   }
   
-  // Update Y APP ICON badge (on SOCIAL tab)
+  // Update Y APP ICON badge (on SOCIAL tab) — includes DMs
   var yAppBadge = document.getElementById('yAppBadge');
   if(yAppBadge) {
-    yAppBadge.style.display = twitterNotifs > 0 ? 'block' : 'none';
-    yAppBadge.textContent = twitterNotifs > 0 ? twitterNotifs : '';
-    console.log('🔔 BADGE UPDATE - X/Twitter app badge:', twitterNotifs, 'element exists:', !!yAppBadge);
+    var yTotal = twitterNotifs + twitterDMs;
+    yAppBadge.style.display = yTotal > 0 ? 'block' : 'none';
+    yAppBadge.textContent = yTotal > 0 ? yTotal : '';
+    console.log('🔔 BADGE UPDATE - X/Twitter app badge:', yTotal, 'element exists:', !!yAppBadge);
   }
   
   // Update DM/Inbox badges (separate from notification badges)
