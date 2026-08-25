@@ -2,15 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Music Life Sim</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Barlow+Condensed:wght@300;400;600;700;800;900&family=Special+Elite&family=Orbitron:wght@400;700;900&family=Caveat:wght@500;700&family=DM+Serif+Display:ital@0;1&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
+/* ── Device safe-area (Android nav bar, iOS home indicator) ──────────────── */
+:root{--sab:env(safe-area-inset-bottom,0px);--sat:env(safe-area-inset-top,0px)}
+
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;background:#111}
 body{display:flex;align-items:center;justify-content:center;font-family:sans-serif;background:#1a1a2e;min-height:100vh}
 .phone{width:100%;max-width:420px;height:100vh;max-height:900px;position:relative;overflow:hidden;display:flex;flex-direction:column;transition:background 0.5s;background:#f0f4ff}
-.screen{position:absolute;inset:0;display:none;flex-direction:column;z-index:1;background:var(--bg);transition:opacity 0.25s ease,transform 0.25s ease;opacity:0;transform:translateY(10px);overflow-y:auto;padding-bottom:70px}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;z-index:1;background:var(--bg);transition:opacity 0.25s ease,transform 0.25s ease;opacity:0;transform:translateY(10px);overflow-y:auto;padding-bottom:calc(70px + var(--sab))}
 .screen.visible{opacity:1;transform:translateY(0)}
 .screen.visible{display:flex;z-index:10}
 
@@ -236,7 +239,24 @@ input[type=range].age-range{-webkit-appearance:none;width:100%;height:4px;backgr
 .menu-item-sub{font-size:12px;color:var(--mut);font-family:var(--fb)}
 
 /* BOTTOM NAV - NEW */
-.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:420px;background:rgba(248,249,250,0.8);backdrop-filter:blur(20px) saturate(180%);border-top:1px solid var(--bord);padding:8px 0 20px;display:flex;justify-content:space-around;z-index:100;pointer-events:auto !important;box-shadow:0 -2px 16px rgba(0,0,0,0.06)}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:420px;background:rgba(248,249,250,0.8);backdrop-filter:blur(20px) saturate(180%);border-top:1px solid var(--bord);padding:8px 0 calc(20px + var(--sab));display:flex;justify-content:space-around;z-index:100;pointer-events:auto !important;box-shadow:0 -2px 16px rgba(0,0,0,0.06)}
+/* ── Platform screen safe-area padding (covers Android nav bar / iOS bar) ── */
+/* Y / Twitter */
+.yw-pane{padding-bottom:calc(40px + var(--sab)) !important}
+.yw-fab{bottom:calc(96px + var(--sab)) !important}
+/* Pentagram / Instagram */
+.ig-container{padding-bottom:calc(80px + var(--sab)) !important}
+/* Yourtube */
+.yt-container{padding-bottom:calc(80px + var(--sab)) !important}
+/* Loopify / Sahara / SoundPuff / iMusic bottom nav footer */
+.loop .foot,.sp .foot{padding-bottom:var(--sab) !important}
+/* Scrollable panes inside platform UIs */
+.sp .scroll,.im .scroll,.sa .scroll{padding-bottom:calc(80px + var(--sab)) !important}
+/* Full-screen overlay contents (merch designer, notifications, etc.) */
+[data-app-overlay]{padding-bottom:var(--sab) !important}
+/* Home header safe-area top already uses env() — keep it consistent */
+.home-header{margin-top:var(--sat)}
+
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:8px 16px;color:var(--mut);transition:all 0.25s ease;font-family:var(--fb);pointer-events:auto !important;border-radius:12px}
 .nav-item:active{transform:scale(0.95)}
 .nav-item.active{color:var(--acc);background:var(--acc-bg)}
