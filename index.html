@@ -14132,6 +14132,36 @@ async function acceptLabelOffer_v2(offerId){
   saveToCloud();
   closeMenu();
   showEvent('🎉','Signed!',`Welcome to ${offer.labelName}! Your career just levelled up. Check your label perks and make sure to review your contract terms.`,['Let\'s go!']);
+
+  // ── Trigger (d): label signs an artist → AirTime brief ───────────────────
+  var _signArtist = GAME.artistName || GAME.sn || 'New Artist';
+  var _signLabel  = offer.labelName || 'a major label';
+  var _signTkey   = 'label_signed_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local')+'_'+String(offer.labelId||Date.now());
+  _fireArticleTrigger({
+    triggerType: 'label_signing',
+    triggerKey:  _signTkey,
+    outlet:      'AirTime',
+    facts: {
+      artist:     _signArtist,
+      label:      _signLabel,
+      tier:       offer.tier || 'indie',
+      game_week:  GAME.week || 1,
+      player_id:  (currentUser && currentUser.id) || null
+    },
+    fallback: {
+      headline: _signArtist+' Signs to '+_signLabel+'!',
+      content: _signArtist+' just made a major career move, inking a deal with '+_signLabel+'. Industry watchers say the signing brings serious backing to one of the most promising artists on the independent scene. Big things ahead!'
+    },
+    onSuccess: function(art){
+      _addLocalArticle({
+        source: 'airtime', outlet: 'AirTime',
+        week: GAME.week, timestamp: Date.now(),
+        type: 'label_signing', artistName: _signArtist,
+        headline: art.headline, content: art.content
+      });
+      // No fan delta — signing is pure prestige; industry rep already bumped above
+    }
+  });
 }
 
 function declineLabelOffer_v2(offerId){
@@ -28071,7 +28101,49 @@ function releaseSingle(songId){
     song.platforms.soundcloud=Math.floor(totalStreams*_sc3/_tot3);
     song.platforms.itunes=Math.floor(totalStreams*_it3/_tot3);
   });
-  
+
+  // ── Trigger (c): first-ever release → Undertone discovery blurb ──────────
+  // Count songs that were released BEFORE this batch (exclude the ids just set)
+  var _preExistingReleases = GAME.songs.filter(function(s){
+    return s.released && !songIds.includes(s.id);
+  }).length;
+  if(_preExistingReleases === 0 && !GAME._firstReleaseArticleFired){
+    GAME._firstReleaseArticleFired = true;
+    var _firstSong = GAME.songs.find(function(s){ return s.id === songIds[0]; });
+    var _firstArtist = GAME.artistName || GAME.sn || 'New Artist';
+    var _firstTitle  = (_firstSong && _firstSong.title) || 'Debut Single';
+    var _firstGenre  = (_firstSong && _firstSong.genre) || 'music';
+    var _firstTkey   = 'first_release_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local');
+    _fireArticleTrigger({
+      triggerType: 'first_release',
+      triggerKey:  _firstTkey,
+      outlet:      'Undertone',
+      facts: {
+        artist:    _firstArtist,
+        song:      _firstTitle,
+        genre:     _firstGenre,
+        game_week: GAME.week || 1,
+        player_id: (currentUser && currentUser.id) || null
+      },
+      fallback: {
+        headline: _firstArtist+' Drops Debut Single "'+_firstTitle+'" — One to Watch',
+        content: _firstArtist+' has arrived with "'+_firstTitle+'", a '+_firstGenre+' debut that shows real promise. First impressions suggest an artist who\'s been honing their craft carefully. Keep this name in your playlists.'
+      },
+      onSuccess: function(art){
+        _addLocalArticle({
+          source: 'undertone', outlet: 'Undertone',
+          week: GAME.week, timestamp: Date.now(),
+          type: 'first_release', artistName: _firstArtist,
+          headline: art.headline, content: art.content
+        });
+        // Small hype boost — discovery energy from a warm outlet
+        addHype(15);
+        updateStats();
+        markDirty();
+      }
+    });
+  }
+
   const mainSong=GAME.songs.find(s=>s.id===songIds[0]);
   const releaseTitle=GAME.pendingAlbumName||mainSong.title;
   const release={
@@ -33926,6 +33998,85 @@ async function _pushArticle(article){
   }
 }
 
+// ── PRESS ARTICLE GENERATION SYSTEM ──────────────────────────────────────────
+// Calls the generate-article edge function, which writes AI prose in the
+// outlet's voice and inserts the result into industry_articles (service role).
+// The client NEVER inserts articles directly — RLS blocks client writes.
+//
+// opts: {
+//   triggerType  string   e.g. 'number_one_streak'
+//   triggerKey   string   unique dedup key — edge fn ignores duplicate calls
+//   outlet       string   'Velour'|'Room Service'|'Chartwell'|'Undertone'|'AirTime'
+//   facts        object   context passed to the AI (never shown in-game)
+//   fallback     {headline, content}  used offline / on edge-fn failure
+//   onSuccess    fn({headline, content})  called when an article is live
+// }
+// onSuccess is called both on a successful edge-fn response and on fallback,
+// but NOT on dedup or cap hits (no article = no effect).
+async function _fireArticleTrigger(opts){
+  if(!opts || !opts.triggerKey || !opts.onSuccess) return;
+  var EDGE = 'https://pvxrciebegirmrrrzkor.supabase.co/functions/v1/generate-article';
+
+  try {
+    var token = SUPABASE_ANON_KEY;
+    if(typeof supabase !== 'undefined' && supabase.auth){
+      try {
+        var sess = await supabase.auth.getSession();
+        token = (sess.data && sess.data.session && sess.data.session.access_token) || token;
+      } catch(e){ /* keep anon key */ }
+    }
+
+    var controller = new AbortController();
+    var tid = setTimeout(function(){ controller.abort(); }, 18000);
+
+    var res = await fetch(EDGE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+token },
+      body: JSON.stringify({
+        trigger_type: opts.triggerType,
+        trigger_key:  opts.triggerKey,
+        outlet:       opts.outlet,
+        facts:        opts.facts || {}
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(tid);
+
+    var json = await res.json();
+
+    if(json.duplicate || json.capped){
+      // No article generated — no-op (no effect applied either)
+      console.log('[Article] '+opts.triggerKey+': '+(json.duplicate?'dedup':'cap'));
+      return;
+    }
+    if(json.error){
+      throw new Error(json.error);
+    }
+
+    // Edge function confirmed insert — apply effect with AI prose
+    opts.onSuccess({ headline: json.headline, content: json.content });
+
+  } catch(err){
+    console.warn('[Article] Edge fn failed ('+opts.triggerKey+'):', err.message||err);
+    // Fallback: use template article, still apply effect so story matches
+    if(opts.fallback && opts.fallback.headline){
+      opts.onSuccess(opts.fallback);
+    }
+  }
+}
+
+// Adds an article only to the local feed (no Supabase upsert).
+// Used after _fireArticleTrigger succeeds — the edge function already inserted
+// the canonical record; this just makes it visible in the current session.
+function _addLocalArticle(article){
+  if(!GAME) return;
+  if(!GAME.newsArticles) GAME.newsArticles = [];
+  if(!article.id) article.id = 'art_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  if(!article.timestamp) article.timestamp = Date.now();
+  if(GAME.newsArticles.find(function(a){ return a.id === article.id; })) return;
+  GAME.newsArticles.unshift(article);  // newest first
+}
+
 async function generateNewsArticles(){
   if(!GAME.newsArticles) GAME.newsArticles = [];
   if(!GAME.lastNewsCheck) GAME.lastNewsCheck = 0;
@@ -35124,6 +35275,49 @@ function checkDailyEconomy(){
         if(!song.peakPosition || song.chartPosition < song.peakPosition){
           song.peakPosition = song.chartPosition;
         }
+
+        // ── Trigger (a): player song holds #1 for 2+ weeks → Chartwell ──
+        if(song.chartPosition === 1 && song.weeksOnChart >= 2){
+          var _reignKey = 'chart_reign_'+(song.id)+'_w'+(song.weeksOnChart);
+          if(!song._articleFiredFor) song._articleFiredFor = {};
+          if(!song._articleFiredFor[_reignKey]){
+            song._articleFiredFor[_reignKey] = true;
+            var _reignArtist = GAME.artistName || GAME.sn || 'Artist';
+            var _reignTitle  = song.title || 'the track';
+            var _reignWeeks  = song.weeksOnChart;
+            var _reignStreams = song.streams ? Math.round(song.streams/1000)+'K' : 'growing';
+            _fireArticleTrigger({
+              triggerType: 'number_one_streak',
+              triggerKey:  _reignKey,
+              outlet:      'Chartwell',
+              facts: {
+                artist:    _reignArtist,
+                song:      _reignTitle,
+                weeks:     _reignWeeks,
+                streams:   _reignStreams,
+                game_week: GAME.week || 1,
+                player_id: (currentUser && currentUser.id) || null
+              },
+              fallback: {
+                headline: _reignArtist+' Extends Chart Reign: '+_reignWeeks+' Weeks at #1',
+                content: '"'+_reignTitle+'" by '+_reignArtist+' holds the #1 position for a '+_reignWeeks+'-week run, accumulating '+_reignStreams+' streams. Analysts note the track\'s staying power as evidence of genuine audience demand rather than a first-week algorithm spike.'
+              },
+              onSuccess: function(art){
+                _addLocalArticle({
+                  source: 'chartwell', outlet: 'Chartwell',
+                  week: GAME.week, timestamp: Date.now(),
+                  type: 'number_one_streak', artistName: _reignArtist,
+                  headline: art.headline, content: art.content
+                });
+                // Small fan boost — chart visibility drives discovery
+                var _reignRegion = (S && S.country) || 'North America';
+                if(GAME.fansByRegion) GAME.fansByRegion[_reignRegion] = (GAME.fansByRegion[_reignRegion]||0) + 800;
+                updateStats();
+                markDirty();
+              }
+            });
+          }
+        }
       }
       // Drop off chart if streams stall
       if(weeklyStreams < 5000){
@@ -35158,7 +35352,47 @@ function checkDailyEconomy(){
 
   if(typeof checkViralMoment==='function') checkViralMoment();
   if(info.dow === 0 && typeof processPromoCampaigns==='function') processPromoCampaigns();
-  
+
+  // ── Trigger (b): stress ≥ 85 → Room Service concern piece ─────────────────
+  // Max once per 2 game weeks per artist. Effect: small fan loss (gossip hurts).
+  if((GAME.stress||0) >= 85 && info.dow === 0){
+    var _stressWeek = GAME.week || 1;
+    var _lastSArt   = GAME._lastStressArticleWeek || 0;
+    if(_stressWeek - _lastSArt >= 2){
+      GAME._lastStressArticleWeek = _stressWeek;
+      var _stressArtist = GAME.artistName || GAME.sn || 'Artist';
+      var _stressTkey   = 'stress_burnout_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local')+'_w'+_stressWeek;
+      _fireArticleTrigger({
+        triggerType: 'stress_burnout',
+        triggerKey:  _stressTkey,
+        outlet:      'Room Service',
+        facts: {
+          artist:    _stressArtist,
+          stress:    GAME.stress || 85,
+          game_week: _stressWeek,
+          player_id: (currentUser && currentUser.id) || null
+        },
+        fallback: {
+          headline: 'Is '+_stressArtist+' Burning Out?',
+          content: 'Sources close to '+_stressArtist+' are raising eyebrows after the artist was spotted looking unusually frazzled at a recent industry event. "They\'re pushing themselves incredibly hard right now," one insider tells us. We\'re all rooting for a vacation, babe.'
+        },
+        onSuccess: function(art){
+          _addLocalArticle({
+            source: 'room-service', outlet: 'Room Service',
+            week: GAME.week, timestamp: Date.now(),
+            type: 'stress_burnout', artistName: _stressArtist,
+            headline: art.headline, content: art.content
+          });
+          // Small fan loss — negative press takes a small toll
+          var _stressRegion = (S && S.country) || 'North America';
+          if(GAME.fansByRegion) GAME.fansByRegion[_stressRegion] = Math.max(0, (GAME.fansByRegion[_stressRegion]||0) - 300);
+          updateStats();
+          markDirty();
+        }
+      });
+    }
+  }
+
   updateStats();
   if(typeof updateMusicStats==='function') updateMusicStats();
 }
