@@ -597,10 +597,10 @@ function emergencySkip() {
 @keyframes vn-sweep-r{0%,100%{transform:rotate(15deg);opacity:.8}50%{transform:rotate(-5deg);opacity:1}}
 @keyframes vn-mote{0%{transform:translateY(0) scale(1);opacity:.7}100%{transform:translateY(-100px) scale(.3);opacity:0}}
 @keyframes vn-neon{0%,100%{text-shadow:0 0 8px var(--vn-acc,#00f0ff),0 0 24px var(--vn-acc,#00f0ff),0 0 48px var(--vn-acc2,#764ba2)}50%{text-shadow:0 0 16px var(--vn-acc,#00f0ff),0 0 48px var(--vn-acc,#00f0ff),0 0 96px var(--vn-acc2,#764ba2)}}
-@keyframes vn-wave{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(14deg)}}
+@keyframes vn-sway{0%,100%{transform:translateX(-2px) rotate(-1.2deg)}50%{transform:translateX(2px) rotate(1.2deg)}}
 @keyframes vn-icon{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.08)}}
 @keyframes vn-sheen{0%{left:-80px}100%{left:calc(100% + 80px)}}
-@keyframes vn-pop{from{opacity:0;transform:scaleY(.85) translateY(4px)}to{opacity:1;transform:scaleY(1) translateY(0)}}
+@keyframes vn-pop{from{opacity:0}to{opacity:1}}
 @keyframes vn-fade{from{opacity:0}to{opacity:1}}
 @keyframes vn-sttxt{from{opacity:0;transform:translateY(4px)}to{opacity:.88;transform:translateY(0)}}
 @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-10px)}}
@@ -614,13 +614,12 @@ function emergencySkip() {
 .vn-motes{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .vn-mote{position:absolute;border-radius:50%;background:var(--vn-acc,#00f0ff);opacity:0;animation:vn-mote linear infinite}
 /* crowd */
-.vn-crowd{position:absolute;bottom:0;left:0;right:0;display:flex;flex-direction:column-reverse;align-items:center;pointer-events:none}
-.vn-row{display:flex;align-items:flex-end;justify-content:center;width:100%}
-.vn-fan{position:relative;flex-shrink:0;border-radius:4px 4px 0 0;background:#111;opacity:0;transform-origin:bottom center}
+.vn-crowd{position:absolute;bottom:0;left:0;right:0;pointer-events:none}
+.vn-row{position:absolute;left:0;right:0;display:flex;justify-content:center;align-items:flex-end}
+.vn-fan{position:relative;flex-shrink:0;border-radius:35% 35% 15% 15%;background:#111;opacity:0;transform-origin:bottom center}
 .vn-fan.on{animation:vn-pop .4s ease forwards}
-.vn-head{position:absolute;border-radius:50%;background:#111;left:50%;transform:translateX(-50%)}
-.vn-arm{position:absolute;border-radius:3px 3px 0 0;background:#1a1a1a;transform-origin:bottom center}
-.vn-arm.wave{animation:vn-wave .9s ease-in-out infinite alternate}
+.vn-fan.sway{animation:vn-pop .4s ease forwards}
+.vn-fan.on.sway{animation:vn-pop .4s ease forwards,vn-sway 1.8s ease-in-out infinite alternate}
 /* content */
 .vn-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;text-align:center;padding:10vh 20px 0;width:100%;max-width:420px}
 .vn-title{font-size:clamp(36px,10vw,60px);font-weight:900;letter-spacing:-1px;margin:0;animation:vn-neon 3s ease-in-out infinite;color:#fff}
@@ -639,7 +638,7 @@ function emergencySkip() {
 .vn-golive:active{opacity:.85}
 .vn-golive-sub{font-size:13px;opacity:.55;margin-top:10px;letter-spacing:.5px}
 .vn-ver{position:absolute;bottom:14px;font-size:11px;opacity:.35;letter-spacing:.5px}
-@media(prefers-reduced-motion:reduce){.vn-spot,.vn-mote,.vn-arm.wave,.vn-title,.vn-icon,.vn-sheen,.vn-fan{animation:none!important}}
+@media(prefers-reduced-motion:reduce){.vn-spot,.vn-mote,.vn-title,.vn-icon,.vn-sheen,.vn-fan,.vn-fan.on.sway{animation:none!important}}
 </style>
 
 <div class="screen" id="landingScreen" style="display:flex;position:fixed;inset:0;background:#0a0a0f;overflow:hidden;flex-direction:column;align-items:center;color:#fff;font-family:'Syne',sans-serif;z-index:100;padding-bottom:0;">
@@ -40531,55 +40530,41 @@ async function openRegionChart(region) {
   var rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches);
 
   // ── Crowd builder ─────────────────────────────────────────────
-  // 4 rows: far → back → mid → front (column-reverse stacks front at bottom)
-  var ROWS = [
-    {n:10, hMin:18, hMax:24, op:.22, wave:false},
-    {n:15, hMin:26, hMax:33, op:.38, wave:false},
-    {n:18, hMin:34, hMax:42, op:.58, wave:true },
-    {n:22, hMin:44, hMax:56, op:.82, wave:true },
+  // 4 rows from far (top, small, dim) to front (bottom, large, bright)
+  // Each row is position:absolute so rows layer behind each other (depth effect)
+  var RCFG = [
+    { n:12, scl:0.38, op:0.14, btm:78, z:1, sway:false },  // far
+    { n:15, scl:0.55, op:0.27, btm:56, z:2, sway:false },  // back
+    { n:18, scl:0.78, op:0.50, btm:30, z:3, sway:true  },  // mid
+    { n:22, scl:1.00, op:0.85, btm:0,  z:4, sway:true  },  // front
   ];
+  var BASE_MIN = 42, BASE_MAX = 58;
 
   function buildCrowd(wrap) {
     if (!wrap) return [];
     var fans = [];
-    ROWS.forEach(function(row) {
+    RCFG.forEach(function(cfg) {
       var rowEl = document.createElement('div');
       rowEl.className = 'vn-row';
-      for (var i = 0; i < row.n; i++) {
-        var h = (row.hMin + Math.random() * (row.hMax - row.hMin)) | 0;
-        var w = (h * 0.52) | 0;
+      rowEl.style.bottom   = cfg.btm + 'px';
+      rowEl.style.zIndex   = cfg.z;
+      for (var i = 0; i < cfg.n; i++) {
+        var baseH = (BASE_MIN + Math.random() * (BASE_MAX - BASE_MIN));
+        var h = Math.round(baseH * cfg.scl);
+        var w = Math.round(h * 0.74);
 
         var fan = document.createElement('div');
-        fan.className = 'vn-fan';
-        fan.style.width  = w + 'px';
-        fan.style.height = h + 'px';
-        fan.style.marginLeft  = ((Math.random() * 3) | 0) + 'px';
-        fan.style.marginRight = ((Math.random() * 3) | 0) + 'px';
-        fan.style.filter = 'brightness(' + (0.65 + Math.random() * 0.35).toFixed(2) + ')';
-
-        // head circle
-        var hw = (w * 0.72) | 0;
-        var hd = document.createElement('div');
-        hd.className  = 'vn-head';
-        hd.style.width  = hw + 'px';
-        hd.style.height = hw + 'px';
-        hd.style.top    = '-' + ((hw * 0.82) | 0) + 'px';
-        fan.appendChild(hd);
-
-        // waving arms (mid + front rows only, skip if reduced-motion)
-        if (row.wave && !rm) {
-          var armH = (h * 0.38) | 0;
-          var armTop = '-' + ((h * 0.22) | 0) + 'px';
-          var la = document.createElement('div');
-          la.className  = 'vn-arm wave';
-          la.style.cssText = 'width:4px;height:' + armH + 'px;left:2px;top:' + armTop + ';animation-delay:' + (Math.random() * 0.6).toFixed(2) + 's;';
-          fan.appendChild(la);
-          var ra = document.createElement('div');
-          ra.className  = 'vn-arm wave';
-          ra.style.cssText = 'width:4px;height:' + armH + 'px;right:2px;top:' + armTop + ';animation-delay:' + (Math.random() * 0.6 + 0.3).toFixed(2) + 's;animation-direction:alternate-reverse;';
-          fan.appendChild(ra);
+        fan.className = 'vn-fan' + (cfg.sway && !rm ? ' sway' : '');
+        fan.style.width   = w + 'px';
+        fan.style.height  = h + 'px';
+        fan.style.opacity = '0';
+        fan.style.marginLeft  = ((Math.random() * 2) | 0) + 'px';
+        fan.style.marginRight = ((Math.random() * 2) | 0) + 'px';
+        fan.style.filter = 'brightness(' + (0.6 + Math.random() * 0.4).toFixed(2) + ')';
+        if (cfg.sway && !rm) {
+          fan.style.animationDelay = (Math.random() * 1.2).toFixed(2) + 's';
         }
-
+        fan._fanOp = cfg.op;  // store for use later if needed
         rowEl.appendChild(fan);
         fans.push(fan);
       }
@@ -40688,10 +40673,11 @@ async function openRegionChart(region) {
   var landFans = buildCrowd(document.getElementById('vnLandCrowd'));
   buildMotes(document.getElementById('vnLandMotes'), rm ? 0 : 12);
 
-  // Reveal all landing fans after a short tick
-  setTimeout(function() {
-    for (var i = 0; i < landFans.length; i++) landFans[i].classList.add('on');
-  }, 60);
+  // Reveal landing fans staggered (shuffled, 12 ms per fan)
+  var shuffled2 = landFans.slice().sort(function() { return Math.random() - 0.5; });
+  shuffled2.forEach(function(f, i) {
+    setTimeout(function() { f.classList.add('on'); }, 60 + i * 12);
+  });
 
   // Tagline rotation
   var TAGS = [
@@ -40734,9 +40720,10 @@ async function openRegionChart(region) {
     cr.className = 'vn-crowd';
     el.insertBefore(cr, el.firstChild);
     var fans = buildCrowd(cr);
-    setTimeout(function() {
-      for (var i = 0; i < fans.length; i++) fans[i].classList.add('on');
-    }, 80);
+    var sfans = fans.slice().sort(function() { return Math.random() - 0.5; });
+    sfans.forEach(function(f, i) {
+      setTimeout(function() { f.classList.add('on'); }, 80 + i * 12);
+    });
 
     // motes
     var mo = document.createElement('div');
