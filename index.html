@@ -33833,6 +33833,41 @@ async function showIndustryNews(){
   `);
 
   renderPressRoom();
+
+  // Subscribe to realtime article inserts so other players' news appears live
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined'){
+    // Unsubscribe any previous press channel
+    if(window._prRealtimeCh){
+      try{ supabase.removeChannel(window._prRealtimeCh); }catch(e){}
+      window._prRealtimeCh = null;
+    }
+    window._prRealtimeCh = supabase.channel('press-room-live')
+      .on('postgres_changes', {event:'INSERT', schema:'public', table:'industry_articles'}, function(payload){
+        var a = payload.new;
+        if(!a || !a.id) return;
+        // Avoid duplicates
+        if((GAME.newsArticles||[]).some(function(x){ return x.id === a.id; })) return;
+        _addLocalArticle({
+          id: a.id,
+          source: a.source,
+          week: a.week,
+          timestamp: a.timestamp || Date.now(),
+          type: a.type,
+          artistName: a.artist_name,
+          headline: a.headline,
+          preview: a.preview,
+          content: a.content,
+          is_rumor: a.is_rumor || false,
+          target_player_id: a.target_player_id || null,
+          expires_week: a.expires_week || null,
+          response: a.response || null
+        });
+        // Refresh the visible press room if it's open
+        if(document.getElementById('pr-body')) prApply();
+      })
+      .subscribe();
+    console.log('📡 Press room subscribed to realtime article inserts');
+  }
 }
 
 function _relTime(ts){
@@ -34223,6 +34258,39 @@ async function _pushArticle(article){
   }
 }
 
+// In multiplayer, routes milestone articles through the edge function so they
+// reach Supabase (service-role insert) and all players can read them.
+// In single player, pushes locally only.
+function _milestoneFire(mkey, a, mOpts){
+  if(!GAME.newsArticles) GAME.newsArticles = [];
+  if(GAME.newsArticles.find(function(x){ return x.type === mkey; })) return;
+  if(!GAME._mfiring) GAME._mfiring = {};
+  if(GAME._mfiring[mkey]) return; // edge-fn call already in flight this session
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && currentUser){
+    GAME._mfiring[mkey] = true;
+    var outlet = mOpts.outlet || 'Chartwell';
+    _fireArticleTrigger({
+      triggerType: mOpts.triggerType || 'milestone',
+      triggerKey:  mkey,
+      outlet:      outlet,
+      facts:       mOpts.facts || {},
+      fallback:    { headline: a.headline, content: a.content },
+      onSuccess: function(art){
+        _addLocalArticle({
+          source: outlet.toLowerCase().replace(/ /g,'-'),
+          week: GAME.week, timestamp: Date.now(),
+          type: mkey, artistName: a.artistName,
+          preview: a.preview, headline: art.headline, content: art.content
+        });
+      }
+    });
+  } else {
+    _pushArticle(Object.assign({}, a, {
+      type: mkey, week: GAME.week, timestamp: Date.now(), isSystemPost: true
+    }));
+  }
+}
+
 // ── PRESS ARTICLE GENERATION SYSTEM ──────────────────────────────────────────
 // Calls the generate-article edge function, which writes AI prose in the
 // outlet's voice, runs it through moderate-content, and inserts the result
@@ -34582,289 +34650,128 @@ async function generateNewsArticles(){
   // CHART MILESTONE ARTICLES (Your real achievements!)
   // ========================================
   if(GAME.songs && GAME.songs.length > 0){
-    GAME.songs.forEach(song => {
+    GAME.songs.forEach(function(song){
       if(!song.released) return;
-      
-      // 100K streams milestone
-      if(song.streams >= 100000 && song.streams < 110000 && !GAME.newsArticles.find(a=>a.type===`streams-100k-${song.id}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `streams-100k-${song.id}`,
-          artistName: S.artistName,
-          headline: `${S.artistName}'s "${song.title}" Hits 100K Streams`,
-          preview: `Rising ${S.genre} artist ${S.artistName} celebrates major milestone as "${song.title}" crosses 100,000 streams.`,
-          content: `"${song.title}" by ${S.artistName} has officially surpassed 100,000 streams across all platforms - a significant achievement for independent artists.\n\nThe ${S.genre.toLowerCase()} track has been steadily gaining traction, with listeners responding to its authentic sound and relatable themes.\n\n"Breaking 100K is when labels start paying attention," notes A&R executive Marcus Chen. "It proves there's real audience demand."\n\n${S.artistName} celebrated the milestone with fans on social media, promising more music is on the way.`
-        ,isSystemPost:GAME_MODE==="single"});
+      var sA = S.artistName, sT = song.title, sG = S.genre || 'Pop';
+      var stStr = song.streams >= 1000000 ? (song.streams/1000000).toFixed(1)+'M' : Math.floor((song.streams||0)/1000)+'K';
+
+      if(song.streams >= 100000 && song.streams < 110000){
+        _milestoneFire('streams-100k-'+song.id, {
+          artistName: sA,
+          headline: sA+`'s "${sT}" Hits 100K Streams`,
+          preview: `Rising ${sG} artist ${sA} crosses 100,000 streams — labels are starting to pay attention.`,
+          content: `"${sT}" by ${sA} has officially surpassed 100,000 streams across all platforms.\n\nThe ${sG.toLowerCase()} track has been steadily gaining traction with listeners.\n\n"Breaking 100K is when labels start paying attention," notes A&R executive Marcus Chen.\n\n${sA} celebrated the milestone with fans on social media, promising more music is on the way.`
+        },{ outlet:'Chartwell', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'100K',genre:sG,game_week:GAME.week} });
       }
-      
-      // 500K streams milestone
-      if(song.streams >= 500000 && song.streams < 520000 && !GAME.newsArticles.find(a=>a.type===`streams-500k-${song.id}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `streams-500k-${song.id}`,
-          artistName: S.artistName,
-          headline: `BREAKING: "${song.title}" Reaches Half a Million Streams`,
-          preview: `${S.artistName}'s viral hit "${song.title}" crosses 500,000 streams as momentum continues to build.`,
-          content: `${S.artistName} is having a moment. "${song.title}" has now been streamed over 500,000 times, cementing its status as a breakout hit.\n\nThe song's success has caught the attention of playlist curators and industry gatekeepers alike. "This is the kind of organic growth that can't be manufactured," says streaming analyst Jamie Rodriguez.\n\nFans have been sharing clips on social media, creating viral moments that drive even more streams.\n\n"We're just getting started," ${S.artistName} posted on social media. The artist's growing fanbase seems to agree.`
-        ,isSystemPost:GAME_MODE==="single"});
+
+      if(song.streams >= 500000 && song.streams < 520000){
+        _milestoneFire('streams-500k-'+song.id, {
+          artistName: sA,
+          headline: `BREAKING: "${sT}" Reaches Half a Million Streams`,
+          preview: `${sA}'s viral hit "${sT}" crosses 500,000 streams as momentum continues to build.`,
+          content: `${sA} is having a moment. "${sT}" has now been streamed over 500,000 times, cementing its status as a breakout hit.\n\nThe song's success has caught the attention of playlist curators and industry gatekeepers alike. "This is the kind of organic growth that can't be manufactured," says streaming analyst Jamie Rodriguez.\n\nFans have been sharing clips on social media, creating viral moments that drive even more streams.`
+        },{ outlet:'Chartwell', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'500K',genre:sG,game_week:GAME.week} });
       }
-      
-      // 1M streams milestone
-      if(song.streams >= 1000000 && song.streams < 1050000 && !GAME.newsArticles.find(a=>a.type===`streams-1m-${song.id}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `streams-1m-${song.id}`,
-          artistName: S.artistName,
-          headline: `🎉 ${S.artistName}'s "${song.title}" Goes PLATINUM with 1M Streams`,
-          preview: `The ${S.genre} sensation celebrates as "${song.title}" officially joins the million-stream club.`,
-          content: `It's official: "${song.title}" by ${S.artistName} has crossed the coveted 1 million stream threshold.\n\nThe milestone represents months of grassroots promotion, fan dedication, and undeniable talent. Industry veterans say reaching 1M streams independently is no small feat.\n\n"Most artists never see these numbers without label support," explains music business consultant Tanya Williams. "${S.artistName} is proving you can build a real career on your own terms."\n\nThe song continues to gain momentum on playlists and social media, with no signs of slowing down.`
-        ,isSystemPost:GAME_MODE==="single"});
+
+      if(song.streams >= 1000000 && song.streams < 1050000){
+        _milestoneFire('streams-1m-'+song.id, {
+          artistName: sA,
+          headline: `${sA}'s "${sT}" Goes PLATINUM with 1M Streams`,
+          preview: `The ${sG} sensation celebrates as "${sT}" officially joins the million-stream club.`,
+          content: `It's official: "${sT}" by ${sA} has crossed the coveted 1 million stream threshold.\n\nThe milestone represents months of grassroots promotion, fan dedication, and undeniable talent.\n\n"Most artists never see these numbers without label support," explains music business consultant Tanya Williams. "${sA} is proving you can build a real career on your own terms."\n\nThe song continues to gain momentum on playlists and social media, with no signs of slowing down.`
+        },{ outlet:'Velour', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'1M',genre:sG,game_week:GAME.week} });
       }
-      
-      // 5M streams milestone
-      if(song.streams >= 5000000 && song.streams < 5100000 && !GAME.newsArticles.find(a=>a.type===`streams-5m-${song.id}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `streams-5m-${song.id}`,
-          artistName: S.artistName,
-          headline: `CHART DOMINATION: "${song.title}" Hits 5 Million Streams`,
-          preview: `${S.artistName}'s monster hit "${song.title}" reaches 5M streams, solidifying artist as a major force in ${S.genre}.`,
-          content: `"${song.title}" by ${S.artistName} has officially entered the stratosphere with over 5 million streams.\n\nThe track's unprecedented success has industry insiders predicting major award nominations and lucrative partnership deals.\n\n"Five million streams means you're not just trending - you're a cultural phenomenon," says chart analyst David Park. "Labels will be fighting over ${S.artistName} now."\n\nFans worldwide have embraced the song, with viral dance challenges and cover versions flooding social media.\n\n"This is beyond anything I imagined," ${S.artistName} said in a recent interview. "But we're not stopping here."`
-        ,isSystemPost:GAME_MODE==="single"});
+
+      if(song.streams >= 5000000 && song.streams < 5100000){
+        _milestoneFire('streams-5m-'+song.id, {
+          artistName: sA,
+          headline: `CHART DOMINATION: "${sT}" Hits 5 Million Streams`,
+          preview: `${sA}'s monster hit "${sT}" reaches 5M streams, solidifying artist as a major force in ${sG}.`,
+          content: `"${sT}" by ${sA} has officially entered the stratosphere with over 5 million streams.\n\nThe track's unprecedented success has industry insiders predicting major award nominations and lucrative partnership deals.\n\n"Five million streams means you're not just trending — you're a cultural phenomenon," says chart analyst David Park. "Labels will be fighting over ${sA} now."\n\nFans worldwide have embraced the song, with viral dance challenges and cover versions flooding social media.`
+        },{ outlet:'Velour', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'5M',genre:sG,game_week:GAME.week} });
       }
-      
-      // Top 10 chart debut
-      if(song.chartPosition && song.chartPosition <= 10 && (song.weeksOnChart || 0) === 1 && !GAME.newsArticles.find(a=>a.type===`chart-top10-${song.id}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `chart-top10-${song.id}`,
-          artistName: S.artistName,
-          headline: `${S.artistName} Debuts at #${song.chartPosition} on Global Charts`,
-          preview: `"${song.title}" storms into the top 10 with ${song.streams >= 1000000 ? (song.streams/1000000).toFixed(1)+'M' : Math.floor((song.streams||0)/1000)+'K'} streams, marking ${S.artistName}'s highest chart position yet.`,
-          content: `In a stunning debut, "${song.title}" by ${S.artistName} has entered the Global Top 40 at #${song.chartPosition} with ${song.streams >= 1000000 ? (song.streams/1000000).toFixed(1)+' million' : Math.floor((song.streams||0)/1000)+'K'} streams in its first week.\n\nThe strong opening signals serious commercial potential and mainstream appeal. "Debuting in the top 10 is incredibly rare for independent artists," notes chart expert Lisa Chang.\n\nThe song is pulling ${Math.floor((song.streams||0)/Math.max(1,song.weeksOnChart||1)/1000)}K streams per week on average across all platforms, with Loopify leading the charge.\n\n"Chart positions like this change careers overnight," says music journalist Alex Torres. "${S.artistName} is officially a player now."`
-        ,isSystemPost:GAME_MODE==="single"});
+
+      if(song.chartPosition && song.chartPosition <= 10 && (song.weeksOnChart || 0) === 1){
+        _milestoneFire('chart-top10-'+song.id, {
+          artistName: sA,
+          headline: `${sA} Debuts at #${song.chartPosition} on Global Charts`,
+          preview: `"${sT}" storms into the top 10 with ${stStr} streams, marking ${sA}'s highest chart position yet.`,
+          content: `In a stunning debut, "${sT}" by ${sA} has entered the Global Top 40 at #${song.chartPosition} with ${stStr} streams in its first week.\n\nThe strong opening signals serious commercial potential and mainstream appeal. "Debuting in the top 10 is incredibly rare for independent artists," notes chart expert Lisa Chang.\n\n"Chart positions like this change careers overnight," says music journalist Alex Torres. "${sA} is officially a player now."`
+        },{ outlet:'AirTime', triggerType:'chart_debut', facts:{artist:sA,song:sT,position:song.chartPosition,streams:stStr,genre:sG,game_week:GAME.week} });
       }
-      
-      // SUSTAINED CHART SUCCESS — covers songs charting for weeks with rising streams.
-      // The debut article above only fires once on week 1, so anything past its first
-      // charting week (like 10+ weeks at #4) never got an article at all before this.
-      const chartMilestoneWeeks = [5, 10, 20, 30, 52];
-      if(song.chartPosition && chartMilestoneWeeks.includes(song.weeksOnChart || 0) && !GAME.newsArticles.find(a=>a.type===`chart-milestone-${song.id}-${song.weeksOnChart}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `chart-milestone-${song.id}-${song.weeksOnChart}`,
-          artistName: S.artistName,
-          headline: `"${song.title}" Marks ${song.weeksOnChart} Weeks on the Global Charts`,
-          preview: `${S.artistName}'s "${song.title}" holds at #${song.chartPosition} with ${song.streams >= 1000000 ? (song.streams/1000000).toFixed(1)+'M' : Math.floor((song.streams||0)/1000)+'K'} total streams and counting.`,
-          content: `"${song.title}" by ${S.artistName} is proving to have real staying power, holding strong at #${song.chartPosition} after ${song.weeksOnChart} consecutive weeks on the Global Top 40.\n\nWith ${song.streams >= 1000000 ? (song.streams/1000000).toFixed(2)+' million' : (song.streams||0).toLocaleString()} total streams and counting, the track is averaging ${Math.floor((song.streams||0)/Math.max(1,song.weeksOnChart||1)/1000)}K streams per week — defying the usual fast burnout cycle.\n\n"Longevity like this tells you a song actually connected with listeners, it wasn't just an algorithm push," says industry analyst Priya Shah. "${S.artistName} has a real hit on their hands."`
-        ,isSystemPost:GAME_MODE==="single"});
+
+      var chartMilestoneWeeks = [5, 10, 20, 30, 52];
+      if(song.chartPosition && chartMilestoneWeeks.indexOf(song.weeksOnChart || 0) !== -1){
+        var wksPerK = Math.floor((song.streams||0)/Math.max(1,song.weeksOnChart||1)/1000);
+        _milestoneFire('chart-milestone-'+song.id+'-'+song.weeksOnChart, {
+          artistName: sA,
+          headline: `"${sT}" Marks ${song.weeksOnChart} Weeks on the Global Charts`,
+          preview: `${sA}'s "${sT}" holds at #${song.chartPosition} with ${stStr} total streams and counting.`,
+          content: `"${sT}" by ${sA} is proving to have real staying power, holding strong at #${song.chartPosition} after ${song.weeksOnChart} consecutive weeks on the Global Top 40.\n\nWith ${stStr} total streams and counting, the track is averaging ${wksPerK}K streams per week — defying the usual fast burnout cycle.\n\n"Longevity like this tells you a song actually connected with listeners, it wasn't just an algorithm push," says industry analyst Priya Shah. "${sA} has a real hit on their hands."`
+        },{ outlet:'Chartwell', triggerType:'chart_milestone', facts:{artist:sA,song:sT,position:song.chartPosition,weeks:song.weeksOnChart,genre:sG,game_week:GAME.week} });
       }
     });
   }
-  
-  // Generate news based on milestones
-  if(myHype >= 100 && myHype < 110 && !GAME.newsArticles.find(a=>a.type==='hype-100')){
-    _pushArticle({
-      source: sources[Math.floor(Math.random()*sources.length)],
-      week: GAME.week,
-      timestamp: Date.now(),
-      type: 'hype-100',
+  // Generate news based on milestones — route through edge function in multiplayer
+  if(myHype >= 100 && myHype < 110){
+    _milestoneFire('hype-100', {
       artistName: S.artistName,
       headline: `${S.artistName} Building Momentum in ${S.genre} Scene`,
       preview: `Rising ${S.genre.toLowerCase()} artist ${S.artistName} is generating buzz online with growing fan engagement and social media presence.`,
       content: `${S.artistName}, an emerging ${S.genre.toLowerCase()} artist, has been steadily building momentum in recent weeks. Industry insiders are taking notice as the artist's hype continues to grow.\n\nWith a dedicated fanbase and consistent releases, ${S.artistName} is positioning themselves as one to watch in the ${S.genre.toLowerCase()} scene.\n\n"It's all about staying authentic and connecting with fans," sources close to the artist say.`
-    ,isSystemPost:GAME_MODE==="single"});
+    },{ outlet:'AirTime', triggerType:'hype_milestone', facts:{artist:S.artistName,hype:myHype,genre:S.genre,game_week:GAME.week} });
   }
-  
-  if(myHype >= 500 && myHype < 520 && !GAME.newsArticles.find(a=>a.type==='hype-500')){
-    _pushArticle({
-      source: sources[Math.floor(Math.random()*sources.length)],
-      week: GAME.week,
-      timestamp: Date.now(),
-      type: 'hype-500',
+
+  if(myHype >= 500 && myHype < 520){
+    _milestoneFire('hype-500', {
       artistName: S.artistName,
       headline: `TRENDING: ${S.artistName} Goes Viral`,
       preview: `${S.genre} sensation ${S.artistName} is trending across social media platforms as fans can't stop talking about their latest moves.`,
       content: `${S.artistName} has officially entered viral territory, with mentions skyrocketing across all major platforms.\n\nThe ${S.genre.toLowerCase()} artist's name has been trending for the past 24 hours, with fans sharing clips, creating memes, and spreading the word organically.\n\n"This is what happens when talent meets timing," music industry analyst Sarah Chen told us. "${S.artistName} has tapped into something real."`
-    ,isSystemPost:GAME_MODE==="single"});
+    },{ outlet:'Room Service', triggerType:'hype_milestone', facts:{artist:S.artistName,hype:myHype,genre:S.genre,game_week:GAME.week} });
   }
-  
-  if(myFans >= 1000 && myFans < 1100 && !GAME.newsArticles.find(a=>a.type==='fans-1k')){
-    _pushArticle({
-      source: sources[Math.floor(Math.random()*sources.length)],
-      week: GAME.week,
-      timestamp: Date.now(),
-      type: 'fans-1k',
+
+  if(myFans >= 1000 && myFans < 1100){
+    _milestoneFire('fans-1k', {
       artistName: S.artistName,
       headline: `${S.artistName} Hits 1,000 Fans Milestone`,
       preview: `Independent ${S.genre} artist ${S.artistName} celebrates reaching 1,000 dedicated fans without major label backing.`,
       content: `In an era where record labels dominate the charts, ${S.artistName} has proven that independent artists can still build meaningful fanbases.\n\nReaching 1,000 fans might not sound like much compared to major label artists, but industry veterans know this is where sustainable careers begin.\n\n"Every superstar started with their first thousand," notes music journalist Marcus Williams. "${S.artistName} is doing it the right way."`
-    ,isSystemPost:GAME_MODE==="single"});
+    },{ outlet:'Undertone', triggerType:'fans_milestone', facts:{artist:S.artistName,fans:myFans,genre:S.genre,game_week:GAME.week} });
   }
-  
-  // Check if any song is ACTUALLY #1 on a specific chart
-  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && GAME.songs && GAME.songs.length > 0){
-    const releasedSongs = GAME.songs.filter(s => s.released);
-    
-    releasedSongs.forEach(async song => {
-      // Check global chart (top 40)
-      const allSongs = await getAllChartsData();
-      if(allSongs.length > 0 && allSongs[0].songId === song.id && allSongs[0].isPlayer){
-        // This song is #1 globally!
-        await createChartArticle('Global Charts', song, S.artistName, S.genre);
-      }
-      
-      // Check regional charts
-      const regions = ['North America', 'Europe', 'Asia', 'Africa', 'South America', 'Oceania'];
-      regions.forEach(async region => {
-        const regionStreams = song.streams?.[region] || 0;
-        if(regionStreams > 0){
-          // Get all songs for this region and check if this one is #1
-          const regionalSongs = allSongs
-            .filter(s => s.streams && s.streams[region] > 0)
-            .sort((a,b) => (b.streams?.[region]||0) - (a.streams?.[region]||0));
-          
-          if(regionalSongs.length > 0 && regionalSongs[0].songId === song.id){
-            // This song is #1 in this region!
-            await createChartArticle(region, song, S.artistName, S.genre);
-          }
-        }
-      });
-    });
-  }
-  
-  async function createChartArticle(chartName, song, artistName, genre){
-    // Check if article already exists in Supabase
-    try {
-      const { data: existing } = await supabase
-        .from('industry_articles')
-        .select('id')
-        .eq('type', 'chart-1-' + song.id + '-' + chartName)
-        .single();
-      
-      if(existing) return; // Article already exists
-      
-      // Create new article
-      const totalStreams = Object.values(song.streams || {}).reduce((a,b)=>a+b,0);
-      const sources = ['music-wire','beat-report','pop-culture'];
-      
-      await supabase.from('industry_articles').insert({
-        source: sources[Math.floor(Math.random()*sources.length)],
-        week: GAME.week,
-        timestamp: Date.now(),
-        type: 'chart-1-' + song.id + '-' + chartName,
-        artist_name: artistName,
-        player_id: currentUser ? currentUser.id : null,
-        headline: `${artistName}'s "${song.title}" Hits #1 on ${chartName}!`,
-        preview: `${genre} artist ${artistName} celebrates as "${song.title}" reaches the top spot on ${chartName} with over ${(totalStreams/1000).toFixed(0)}K streams.`,
-        content: `${artistName} has officially claimed the #1 spot on ${chartName} with "${song.title}", marking a major milestone in the ${genre.toLowerCase()} artist's career.\n\nThe song has amassed over ${(totalStreams/1000).toFixed(0)}K streams across all platforms, resonating with fans worldwide.\n\n"This is a dream come true," ${artistName} said in a statement. "Thank you to everyone who believed in this song."\n\nIndustry experts say this chart-topping success could open doors to major label deals and festival headlining slots.`
-      });
-      
-      console.log(`📰 Created #1 chart article for ${artistName} - ${song.title} on ${chartName}`);
-    } catch(e){
-      console.error('Failed to create chart article:', e);
-    }
-  }
-  
-  // Generate random industry news (ONLY if relevant)
-  if(Math.random() < 0.2){
-    const trendArticles = [];
-    
-    // Only generate crowdfunding article if there ARE active crowdfunding campaigns
+
+  // Generate random industry news (single-player only — in multi, the edge function handles this)
+  if(GAME_MODE !== 'multi' && Math.random() < 0.2){
+    var trendArticles = [];
     if(GAME.activeCrowdfunding){
-      const cf = GAME.activeCrowdfunding;
-      const progress = Math.floor((cf.raised / cf.goal) * 100);
+      var cf = GAME.activeCrowdfunding;
+      var progress = Math.floor((cf.raised / cf.goal) * 100);
       trendArticles.push({
         headline: `Crowdfunding Campaigns See ${progress > 50 ? 'Success' : 'Mixed Results'}`,
         preview: `Independent artists turn to fans for project funding as ${S.artistName || 'emerging artists'} raise money for new releases.`,
         content: `The music industry is seeing a surge in artist-funded projects, with crowdfunding platforms becoming a viable alternative to traditional label deals.\n\nRecent campaigns have raised anywhere from hundreds to tens of thousands of dollars, with fan engagement playing a crucial role in success rates.\n\n"Fans want to be part of the journey," notes music business analyst Jordan Lee. "When artists are transparent about their goals, backers respond positively."`
       });
     }
-    
-    // Only generate viral post article if player had recent viral posts
-    const recentViralPosts = (GAME.socialPosts || []).filter(p => p.isViral && p.viralBoostedUntil > GAME.week);
+    var recentViralPosts = (GAME.socialPosts || []).filter(function(p){ return p.isViral && p.viralBoostedUntil > GAME.week; });
     if(recentViralPosts.length > 0){
       trendArticles.push({
-        headline: `Social Media Virality Drives Music Discovery`,
-        preview: `Artists see massive streaming spikes after posts go viral, reshaping how music reaches audiences.`,
+        headline: 'Social Media Virality Drives Music Discovery',
+        preview: 'Artists see massive streaming spikes after posts go viral, reshaping how music reaches audiences.',
         content: `The traditional music marketing playbook is being rewritten as viral social media moments increasingly drive streaming success.\n\nRecent examples show artists gaining thousands of new followers overnight when content resonates with algorithms and audiences.\n\n"A single viral moment can change an artist's trajectory," says digital marketing expert Casey Morgan. "The key is authentic content that connects."`
       });
     }
-    
-    // Generic article about indie artists (always relevant)
     trendArticles.push({
-      headline: `Independent Artists Challenge Traditional Label Model`,
-      preview: `DIY musicians prove commercial success possible without major label backing.`,
+      headline: 'Independent Artists Challenge Traditional Label Model',
+      preview: 'DIY musicians prove commercial success possible without major label backing.',
       content: `The rise of streaming platforms and social media has empowered independent artists to build sustainable careers outside the traditional label system.\n\nWhile challenges remain, many artists report greater creative control and higher profit margins by staying independent.\n\n"The tools are there," notes independent music consultant Sam Rivera. "Artists just need to learn how to use them effectively."`
     });
-    
     if(trendArticles.length > 0){
-      const article = trendArticles[Math.floor(Math.random()*trendArticles.length)];
+      var article = trendArticles[Math.floor(Math.random()*trendArticles.length)];
       GAME.newsArticles.push({
         source: sources[Math.floor(Math.random()*sources.length)],
-        week: GAME.week,
-        timestamp: Date.now(),
-        type: 'random',
-        headline: article.headline,
-        preview: article.preview,
-        content: article.content
-      ,isSystemPost:GAME_MODE==="single"});
-    }
-  }
-  
-  // Save newly generated articles to Supabase in multiplayer mode
-  if(GAME_MODE === 'multi' && supabase){
-    try {
-      // Get articles that were just added (from this week)
-      const newArticles = GAME.newsArticles.filter(a => a.week === GAME.week && !a.id);
-      
-      if(newArticles.length > 0){
-        const articlesToSave = newArticles.map(a => ({
-          source: a.source,
-          week: a.week,
-          timestamp: a.timestamp || Date.now(),
-          type: a.type || 'generated',
-          artist_name: a.artistName || null,
-          player_id: currentUser ? currentUser.id : null,
-          headline: a.headline,
-          preview: a.preview,
-          content: a.content
-        }));
-        
-        const { data, error } = await supabase
-          .from('industry_articles')
-          .insert(articlesToSave)
-          .select();
-        
-        if(error) {
-          console.error('Error saving articles to Supabase:', error);
-        } else {
-          console.log(`✅ Saved ${newArticles.length} articles to Supabase for week ${GAME.week}`);
-          // Update local articles with IDs from Supabase
-          if(data){
-            data.forEach((savedArticle, i) => {
-              const localArticle = newArticles[i];
-              if(localArticle){
-                localArticle.id = savedArticle.id;
-              }
-            });
-          }
-        }
-      }
-    } catch(err){
-      console.error('Supabase save articles error:', err);
+        week: GAME.week, timestamp: Date.now(), type: 'random', isSystemPost: true,
+        headline: article.headline, preview: article.preview, content: article.content
+      });
     }
   }
   
