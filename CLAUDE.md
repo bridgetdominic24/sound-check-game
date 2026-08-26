@@ -97,3 +97,31 @@ K-pop Trainee/Idol path (dice-roll stat creation, birth names only for trainees,
 - Test account: `iriswaeris@gmail.com`, player Bootswidafur.
 - Admin reset password: `soundcheck_reset_2024`.
 - After merge, Vercel auto-deploys — test on mobile.
+
+- ## Label decision screens (all per docs/label_decisions_blueprint.html)
+
+PRESS STATEMENT:
+- Triggered from Daily Inbox "Room Service press request" or any label news event
+- Opens editor with: label logo/name header, 4 tone chips (Professional/Warm/Firm/Dismissive), 4 preset openers, editable headline + body textarea, article preview rendering in paper/cream style
+- AI draft pre-fills on open (call generate-article edge function with trigger='label_statement', outlet='label_official') — player edits from there
+- Publish inserts into articles table as type='statement', outlet='[Label Name] Official', with verified:true flag; RLS allows label owners to insert their own statements
+- Effect: rep modifier ±1 depending on tone, rumor expire chance boost
+
+SONG REVIEW (approval queue):
+- Shows: song cover gradient + title/artist/genre, quality score bar with breakdown (writing/production/vocals/concept/studio bonus), featured artist card (their fans + roster bonus if applicable), projections grid, week selector, 4 action buttons
+- Approve: sets pendingReleases[i].status='approved', triggers processRelease, morale +12
+- Schedule: sets status='scheduled', stores chosen week, morale +4
+- Send Back: sets status='returned', stores note, morale -10
+- Shelve: sets status='shelved', stores to label.shelvedTracks[], morale -5 (can resubmit)
+
+COLLAB COMPARE (collab approval):
+- Shows: side-by-side artist cards, compatibility score (genre match + fan overlap + chart form + workload + history + morale), active collab warning if either has concurrent, last 3 songs each with streams, proposed song info, roster bonus call-out
+- Approve: fires existing collab flow with roster_bonus:true flag → +15% first week streams, morale +5 each
+- Block: morale -6 each, logged in activity feed
+- Suggest Different: owner nominates two other roster artists, both get notification
+
+LABEL TIER REQUIREMENTS (for tutorial):
+- Indie → Mid-Indie: 500K total roster streams + min 3 artists (auto-upgrades, appears in Activity Feed)
+- Mid-Indie → Major Boutique: 5M total roster streams + min 5 artists
+- Major Boutique → Global Major: 50M total roster streams + min 10 artists
+- Tier perks per upgrade: bigger advance range, more staff slots, higher Velour submission quota (Indie=1/mo, Mid=2/mo, Boutique=3/mo, Global=5/mo + Label Showcase unlock)
