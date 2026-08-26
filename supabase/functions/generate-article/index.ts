@@ -1,27 +1,32 @@
 // generate-article — Sound Check Supabase edge function
 // Generates a press article headline + body in the requested outlet's voice,
-// then inserts it into industry_articles using the service role key.
+// runs the text through moderate-content for safety, then inserts the result
+// into industry_articles using the service role key.
 //
 // Request body (JSON):
-//   trigger_type  string  — e.g. "number_one_streak"
-//   trigger_key   string  — unique dedup key; duplicate → 200 {duplicate:true}
-//   outlet        string  — Velour | Room Service | Chartwell | Undertone | AirTime
-//   facts         object  — free-form context passed to the AI prompt
+//   trigger_type      string   — e.g. "number_one_streak"
+//   trigger_key       string   — unique dedup key; duplicate → 200 {duplicate:true}
+//   outlet            string   — Velour | Room Service | Chartwell | Undertone | AirTime
+//   facts             object   — free-form context passed to the AI prompt
+//   target_player_id  string?  — player the article is about (rumor target)
+//   expires_week      number?  — game week the rumor stops having effects (current + 3)
+//   is_rumor          boolean? — true → stored as type='rumor'
 //
 // Response (JSON):
 //   headline      string
 //   content       string
 //   duplicate     boolean  (true = trigger_key already exists, no insert done)
 //   capped        boolean  (true = weekly server cap hit, no insert done)
+//   blocked       boolean  (true = moderation rejected the content)
 //   error         string   (only on hard failure)
 
 import Anthropic from 'npm:@anthropic-ai/sdk@0.20.9';
 
-const SUPABASE_URL     = Deno.env.get('SUPABASE_URL') || '';
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const SUPABASE_URL      = Deno.env.get('SUPABASE_URL') || '';
+const SERVICE_ROLE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
 
-// Max AI-generated articles inserted server-wide per game week
+// Max AI-generated articles inserted server-wide per game week (rumors count)
 const WEEKLY_CAP = 10;
 
 // Outlet voice instructions — the AI writes prose; it never decides game effects
@@ -53,6 +58,44 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+const supabaseHeaders = () => ({
+  'Content-Type': 'application/json',
+  'apikey': SERVICE_ROLE_KEY,
+  'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+});
+
+async function moderateText(text: string): Promise<boolean> {
+  // Calls the existing moderate-content edge function.
+  // Returns true = content is safe, false = blocked.
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/moderate-content`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_ROLE_KEY}` },
+        body: JSON.stringify({ text }),
+      }
+    );
+    if (!res.ok) {
+      // If the moderation function itself errors, be conservative and allow
+      console.warn('[generate-article] moderate-content returned', res.status, '— allowing');
+      return true;
+    }
+    const data = await res.json();
+    // The moderate-content function returns { safe: boolean } or { blocked: boolean }
+    if (typeof data.safe === 'boolean') return data.safe;
+    if (typeof data.blocked === 'boolean') return !data.blocked;
+    return true; // unknown format — allow
+  } catch (e) {
+    console.warn('[generate-article] moderate-content error:', e);
+    return true; // network failure — allow so articles still work offline
+  }
+}
+
+// ── main handler ──────────────────────────────────────────────────────────────
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -60,7 +103,15 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { trigger_type, trigger_key, outlet, facts } = body;
+    const {
+      trigger_type,
+      trigger_key,
+      outlet,
+      facts,
+      target_player_id,
+      expires_week,
+      is_rumor,
+    } = body;
 
     if (!trigger_type || !trigger_key || !outlet || !OUTLET_VOICES[outlet]) {
       return new Response(
@@ -69,16 +120,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabaseHeaders = {
-      'Content-Type': 'application/json',
-      'apikey': SERVICE_ROLE_KEY,
-      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-    };
+    const hdrs = supabaseHeaders();
 
-    // ── 1. Dedup check ────────────────────────────────────────────
+    // ── 1. Dedup check ────────────────────────────────────────────────────────
     const dedupRes = await fetch(
       `${SUPABASE_URL}/rest/v1/industry_articles?trigger_key=eq.${encodeURIComponent(trigger_key)}&select=id&limit=1`,
-      { headers: supabaseHeaders }
+      { headers: hdrs }
     );
     const dedupRows = await dedupRes.json();
     if (Array.isArray(dedupRows) && dedupRows.length > 0) {
@@ -89,9 +136,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── 2. Weekly cap check ───────────────────────────────────────
-    // "game week" here means ISO calendar week of real time, which keeps the
-    // cap rolling without needing to track the in-game week server-side.
+    // ── 2. Weekly cap check ───────────────────────────────────────────────────
+    // "game week" = ISO calendar week of real time so the cap rolls without
+    // needing to track in-game week server-side.
     const now = new Date();
     const weekStart = new Date(now);
     weekStart.setUTCDate(now.getUTCDate() - now.getUTCDay());
@@ -99,7 +146,7 @@ Deno.serve(async (req: Request) => {
 
     const capRes = await fetch(
       `${SUPABASE_URL}/rest/v1/industry_articles?generated=eq.true&inserted_at=gte.${weekStart.toISOString()}&select=id`,
-      { headers: supabaseHeaders }
+      { headers: hdrs }
     );
     const capRows = await capRes.json();
     if (Array.isArray(capRows) && capRows.length >= WEEKLY_CAP) {
@@ -110,7 +157,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── 3. Generate prose with Claude Haiku ──────────────────────
+    // ── 3. Generate prose with Claude Haiku ───────────────────────────────────
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
     const factsText = Object.entries(facts || {})
@@ -127,11 +174,15 @@ Deno.serve(async (req: Request) => {
       `  "headline": a punchy headline (max 12 words)\n` +
       `  "content": the article body (2–3 sentences, 60–120 words)\n\n` +
       `Write entirely in the outlet's voice. Do NOT mention game mechanics, multipliers, ` +
-      `or numerical formulas. Sound like a real article.`;
+      `or numerical formulas. Sound like a real article.\n\n` +
+      `IMPORTANT CONTENT RULES:\n` +
+      `- Never reference real money, family, relationships/cheating, health, or cruel personal topics.\n` +
+      `- For rumor pieces: base the speculation only on the career event described in the facts.\n` +
+      `- Keep any negative framing light, gossipy, and firmly in "music industry" territory.`;
 
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
+      max_tokens: 350,
       messages: [{ role: 'user', content: userPrompt }],
       system: systemPrompt,
     });
@@ -151,29 +202,45 @@ Deno.serve(async (req: Request) => {
       throw new Error('Model returned empty headline or content.');
     }
 
-    // ── 4. Insert into industry_articles ─────────────────────────
-    const insertPayload = {
-      source: outlet.toLowerCase().replace(/\s+/g, '-'),
-      week: facts?.game_week ?? null,
-      timestamp: Date.now(),
-      type: trigger_type,
+    // ── 4. Moderation check ───────────────────────────────────────────────────
+    const combinedText = headline + ' ' + content;
+    const safe = await moderateText(combinedText);
+    if (!safe) {
+      console.warn('[generate-article] Content blocked by moderation for', trigger_key);
+      return new Response(
+        JSON.stringify({ blocked: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ── 5. Insert into industry_articles ──────────────────────────────────────
+    const insertPayload: Record<string, unknown> = {
+      source:      outlet.toLowerCase().replace(/\s+/g, '-'),
+      week:        facts?.game_week ?? null,
+      timestamp:   Date.now(),
+      type:        is_rumor ? 'rumor' : trigger_type,
       artist_name: String(facts?.artist || ''),
-      player_id: facts?.player_id ?? null,
+      player_id:   facts?.player_id ?? null,
       headline,
-      preview: content.split('.')[0] + '.',   // first sentence as preview
+      preview:     content.split('.')[0] + '.',
       content,
       trigger_key,
-      generated: true,
+      generated:   true,
       inserted_at: now.toISOString(),
     };
+
+    // Rumor-specific fields (nullable — no impact on non-rumor rows)
+    if (target_player_id)             insertPayload.target_player_id = target_player_id;
+    if (typeof expires_week === 'number') insertPayload.expires_week = expires_week;
+    if (is_rumor)                     insertPayload.is_rumor = true;
 
     const insertRes = await fetch(
       `${SUPABASE_URL}/rest/v1/industry_articles`,
       {
         method: 'POST',
         headers: {
-          ...supabaseHeaders,
-          'Prefer': 'resolution=ignore-duplicates',  // no-op if trigger_key already exists
+          ...hdrs,
+          'Prefer': 'resolution=ignore-duplicates',  // no-op if trigger_key race
         },
         body: JSON.stringify(insertPayload),
       }
@@ -192,7 +259,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('[generate-article] Inserted article for', trigger_key);
+    console.log('[generate-article] Inserted article for', trigger_key, is_rumor ? '(rumor)' : '');
     return new Response(
       JSON.stringify({ headline, content }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -201,7 +268,7 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     console.error('[generate-article] Error:', err);
     return new Response(
-      JSON.stringify({ error: String(err.message || err) }),
+      JSON.stringify({ error: String((err as Error).message || err) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

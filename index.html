@@ -13719,6 +13719,39 @@ async function confirmCreateLabel(){
   GAME.ownedLabel = label;
   GAME.money -= 25000;
 
+  // ── Trigger: new label founded → Chartwell brief ──────────────────────────
+  (function(){
+    var _foundArtist = GAME.artistName || GAME.sn || 'Artist';
+    var _foundName   = label.name || 'New Label';
+    var _foundTier   = label.tier || 'indie';
+    var _foundTkey   = 'label_founded_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local');
+    _fireArticleTrigger({
+      triggerType: 'label_founded',
+      triggerKey:  _foundTkey,
+      outlet:      'Chartwell',
+      facts: {
+        artist:     _foundArtist,
+        label:      _foundName,
+        tier:       _foundTier,
+        game_week:  GAME.week || 1,
+        player_id:  (currentUser && currentUser.id) || null
+      },
+      fallback: {
+        headline: _foundArtist+' Launches '+_foundName,
+        content: _foundArtist+' has entered the business side of the industry, founding '+_foundName+' as an independent '+_foundTier+'-tier imprint. The move signals a strategic push toward artist ownership and long-term catalog control.'
+      },
+      onSuccess: function(art){
+        _addLocalArticle({
+          source: 'chartwell', outlet: 'Chartwell',
+          week: GAME.week, timestamp: Date.now(),
+          type: 'label_founded', artistName: _foundArtist,
+          headline: art.headline, content: art.content
+        });
+        // No stat delta — prestige only
+      }
+    });
+  })();
+
   // Auto-sign the owner to their own label (owner is always on the roster)
   GAME.signedLabel = {
     labelId: label.id,
@@ -14409,8 +14442,36 @@ function processLabelWeekly(){
 
     // Check expiry
     if((GAME.week||1) >= sl.expiresWeek){
+      var _exitArtist = GAME.artistName || GAME.sn || 'Artist';
+      var _exitLabel  = sl.labelName || 'label';
       GAME.signedLabel = null;
       addNotification('📄 Contract Expired',`Your contract with ${sl.labelName} has ended. You are now a free agent.`,'label');
+
+      // ── Trigger: artist exits label → Chartwell brief ───────────────────
+      var _exitTkey = 'label_exit_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local')+'_w'+(GAME.week||1);
+      _fireArticleTrigger({
+        triggerType: 'label_exit',
+        triggerKey:  _exitTkey,
+        outlet:      'Chartwell',
+        facts: {
+          artist:    _exitArtist,
+          label:     _exitLabel,
+          game_week: GAME.week || 1,
+          player_id: (currentUser && currentUser.id) || null
+        },
+        fallback: {
+          headline: _exitArtist+' Parts Ways with '+_exitLabel,
+          content: _exitArtist+'\'s contract with '+_exitLabel+' has come to a close. The artist is now operating as a free agent, with several imprints understood to be circling. Sources describe the split as amicable and contractually straightforward.'
+        },
+        onSuccess: function(art){
+          _addLocalArticle({
+            source: 'chartwell', outlet: 'Chartwell',
+            week: GAME.week, timestamp: Date.now(),
+            type: 'label_exit', artistName: _exitArtist,
+            headline: art.headline, content: art.content
+          });
+        }
+      });
     }
   }
 
@@ -14445,6 +14506,39 @@ function _checkLabelTierUpgrade(ol){
     ol.activity = ol.activity||[];
     ol.activity.unshift({text:`🎉 <strong>${ol.name}</strong> upgraded to <strong>${tierDef.name}</strong> tier!`,color:'#f59e0b',time:'now'});
     addNotification('🎉 Label Upgraded!',`${ol.name} is now a ${tierDef.name} label. New perks unlocked.`,'label');
+
+    // ── Trigger: label tier upgrade → Chartwell brief ─────────────────────
+    (function(_ol, _newTier, _tierDef){
+      var _tuArtist = GAME.artistName || GAME.sn || 'Label Owner';
+      var _tuLabel  = _ol.name || 'Label';
+      var _tuTkey   = 'label_tier_up_'+(_ol.id||'local')+'_'+_newTier;
+      _fireArticleTrigger({
+        triggerType: 'label_tier_up',
+        triggerKey:  _tuTkey,
+        outlet:      'Chartwell',
+        facts: {
+          artist:    _tuArtist,
+          label:     _tuLabel,
+          old_tier:  current,
+          new_tier:  _newTier,
+          tier_name: _tierDef ? _tierDef.name : _newTier,
+          game_week: GAME.week || 1,
+          player_id: (currentUser && currentUser.id) || null
+        },
+        fallback: {
+          headline: _tuLabel+' Advances to '+(_tierDef ? _tierDef.name : _newTier)+' Tier',
+          content: _tuLabel+', the imprint helmed by '+_tuArtist+', has crossed the threshold into '+(_tierDef ? _tierDef.name : _newTier)+' status. The upgrade comes on the back of improved roster performance and streaming figures that signal genuine commercial momentum.'
+        },
+        onSuccess: function(art){
+          _addLocalArticle({
+            source: 'chartwell', outlet: 'Chartwell',
+            week: GAME.week, timestamp: Date.now(),
+            type: 'label_tier_up', artistName: _tuArtist,
+            headline: art.headline, content: art.content
+          });
+        }
+      });
+    })(ol, newTier, tierDef);
   }
 }
 
@@ -18110,7 +18204,15 @@ async function respondCollab(requestId,action){
       if(GAME_MODE==='multi'){
         await syncAcceptedCollabs();
       }
-      
+
+      // ── Rumor: studio tease — both artists were spotted "together" ────────
+      _seedStudioTease(
+        GAME.sn || GAME.artistName || 'You',
+        req.from_artist_name || 'a collaborator',
+        currentUser ? currentUser.id : null,
+        req.from_user_id || null
+      );
+
       setTimeout(()=>{if(document.getElementById('messagesOverlay')) showMessages('collabs');},500);
     }catch(e){
       console.error('Error accepting collab:', e);
@@ -18148,6 +18250,35 @@ async function respondCollab(requestId,action){
         time:new Date(),
         subType:'collab'
       });
+
+      // ── Rumor: track declined collabs; if ≥3 in a window → "difficult to work with?" ──
+      if(!GAME._declinedCollabs) GAME._declinedCollabs = [];
+      var _currentWeek = GAME.week || 1;
+      // Keep only declines in the last 4 game weeks
+      GAME._declinedCollabs = GAME._declinedCollabs.filter(function(d){ return _currentWeek - d.week <= 4; });
+      GAME._declinedCollabs.push({ week: _currentWeek, id: requestId });
+      if(GAME._declinedCollabs.length >= 3){
+        var _difficultArtist = GAME.artistName || GAME.sn || 'Artist';
+        var _difficultTkey   = 'difficult_rep_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local')+'_w'+_currentWeek;
+        _seedRumor({
+          seedType:       'difficult_rep',
+          triggerKey:     _difficultTkey,
+          targetArtist:   _difficultArtist,
+          targetPlayerId: (currentUser && currentUser.id) || null,
+          facts: {
+            artist:    _difficultArtist,
+            declines:  GAME._declinedCollabs.length,
+            game_week: _currentWeek,
+            player_id: (currentUser && currentUser.id) || null
+          },
+          fallback: {
+            headline: 'Is '+_difficultArtist+' Becoming Difficult to Work With?',
+            content: 'Industry chatter is quietly circulating that '+_difficultArtist+' has turned down several collaborative opportunities in a short period. "They\'re very selective," one insider says diplomatically. Others are less charitable. We\'re just asking questions!'
+          }
+        });
+        GAME._declinedCollabs = []; // reset window after firing
+      }
+
       saveToCloud();
       closeMenu();
       showEvent('✗','Request Declined','You declined the collab request.',['OK']);
@@ -34000,19 +34131,24 @@ async function _pushArticle(article){
 
 // ── PRESS ARTICLE GENERATION SYSTEM ──────────────────────────────────────────
 // Calls the generate-article edge function, which writes AI prose in the
-// outlet's voice and inserts the result into industry_articles (service role).
-// The client NEVER inserts articles directly — RLS blocks client writes.
+// outlet's voice, runs it through moderate-content, and inserts the result
+// into industry_articles (service role). The client NEVER inserts articles
+// directly — RLS blocks client writes.
 //
 // opts: {
-//   triggerType  string   e.g. 'number_one_streak'
-//   triggerKey   string   unique dedup key — edge fn ignores duplicate calls
-//   outlet       string   'Velour'|'Room Service'|'Chartwell'|'Undertone'|'AirTime'
-//   facts        object   context passed to the AI (never shown in-game)
-//   fallback     {headline, content}  used offline / on edge-fn failure
-//   onSuccess    fn({headline, content})  called when an article is live
+//   triggerType      string    e.g. 'number_one_streak'
+//   triggerKey       string    unique dedup key — edge fn ignores duplicate calls
+//   outlet           string    'Velour'|'Room Service'|'Chartwell'|'Undertone'|'AirTime'
+//   facts            object    context passed to the AI (never shown in-game)
+//   fallback         {headline, content}  used offline / on edge-fn failure
+//   onSuccess        fn({headline, content})  called when an article is live
+//   // Rumor-only optional fields:
+//   targetPlayerId   string?   player this rumor is about
+//   expiresWeek      number?   game week the rumor expires (current + 3)
+//   isRumor          boolean?  true → stored as type='rumor'
 // }
 // onSuccess is called both on a successful edge-fn response and on fallback,
-// but NOT on dedup or cap hits (no article = no effect).
+// but NOT on dedup, cap, or moderation hits (no article = no effect).
 async function _fireArticleTrigger(opts){
   if(!opts || !opts.triggerKey || !opts.onSuccess) return;
   var EDGE = 'https://pvxrciebegirmrrrzkor.supabase.co/functions/v1/generate-article';
@@ -34029,24 +34165,29 @@ async function _fireArticleTrigger(opts){
     var controller = new AbortController();
     var tid = setTimeout(function(){ controller.abort(); }, 18000);
 
+    var body = {
+      trigger_type: opts.triggerType,
+      trigger_key:  opts.triggerKey,
+      outlet:       opts.outlet,
+      facts:        opts.facts || {}
+    };
+    if(opts.targetPlayerId) body.target_player_id = opts.targetPlayerId;
+    if(typeof opts.expiresWeek === 'number') body.expires_week = opts.expiresWeek;
+    if(opts.isRumor) body.is_rumor = true;
+
     var res = await fetch(EDGE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+token },
-      body: JSON.stringify({
-        trigger_type: opts.triggerType,
-        trigger_key:  opts.triggerKey,
-        outlet:       opts.outlet,
-        facts:        opts.facts || {}
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal
     });
     clearTimeout(tid);
 
     var json = await res.json();
 
-    if(json.duplicate || json.capped){
+    if(json.duplicate || json.capped || json.blocked){
       // No article generated — no-op (no effect applied either)
-      console.log('[Article] '+opts.triggerKey+': '+(json.duplicate?'dedup':'cap'));
+      console.log('[Article] '+opts.triggerKey+': '+(json.duplicate?'dedup':json.capped?'cap':'blocked'));
       return;
     }
     if(json.error){
@@ -34075,6 +34216,208 @@ function _addLocalArticle(article){
   if(!article.timestamp) article.timestamp = Date.now();
   if(GAME.newsArticles.find(function(a){ return a.id === article.id; })) return;
   GAME.newsArticles.unshift(article);  // newest first
+}
+
+// ── RUMOR SYSTEM ──────────────────────────────────────────────────────────────
+// Rumors are seeded ONLY from real in-game events and fire through the same
+// generate-article edge function with is_rumor=true. Hard boundaries:
+//   • Only reference real in-game actions — never invent from nothing
+//   • Never involve real money, partners/cheating, family, health, or cruelty
+//   • Stat effects ±1–2% range only
+//   • Expired rumors (expires_week < GAME.week) have no effect
+//
+// opts: {
+//   seedType         string   e.g. 'studio_tease', 'difficult_rep', 'money_troubles', 'rivalry'
+//   triggerKey       string   dedup key
+//   targetArtist     string   name of the artist the rumor is about
+//   targetPlayerId   string?  Supabase user ID (for response mechanic in multiplayer)
+//   facts            object   fed to AI prompt
+//   fallback         {headline, content}
+// }
+function _seedRumor(opts){
+  if(!opts || !opts.triggerKey) return;
+  var _expiresWeek = (GAME.week || 1) + 3;
+  _fireArticleTrigger({
+    triggerType:    opts.seedType || 'rumor',
+    triggerKey:     opts.triggerKey,
+    outlet:         'Room Service',
+    facts:          opts.facts || {},
+    fallback:       opts.fallback || { headline: 'Industry Whispers...', content: 'Word on the street is that things are shifting for '+opts.targetArtist+'. Sources close to the camp are staying tight-lipped — for now.' },
+    targetPlayerId: opts.targetPlayerId || null,
+    expiresWeek:    _expiresWeek,
+    isRumor:        true,
+    onSuccess: function(art){
+      // Store locally as a rumor article (is_rumor=true, expires_week set)
+      _addLocalArticle({
+        source:          'room-service', outlet: 'Room Service',
+        week:            GAME.week, timestamp: Date.now(),
+        type:            'rumor',
+        artistName:      opts.targetArtist || '',
+        headline:        art.headline, content: art.content,
+        is_rumor:        true,
+        expires_week:    _expiresWeek,
+        target_player_id: opts.targetPlayerId || null,
+        rumor_type:      opts.seedType
+      });
+      // Tiny hype/fan flutter — rumors have small passive effect
+      // ±1–2% of current hype, floored at ±1
+      var _hype = GAME.buzz || GAME.hype || 50;
+      var _delta = Math.max(1, Math.round(_hype * 0.015)) * (Math.random() < 0.5 ? 1 : -1);
+      addHype(_delta);
+      if(typeof opts.onEffect === 'function') opts.onEffect();
+      updateStats();
+      markDirty();
+    }
+  });
+}
+
+// Returns true if this rumor is still "active" (not yet expired)
+function _rumorActive(article){
+  if(!article || !article.is_rumor) return false;
+  if(!article.expires_week) return true; // no expiry set → permanent
+  return (article.expires_week || 0) >= (GAME.week || 1);
+}
+
+// Called when a player responds to a rumor targeted at them.
+// choice: 'deny' | 'ignore' | 'lean_in'
+// articleId: id of the industry_articles row
+async function _handleRumorResponse(articleId, choice){
+  if(!articleId || !choice) return;
+
+  // Find the rumor article locally
+  var rumor = (GAME.newsArticles || []).find(function(a){ return a.id === articleId; });
+
+  // Log the response on the Supabase row if online
+  if(typeof supabase !== 'undefined' && GAME_MODE === 'multi'){
+    try {
+      await supabase.from('industry_articles')
+        .update({ response: choice })
+        .eq('id', articleId);
+    } catch(e){ console.warn('[Rumor] Could not save response:', e); }
+  }
+
+  // Mark locally so the notification doesn't re-appear
+  if(rumor) rumor.response = choice;
+
+  var _artist = GAME.artistName || GAME.sn || 'Artist';
+
+  if(choice === 'deny'){
+    // 70% → rumor expires immediately; 30% → intensifies (one follow-up, effect doubles, then expires)
+    if(Math.random() < 0.70){
+      if(rumor) rumor.expires_week = (GAME.week || 1) - 1; // expired immediately
+      addNotification('📢 Statement Out','You addressed the rumor directly. It fizzled — the story died almost immediately.','social');
+      addHype(3); // slight relief
+    } else {
+      // Follow-up piece
+      addNotification('📣 It Backfired...','Your denial drew MORE attention. The story just got louder.','social');
+      if(rumor) rumor.expires_week = (GAME.week || 1) + 1; // shortened but still active
+      // Doubled negative effect
+      var _hype2 = GAME.buzz || GAME.hype || 50;
+      addHype(-Math.max(2, Math.round(_hype2 * 0.02)));
+    }
+  } else if(choice === 'ignore'){
+    // 80% → quiet expiry; 20% → one follow-up article
+    if(Math.random() < 0.80){
+      if(rumor) rumor.expires_week = (GAME.week || 1) + 1; // still expires soon
+      addNotification('🤫 Story Faded','By staying quiet, you let the rumor die on its own.','social');
+    } else {
+      addNotification('👀 It\'s Still Going','Your silence was taken as confirmation by some. A follow-up piece hit the wire.','social');
+      if(rumor) rumor.expires_week = (GAME.week || 1) + 2; // slight extension
+    }
+  } else if(choice === 'lean_in'){
+    // +hype now, +stress, rumor runs full course
+    var _hype3 = GAME.buzz || GAME.hype || 50;
+    addHype(Math.max(5, Math.round(_hype3 * 0.02)));
+    GAME.stress = Math.min(100, (GAME.stress || 0) + 8);
+    addNotification('🔥 Leaning In!','You turned the rumor into press. Hype up, stress up — the story runs its full course.','social');
+    // expires_week unchanged — rumor plays out normally
+  }
+
+  updateStats();
+  markDirty();
+  closeMenu();
+}
+
+// Shows the rumor response overlay for the targeted player.
+function _showRumorResponseOverlay(rumor){
+  if(!rumor) return;
+  // Only show once per rumor
+  if(rumor._responseOverlayShown) return;
+  rumor._responseOverlayShown = true;
+
+  var _artist = GAME.artistName || GAME.sn || 'Artist';
+  var html = ''
+    + '<div style="padding:20px;padding-bottom:100px">'
+    + '<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:18px">'
+    + '<div style="font-size:10px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Room Service — Rumor About You</div>'
+    + '<div style="font-size:15px;font-weight:700;color:var(--txt);margin-bottom:8px">'+rumor.headline+'</div>'
+    + '<div style="font-size:12px;color:var(--mut);line-height:1.5">'+rumor.content+'</div>'
+    + '</div>'
+    + '<div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:12px">How do you respond?</div>'
+
+    + '<div onclick="_handleRumorResponse(\''+rumor.id+'\',\'deny\')" style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--txt)">📢 Deny It</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-top:4px">Post a public statement. 70% chance it dies; 30% it intensifies first.</div>'
+    + '</div>'
+
+    + '<div onclick="_handleRumorResponse(\''+rumor.id+'\',\'ignore\')" style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--txt)">🤫 Ignore It</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-top:4px">Stay quiet. 80% fades on its own; 20% a follow-up runs.</div>'
+    + '</div>'
+
+    + '<div onclick="_handleRumorResponse(\''+rumor.id+'\',\'lean_in\')" style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--txt)">🔥 Lean In</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-top:4px">Turn it into press. +Hype now, +Stress, rumor runs full course.</div>'
+    + '</div>'
+
+    + '</div>';
+
+  _insertOverlay({
+    id: 'rumorResponseOverlay_'+rumor.id,
+    title: '🗞️ Rumor Spotted',
+    html: html
+  });
+}
+
+// Checks loaded articles for any active, unanswered rumors targeting this player
+function _checkForRumorsTargetingMe(){
+  if(!GAME || !GAME.newsArticles) return;
+  var myId = currentUser && currentUser.id ? currentUser.id : null;
+  if(!myId) return;
+  (GAME.newsArticles || []).forEach(function(a){
+    if(!a.is_rumor) return;
+    if(a.target_player_id !== myId) return;
+    if(a.response) return;           // already responded
+    if(!_rumorActive(a)) return;     // expired
+    _showRumorResponseOverlay(a);    // shows once per session (flag inside)
+  });
+}
+
+// ── RUMOR SEEDING TRIGGERS ────────────────────────────────────────────────────
+
+// Seed a "studio tease" rumor after a collab is accepted in multiplayer.
+// Called from the collab acceptance flow.
+function _seedStudioTease(myArtist, partnerArtist, myUserId, partnerUserId){
+  if(!myArtist || !partnerArtist) return;
+  // Only in multiplayer and with real partner IDs
+  if(GAME_MODE !== 'multi' || !myUserId || !partnerUserId) return;
+  var _tkey = 'studio_tease_'+[myUserId, partnerUserId].sort().join('_')+'_w'+(GAME.week||1);
+  _seedRumor({
+    seedType:       'studio_tease',
+    triggerKey:     _tkey,
+    targetArtist:   myArtist,
+    targetPlayerId: myUserId,
+    facts: {
+      artist:      myArtist,
+      partner:     partnerArtist,
+      game_week:   GAME.week || 1,
+      player_id:   myUserId
+    },
+    fallback: {
+      headline: myArtist+' and '+partnerArtist+' Spotted Together?',
+      content: 'Word on the street says '+myArtist+' and '+partnerArtist+' have been spending some quality time in the studio lately. Sources close to both camps are being very cagey — we\'re just saying the timing is interesting. New music, perhaps?'
+    }
+  });
 }
 
 async function generateNewsArticles(){
@@ -34114,11 +34457,18 @@ async function generateNewsArticles(){
             artistName: a.artist_name,
             headline: a.headline,
             preview: a.preview,
-            content: a.content
+            content: a.content,
+            // Rumor fields (null for normal articles)
+            is_rumor: a.is_rumor || false,
+            target_player_id: a.target_player_id || null,
+            expires_week: a.expires_week || null,
+            response: a.response || null
           });
         });
         // Sort newest first
         GAME.newsArticles.sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+        // Check for active rumors targeting this player and show response overlay
+        _checkForRumorsTargetingMe();
         // Don't return — still need to generate this player's own milestone articles below
       }
     } catch(err){
@@ -35276,6 +35626,91 @@ function checkDailyEconomy(){
           song.peakPosition = song.chartPosition;
         }
 
+        // ── New trigger: chart debut entry → AirTime ─────────────────────
+        if(song.weeksOnChart === 1){
+          var _debutKey = 'chart_debut_'+(song.id);
+          if(!song._articleFiredFor) song._articleFiredFor = {};
+          if(!song._articleFiredFor[_debutKey]){
+            song._articleFiredFor[_debutKey] = true;
+            var _debutArtist = GAME.artistName || GAME.sn || 'Artist';
+            var _debutTitle  = song.title || 'the track';
+            var _debutPos    = song.chartPosition;
+            _fireArticleTrigger({
+              triggerType: 'chart_debut',
+              triggerKey:  _debutKey,
+              outlet:      'AirTime',
+              facts: {
+                artist:    _debutArtist,
+                song:      _debutTitle,
+                position:  _debutPos,
+                game_week: GAME.week || 1,
+                player_id: (currentUser && currentUser.id) || null
+              },
+              fallback: {
+                headline: '"'+_debutTitle+'" Makes the Charts for '+_debutArtist,
+                content: _debutArtist+'\'s "'+_debutTitle+'" enters the chart at #'+_debutPos+' this week! That\'s a debut you do NOT sleep on — streams are rolling in and the fanbase is talking. Watch this one climb!'
+              },
+              onSuccess: function(art){
+                _addLocalArticle({
+                  source: 'airtime', outlet: 'AirTime',
+                  week: GAME.week, timestamp: Date.now(),
+                  type: 'chart_debut', artistName: _debutArtist,
+                  headline: art.headline, content: art.content
+                });
+                // Small hype boost — debut visibility
+                addHype(5);
+                updateStats();
+                markDirty();
+              }
+            });
+          }
+        }
+
+        // ── New trigger: fastest riser (jumped ≥10 places) → Chartwell ───
+        if(song.weeksOnChart > 1 && song.lastChartPosition && song.chartPosition){
+          var _riseGap = song.lastChartPosition - song.chartPosition; // positive = moved up
+          if(_riseGap >= 10){
+            var _riserKey = 'chart_riser_'+(song.id)+'_w'+(song.weeksOnChart);
+            if(!song._articleFiredFor) song._articleFiredFor = {};
+            if(!song._articleFiredFor[_riserKey]){
+              song._articleFiredFor[_riserKey] = true;
+              var _riserArtist = GAME.artistName || GAME.sn || 'Artist';
+              var _riserTitle  = song.title || 'the track';
+              _fireArticleTrigger({
+                triggerType: 'fastest_riser',
+                triggerKey:  _riserKey,
+                outlet:      'Chartwell',
+                facts: {
+                  artist:        _riserArtist,
+                  song:          _riserTitle,
+                  from_position: song.lastChartPosition,
+                  to_position:   song.chartPosition,
+                  gain:          _riseGap,
+                  game_week:     GAME.week || 1,
+                  player_id:     (currentUser && currentUser.id) || null
+                },
+                fallback: {
+                  headline: '"'+_riserTitle+'" Jumps '+_riseGap+' Places on the Chart',
+                  content: _riserArtist+'\'s "'+_riserTitle+'" rose '+_riseGap+' positions this week, climbing from #'+song.lastChartPosition+' to #'+song.chartPosition+'. The surge tracks a meaningful uptick in daily stream volume, suggesting renewed algorithmic placement or organic playlist adoption.'
+                },
+                onSuccess: function(art){
+                  _addLocalArticle({
+                    source: 'chartwell', outlet: 'Chartwell',
+                    week: GAME.week, timestamp: Date.now(),
+                    type: 'fastest_riser', artistName: _riserArtist,
+                    headline: art.headline, content: art.content
+                  });
+                  // Small fan boost — chart momentum drives discovery
+                  var _riserRegion = (S && S.country) || 'North America';
+                  if(GAME.fansByRegion) GAME.fansByRegion[_riserRegion] = (GAME.fansByRegion[_riserRegion]||0) + 400;
+                  updateStats();
+                  markDirty();
+                }
+              });
+            }
+          }
+        }
+
         // ── Trigger (a): player song holds #1 for 2+ weeks → Chartwell ──
         if(song.chartPosition === 1 && song.weeksOnChart >= 2){
           var _reignKey = 'chart_reign_'+(song.id)+'_w'+(song.weeksOnChart);
@@ -35318,6 +35753,53 @@ function checkDailyEconomy(){
             });
           }
         }
+
+        // ── New trigger: flop detection → Room Service gossip ────────────
+        // Fires once when a song completes its SECOND charting week with
+        // consistently low streams AND the artist spent significantly on promo.
+        // (Second week avoids misfiring on legitimate slow builds.)
+        if(song.weeksOnChart === 2 && !song._flopArticleFired){
+          var _flopPromoSpend = song.promotions
+            ? Object.values(song.promotions).reduce(function(s,p){ return s + (p.cost||0); }, 0)
+            : 0;
+          // "High promo spend": ≥$5,000 spent on promotion
+          // "Flop streams": still below 30K total after 2 weeks on chart
+          if(_flopPromoSpend >= 5000 && (song.streams||0) < 30000){
+            song._flopArticleFired = true;
+            var _flopArtist = GAME.artistName || GAME.sn || 'Artist';
+            var _flopTitle  = song.title || 'the release';
+            var _flopTkey   = 'flop_'+(song.id)+'_w'+(song.weeksOnChart);
+            _fireArticleTrigger({
+              triggerType: 'flop',
+              triggerKey:  _flopTkey,
+              outlet:      'Room Service',
+              facts: {
+                artist:     _flopArtist,
+                song:       _flopTitle,
+                streams:    song.streams || 0,
+                promo_spend: _flopPromoSpend,
+                game_week:  GAME.week || 1,
+                player_id:  (currentUser && currentUser.id) || null
+              },
+              fallback: {
+                headline: 'Is '+_flopArtist+'\'s New Single Underperforming?',
+                content: 'Despite a heavy promo push, "'+_flopTitle+'" by '+_flopArtist+' hasn\'t moved the needle the way insiders expected. Sources close to the camp are "staying positive," but the numbers are telling a quieter story. Time to regroup, babe.'
+              },
+              onSuccess: function(art){
+                _addLocalArticle({
+                  source: 'room-service', outlet: 'Room Service',
+                  week: GAME.week, timestamp: Date.now(),
+                  type: 'flop', artistName: _flopArtist,
+                  headline: art.headline, content: art.content
+                });
+                // Small hype loss — disappointing rollout dents momentum
+                addHype(-8);
+                updateStats();
+                markDirty();
+              }
+            });
+          }
+        }
       }
       // Drop off chart if streams stall
       if(weeklyStreams < 5000){
@@ -35352,6 +35834,81 @@ function checkDailyEconomy(){
 
   if(typeof checkViralMoment==='function') checkViralMoment();
   if(info.dow === 0 && typeof processPromoCampaigns==='function') processPromoCampaigns();
+
+  // ── Rumor: large single-week spending → "money troubles?" ─────────────────
+  // Fires at most once per 4 game weeks. "Large" = spent >$15K in a single week
+  // (tracked as GAME.money delta since week start, already stored in weekStartMoney).
+  if(info.dow === 0 && GAME_MODE === 'multi'){
+    var _weekSpend = Math.max(0, (GAME.weekStartMoney||0) - (GAME.money||0));
+    if(_weekSpend >= 15000){
+      var _moneyWeek = GAME.week || 1;
+      var _lastMoneyRumor = GAME._lastMoneyRumorWeek || 0;
+      if(_moneyWeek - _lastMoneyRumor >= 4){
+        GAME._lastMoneyRumorWeek = _moneyWeek;
+        var _moneyArtist = GAME.artistName || GAME.sn || 'Artist';
+        var _moneyTkey   = 'money_troubles_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local')+'_w'+_moneyWeek;
+        _seedRumor({
+          seedType:       'money_troubles',
+          triggerKey:     _moneyTkey,
+          targetArtist:   _moneyArtist,
+          targetPlayerId: (currentUser && currentUser.id) || null,
+          facts: {
+            artist:    _moneyArtist,
+            spend:     Math.round(_weekSpend / 1000) + 'K this week',
+            game_week: _moneyWeek,
+            player_id: (currentUser && currentUser.id) || null
+          },
+          fallback: {
+            headline: 'Spending Spree: Is '+_moneyArtist+' OK Financially?',
+            content: _moneyArtist+' has been moving serious money around this week, and industry sources are raising an eyebrow. "They\'re investing heavily," one contact tells us — though whether that\'s confidence or desperation, we couldn\'t possibly say. We\'re just asking!'
+          }
+        });
+      }
+    }
+  }
+
+  // ── Rumor: two artists releasing in the same week with chart overlap → rivalry ─
+  // Check for any NPC/player songs releasing in the same week as the player's songs.
+  // Only fires once per week, only in multiplayer.
+  if(info.dow === 0 && GAME_MODE === 'multi' && GAME.songs){
+    var _playerSongsThisWeek = GAME.songs.filter(function(s){
+      return s.released && s.releaseWeek === (GAME.week||1) && s.chartPosition;
+    });
+    if(_playerSongsThisWeek.length > 0 && !GAME._rivalryRumorWeek_set){
+      // Look for NPC competitor songs on the chart in the same position band
+      var _charted = GAME.songs.filter(function(s){
+        return s.released && s.chartPosition && !_playerSongsThisWeek.includes(s);
+      });
+      var _playerPos = Math.min.apply(null, _playerSongsThisWeek.map(function(s){ return s.chartPosition || 999; }));
+      var _rival = _charted.find(function(s){ return Math.abs((s.chartPosition||999) - _playerPos) <= 5; });
+      if(_rival){
+        GAME._rivalryRumorWeek_set = GAME.week;
+        var _rivalArtist = GAME.artistName || GAME.sn || 'Artist';
+        var _rivalName   = (_rival.collaborators && _rival.collaborators[0] && _rival.collaborators[0].name) || 'a competitor';
+        var _rivalTkey   = 'rivalry_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local')+'_w'+(GAME.week||1);
+        _seedRumor({
+          seedType:       'rivalry',
+          triggerKey:     _rivalTkey,
+          targetArtist:   _rivalArtist,
+          targetPlayerId: (currentUser && currentUser.id) || null,
+          facts: {
+            artist:  _rivalArtist,
+            rival:   _rivalName,
+            game_week: GAME.week || 1,
+            player_id: (currentUser && currentUser.id) || null
+          },
+          fallback: {
+            headline: _rivalArtist+' vs '+_rivalName+': A Chart Battle is Brewing',
+            content: 'With both '+_rivalArtist+' and '+_rivalName+' dropping music in the same week, the internet has already decided there\'s a rivalry. Neither camp is commenting — but the numbers will do the talking soon enough.'
+          }
+        });
+      }
+    }
+    // Reset the rivalry flag each week so it can fire again
+    if(GAME._rivalryRumorWeek_set && GAME._rivalryRumorWeek_set < (GAME.week||1)){
+      GAME._rivalryRumorWeek_set = null;
+    }
+  }
 
   // ── Trigger (b): stress ≥ 85 → Room Service concern piece ─────────────────
   // Max once per 2 game weeks per artist. Effect: small fan loss (gossip hurts).
