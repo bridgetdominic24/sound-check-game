@@ -17116,6 +17116,8 @@ function doSkillTrain(skillKey, method){
     // Cap gain so skill doesn't exceed cap
     var newVal = Math.min(cap, val + finalGain);
     GAME.skills[skillKey] = newVal;
+    // Keep Performance in sync whenever a contributing skill changes
+    if(['singing','dance','stagePresence'].includes(skillKey)) _syncPerformanceSkill();
     GAME.skill = Math.min(100, (GAME.skill||0) + (finalGain * 0.3));
     GAME.inspiration = Math.min(100, (GAME.inspiration||0) + 5);
 
@@ -31863,9 +31865,9 @@ function showSkillDetail(skillKey){
     // Body
     +'<div style="padding:0 16px">'
     +decayBanner
-    +sectionLabel('Training Methods')
-    +(refresherCard)
-    +selfCard+coachCard+mcCard
+    +(skillKey !== 'performance'
+      ? sectionLabel('Training Methods')+refresherCard+selfCard+coachCard+mcCard
+      : '')
     +sectionLabel('Quick Activities')
     +quickCards
     +'</div></div>';
