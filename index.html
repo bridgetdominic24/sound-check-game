@@ -33912,7 +33912,11 @@ async function renderPressRoom(searchTerm='', filter='all'){
           artistName: a.artist_name,
           headline: a.headline,
           preview: a.preview,
-          content: a.content
+          content: a.content,
+          is_rumor: a.is_rumor || false,
+          target_player_id: a.target_player_id || null,
+          expires_week: a.expires_week || null,
+          response: a.response || null
         }));
       }
     } catch(e){
@@ -34092,10 +34096,10 @@ function _prRadio(art, idx){
 
 function _prHotTopic(topic, idx){
   const t = _relTime(topic.timestamp);
-  return `<div onclick="viewHotTopic(${idx})" style="background:var(--card);border:1px solid var(--bord);border-left:3px solid #e06666;border-radius:12px;padding:13px 14px;margin-bottom:12px;cursor:pointer">
+  return `<div onclick="viewHotTopic(${idx})" style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:13px 14px;margin-bottom:12px;cursor:pointer">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
       <span style="font-size:16px">${topic.emoji||'🔥'}</span>
-      <span style="font-size:9px;font-weight:900;letter-spacing:2px;color:#e06666">🔥 HOT TOPIC</span>
+      <span style="font-size:9px;font-weight:900;letter-spacing:2px;color:#e06666">HOT TOPIC</span>
       <span style="font-size:9px;color:var(--mut);margin-left:auto">${t}</span>
     </div>
     <div style="font-size:14px;font-weight:700;color:var(--txt);line-height:1.35">${topic.headline}</div>
@@ -34128,10 +34132,27 @@ function prRumorReply(articleId, choice){
   };
   const fx = { deny:{}, ignore:{}, lean:{hype:6, stress:4} };
   const e = fx[choice]||{};
-  if(e.hype)   S.hype   = Math.min(100, (S.hype||0)   + e.hype);
+  if(e.hype)   { if(!S.buzz) S.buzz=0; S.buzz   = Math.min(1000, S.buzz   + e.hype);   addHype(e.hype); }
   if(e.stress) S.stress = Math.min(100, (S.stress||0) + e.stress);
-  const article = (GAME.newsArticles||[]).find(a => a.id === articleId);
+
+  // Find article in local cache and/or the currently displayed list
+  let article = (GAME.newsArticles||[]).find(function(a){ return a.id === articleId; });
+  if(!article && window.displayedArticles){
+    article = window.displayedArticles.find(function(a){ return a.id === articleId; });
+    if(article){
+      // Also add it to local cache so it persists through prApply re-renders
+      if(!GAME.newsArticles) GAME.newsArticles = [];
+      GAME.newsArticles.push(article);
+    }
+  }
   if(article) article.response = choice;
+
+  // Persist response to Supabase so it survives reload
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && articleId && articleId.length > 5){
+    supabase.from('industry_articles').update({ response: choice }).eq('id', articleId)
+      .then(function(r){ if(r.error) console.warn('Failed to save rumor response:', r.error.message); });
+  }
+
   saveGame();
   _toast(msgs[choice]||'Responded.', 3500);
   prApply();
@@ -34964,44 +34985,95 @@ async function generateHotTopics(){
 
 function viewArticle(index){
   const article = window.displayedArticles ? window.displayedArticles[index] : GAME.newsArticles[index];
-  if(!article){
-    console.error('Article not found at index:', index);
-    return;
-  }
-  
-  const sources = {
-    'music-wire': {name:'The Music Wire', color:'#FF6B6B'},
-    'beat-report': {name:'Beat Report', color:'#4ECDC4'},
-    'pop-culture': {name:'Pop Culture Daily', color:'#FFE66D'}
+  if(!article){ console.error('Article not found at index:', index); return; }
+
+  const src = (article.source||'').toLowerCase();
+  const isRumor = article.type === 'rumor' || article.is_rumor;
+  const isAboutMe = S && article.artistName && article.artistName === S.artistName;
+  const hasResponded = article.response;
+
+  // Outlet-specific visual config
+  const OC = {
+    'velour':       { name:'VELOUR',       tag:'The Sound of Prestige',     bg:'linear-gradient(170deg,#0d1a30 0%,#1a2e50 100%)', accent:'#e8b44c', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
+    'music-wire':   { name:'THE MUSIC WIRE', tag:'Breaking Music News',     bg:'linear-gradient(170deg,#1a0d2e 0%,#2a1050 100%)', accent:'#a97de8', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
+    'room-service': { name:'ROOM SERVICE', tag:'All the Tea',               bg:'#fdf6ec',                                          accent:'#c2185b', txt:'#1a1410', muted:'rgba(0,0,0,.45)', div:'rgba(0,0,0,.1)', cream:true },
+    'pop-culture':  { name:'ROOM SERVICE', tag:'All the Tea',               bg:'#fdf6ec',                                          accent:'#c2185b', txt:'#1a1410', muted:'rgba(0,0,0,.45)', div:'rgba(0,0,0,.1)', cream:true },
+    'chartwell':    { name:'CHARTWELL',    tag:'Business of Music',         bg:'linear-gradient(170deg,#071420 0%,#0d2035 100%)',  accent:'#5a9df3', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
+    'beat-report':  { name:'BEAT REPORT',  tag:'Data-Driven Music',         bg:'linear-gradient(170deg,#071420 0%,#0d2035 100%)',  accent:'#5a9df3', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
+    'undertone':    { name:'UNDERTONE',    tag:'Underground First',         bg:'linear-gradient(170deg,#110820 0%,#1e0a35 100%)',  accent:'#a97de8', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
+    'airtime':      { name:'AIRTIME',      tag:'On Air · All Day',          bg:'linear-gradient(170deg,#061412 0%,#0a2018 100%)',  accent:'#4cc98a', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
   };
-  const source = sources[article.source] || sources['music-wire'];
-  
-  const html = `
-    <div id="articleView" style="position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:200000;overflow-y:auto">
-      <div style="max-width:700px;margin:0 auto;min-height:100vh;background:white">
-        <div style="background:${source.color};padding:20px">
-          <button onclick="document.getElementById('articleView').remove()" style="background:rgba(0,0,0,0.2);color:white;border:none;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer;margin-bottom:16px">←</button>
-          <div style="font-size:12px;font-weight:700;color:rgba(0,0,0,0.6);margin-bottom:8px;letter-spacing:1px">${source.name.toUpperCase()}</div>
-          <h1 style="margin:0;font-size:28px;font-weight:900;color:white;line-height:1.2;text-shadow:0 2px 4px rgba(0,0,0,0.1)">${article.headline}</h1>
-          <div style="font-size:13px;color:rgba(255,255,255,0.9);margin-top:12px">${_relTime(article.timestamp)}</div>
+  const o = OC[src] || OC['chartwell'];
+
+  const paragraphs = (article.content||'(No content.)').split('\n\n')
+    .map(p=>`<p style="margin:0 0 18px;line-height:1.8">${p}</p>`).join('');
+
+  const shortHeadline = article.headline.length > 60;
+
+  let rumorHtml = '';
+  if(isRumor && isAboutMe && !hasResponded){
+    rumorHtml = `
+      <div style="margin:28px 0;padding:18px 16px;background:${o.cream?'rgba(0,0,0,.05)':'rgba(255,255,255,.07)'};border-radius:14px;border:1px solid ${o.cream?'rgba(0,0,0,.1)':'rgba(255,255,255,.12)'}">
+        <div style="font-size:9px;font-weight:900;letter-spacing:2.5px;color:${o.accent};margin-bottom:14px">THIS RUMOR IS ABOUT YOU — RESPOND</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="event.stopPropagation();prRumorReply('${article.id||''}','deny');document.getElementById('articleView').remove()"
+            style="flex:1;padding:13px 4px;border-radius:10px;border:1.5px solid ${o.accent};background:transparent;color:${o.txt};font-size:10.5px;font-weight:800;cursor:pointer;letter-spacing:.3px">🗣 Deny</button>
+          <button onclick="event.stopPropagation();prRumorReply('${article.id||''}','ignore');document.getElementById('articleView').remove()"
+            style="flex:1;padding:13px 4px;border-radius:10px;border:1.5px solid ${o.accent};background:transparent;color:${o.txt};font-size:10.5px;font-weight:800;cursor:pointer;letter-spacing:.3px">😶 Ignore</button>
+          <button onclick="event.stopPropagation();prRumorReply('${article.id||''}','lean');document.getElementById('articleView').remove()"
+            style="flex:1;padding:13px 4px;border-radius:10px;border:none;background:${o.accent};color:${o.cream?'#fff':'#000'};font-size:10.5px;font-weight:800;cursor:pointer;letter-spacing:.3px">😏 Lean In</button>
         </div>
-        
-        <div style="padding:24px;line-height:1.8;font-size:16px;color:#333">
-          ${article.content.split('\n\n').map(p=>`<p style="margin-bottom:20px">${p}</p>`).join('')}
-        </div>
-        
-        <div style="padding:0 24px 24px;border-top:1px solid #eee;padding-top:24px;margin-top:24px">
-          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:#666">SHARE THIS ARTICLE</div>
-          <div style="display:flex;gap:8px">
-            <button onclick="shareArticleToSocial(${index},'instagram')" style="flex:1;padding:12px;background:linear-gradient(135deg,#f093fb,#f5576c);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">Share to Instagram</button>
-            <button onclick="shareArticleToSocial(${index},'tiktok')" style="flex:1;padding:12px;background:#fe2c55;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">Share to TikTok</button>
-            <button onclick="shareArticleToSocial(${index},'twitter')" style="flex:1;padding:12px;background:#1d9bf0;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">Share to X</button>
+      </div>`;
+  } else if(hasResponded){
+    const labels = { deny:'📢 You denied it', ignore:'😶 You ignored it', lean:'😏 You leaned in' };
+    rumorHtml = `<div style="margin:24px 0;padding:13px 16px;background:${o.cream?'rgba(0,0,0,.05)':'rgba(255,255,255,.07)'};border-radius:10px;font-size:10px;font-weight:800;letter-spacing:1.5px;color:${o.accent};text-transform:uppercase">${labels[hasResponded]||hasResponded}</div>`;
+  }
+
+  const btnStyle = `flex:1;padding:12px 4px;background:${o.cream?'rgba(0,0,0,.06)':'rgba(255,255,255,.09)'};color:${o.txt};border:1px solid ${o.cream?'rgba(0,0,0,.1)':'rgba(255,255,255,.13)'};border-radius:10px;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.3px`;
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="articleView" style="position:fixed;inset:0;background:${o.bg};z-index:200001;overflow-y:auto;-webkit-overflow-scrolling:touch">
+      <div style="max-width:500px;margin:0 auto;min-height:100%;display:flex;flex-direction:column">
+
+        <!-- BACK + OUTLET NAME -->
+        <div style="flex:none;padding:16px 18px 0;display:flex;align-items:center;gap:12px">
+          <button onclick="document.getElementById('articleView').remove()"
+            style="background:${o.cream?'rgba(0,0,0,.08)':'rgba(255,255,255,.12)'};color:${o.txt};border:none;border-radius:50%;width:36px;height:36px;font-size:17px;cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center">←</button>
+          <div>
+            <div style="font-family:var(--fd),'Georgia',serif;font-size:10px;letter-spacing:4px;font-weight:900;color:${o.accent}">${o.name}</div>
+            <div style="font-size:8.5px;letter-spacing:1.5px;color:${o.muted};text-transform:uppercase">${o.tag}</div>
           </div>
         </div>
+
+        <!-- HEADLINE BLOCK -->
+        <div style="flex:none;padding:20px 18px 18px">
+          ${article.artistName && !isAboutMe ? `<div style="font-size:9px;font-weight:900;letter-spacing:2px;color:${o.accent};margin-bottom:8px;text-transform:uppercase">Re: ${article.artistName}</div>` : ''}
+          ${isAboutMe ? `<div style="font-size:9px;font-weight:900;letter-spacing:2px;color:${o.accent};margin-bottom:8px">★ ABOUT YOU</div>` : ''}
+          <h1 style="font-family:var(--fd),'Georgia',serif;font-size:${shortHeadline?'21':'26'}px;font-weight:900;line-height:1.22;color:${o.txt};margin:0 0 14px">${article.headline}</h1>
+          ${article.preview ? `<p style="font-size:13px;font-style:italic;color:${o.muted};line-height:1.6;margin:0 0 14px;padding-left:12px;border-left:2px solid ${o.accent}">${article.preview}</p>` : ''}
+          <div style="font-size:9px;color:${o.muted};letter-spacing:.5px">${_relTime(article.timestamp)} · WEEK ${article.week||GAME.week||'?'}</div>
+          <div style="margin-top:16px;height:1px;background:${o.div}"></div>
+        </div>
+
+        <!-- ARTICLE BODY -->
+        <div style="flex:1;padding:0 18px 32px;font-size:14.5px;color:${o.cream?'#2a1f14':'rgba(255,255,255,.88)'}">
+          ${paragraphs}
+          ${rumorHtml}
+
+          <!-- SHARE -->
+          <div style="margin-top:28px;padding-top:18px;border-top:1px solid ${o.div}">
+            <div style="font-size:8.5px;letter-spacing:2px;font-weight:800;color:${o.muted};margin-bottom:12px">SHARE THIS STORY</div>
+            <div style="display:flex;gap:7px">
+              <button onclick="shareArticleToSocial(${index},'instagram');document.getElementById('articleView').remove()" style="${btnStyle}">📸 Instagram</button>
+              <button onclick="shareArticleToSocial(${index},'tiktok');document.getElementById('articleView').remove()" style="${btnStyle}">📱 TikTok</button>
+              <button onclick="shareArticleToSocial(${index},'twitter');document.getElementById('articleView').remove()" style="${btnStyle}">𝕏 Post</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
-  `;
-  document.body.insertAdjacentHTML('beforeend', html);
+  `);
 }
 
 function shareArticleToSocial(articleIndex, platform){
