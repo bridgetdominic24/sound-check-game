@@ -11,8 +11,8 @@
 
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;background:#111}
-body{display:flex;align-items:center;justify-content:center;font-family:sans-serif;background:#1a1a2e;min-height:100vh}
-.phone{width:100%;max-width:420px;height:100vh;max-height:900px;position:relative;overflow:hidden;display:flex;flex-direction:column;transition:background 0.5s;background:#f0f4ff}
+body{display:flex;align-items:flex-start;justify-content:center;font-family:sans-serif;background:#1a1a2e;min-height:100vh}
+.phone{width:100%;max-width:420px;height:100vh;height:100svh;max-height:900px;position:relative;overflow:hidden;display:flex;flex-direction:column;transition:background 0.5s;background:#f0f4ff}
 .screen{position:absolute;inset:0;display:none;flex-direction:column;z-index:1;background:var(--bg);transition:opacity 0.25s ease,transform 0.25s ease;opacity:0;transform:translateY(10px);overflow-y:auto;padding-bottom:calc(70px + var(--sab))}
 .screen.visible{opacity:1;transform:translateY(0)}
 .screen.visible{display:flex;z-index:10}
@@ -640,6 +640,11 @@ function emergencySkip() {
 .vn-golive-sub{font-size:13px;opacity:.55;margin-top:10px;letter-spacing:.5px}
 .vn-ver{position:absolute;bottom:14px;font-size:11px;opacity:.35;letter-spacing:.5px}
 @media(prefers-reduced-motion:reduce){.vn-spot,.vn-mote,.vn-title,.vn-icon,.vn-sheen,.vn-fan,.vn-fan.on.sway{animation:none!important}}
+/* THE PRESS — news press room */
+.pr-chip{flex:none;font-size:10.5px;font-weight:700;border:1px solid var(--bord);border-radius:99px;padding:6px 12px;color:var(--mut);cursor:pointer;background:transparent}
+.pr-chip.on{background:var(--txt);color:var(--bg);border-color:var(--txt)}
+@keyframes pr-spin{to{transform:rotate(360deg)}}
+@keyframes pr-tick{to{transform:translateX(-100%)}}
 </style>
 
 <div class="screen" id="landingScreen" style="display:flex;position:fixed;inset:0;background:#0a0a0f;overflow:hidden;flex-direction:column;align-items:center;color:#fff;font-family:'Syne',sans-serif;z-index:100;padding-bottom:0;">
@@ -33773,45 +33778,61 @@ ${score >= 30 ? `🎉 SUCCESS!
 // ========================================
 async function showIndustryNews(){
   if(!GAME.newsArticles) GAME.newsArticles = [];
-  
+
   // Clean up articles older than 3 real-life days
   const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
   GAME.newsArticles = GAME.newsArticles.filter(a => a.timestamp > threeDaysAgo);
-  
-  // Generate news articles if needed (AWAIT because it's async!)
+
+  // Generate news articles if needed
   await generateNewsArticles();
-  
-  const sources = {
-    'music-wire': {name:'The Music Wire', color:'#FF6B6B', icon:'M12 2L2 7v10c0 5 5 8 10 10 5-2 10-5 10-10V7l-10-5z'},
-    'beat-report': {name:'Beat Report', color:'#4ECDC4', icon:'M9 18V5l12-2v13M9 13c0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3 3 1.34 3 3z'},
-    'pop-culture': {name:'Pop Culture Daily', color:'#FFE66D', icon:'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z'}
-  };
-  
-  const html = `
-    <div id="industryNewsOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#f5f5f5;z-index:200000;overflow-y:auto">
-      <div style="max-width:700px;margin:0 auto;min-height:100vh;background:#f5f5f5">
-        <div style="background:linear-gradient(135deg,#FF6B6B,#FFE66D);padding:20px;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,0.1)">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-            <button onclick="document.getElementById('industryNewsOverlay').remove()" style="background:rgba(255,255,255,0.3);color:white;border:none;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer">←</button>
-            <div style="flex:1">
-              <h2 style="margin:0;font-size:22px;color:white;text-shadow:0 2px 4px rgba(0,0,0,0.2)">📰 Industry News</h2>
-              <div style="font-size:12px;color:rgba(255,255,255,0.9)">Breaking stories from the music industry</div>
-            </div>
-          </div>
-          
-          <!-- SEARCH BAR -->
-          <input type="text" id="newsSearchInput" placeholder="Search articles by artist name..." oninput="filterNewsArticles()" style="width:100%;padding:12px 16px;border:none;border-radius:10px;background:rgba(255,255,255,0.95);font-size:14px;box-sizing:border-box">
+
+  const week = GAME.week || 1;
+  const vol = Math.ceil(week / 52);
+
+  _insertOverlay(`
+    <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
+      <!-- MASTHEAD -->
+      <div style="padding:14px 16px 10px;border-bottom:2px solid var(--txt);margin:0 16px;text-align:center;flex:none">
+        <div style="display:flex;justify-content:space-between;font-size:8.5px;letter-spacing:1px;color:var(--mut);font-weight:700;text-transform:uppercase">
+          <span>Week ${week}</span><span>Vol. ${vol}</span>
         </div>
-        
-        <div id="newsTabContent" style="padding:20px;padding-bottom:40px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+          <button onclick="document.querySelector('[data-app-overlay]').remove()"
+            style="background:transparent;border:1px solid var(--bord);color:var(--txt);width:34px;height:34px;border-radius:50%;font-size:17px;cursor:pointer;flex:none;line-height:1">←</button>
+          <h2 style="font-family:var(--fd),'Georgia',serif;font-size:26px;letter-spacing:3px;color:var(--txt);margin:0">THE PRESS</h2>
+          <div style="width:34px"></div>
+        </div>
+        <div style="font-size:9px;letter-spacing:2px;color:var(--mut);margin-top:3px;text-transform:uppercase">Five outlets · zero chill</div>
+      </div>
+      <!-- BREAKING TICKER -->
+      <div style="margin:8px 16px;background:var(--surf);border:1px solid var(--bord);border-radius:10px;overflow:hidden;display:flex;align-items:center;flex:none">
+        <span style="flex:none;font-size:8px;font-weight:900;letter-spacing:1px;background:#e06666;color:#fff;padding:6px 8px;white-space:nowrap">● BREAKING</span>
+        <div style="flex:1;overflow:hidden;white-space:nowrap">
+          <span id="pr-tick" style="display:inline-block;font-size:11px;color:var(--mut);padding-left:100%;animation:pr-tick 18s linear infinite">Loading headlines…</span>
         </div>
       </div>
+      <!-- SEARCH -->
+      <div style="margin:0 16px 8px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:10px 12px;flex:none">
+        <span style="font-size:14px">🔎</span>
+        <input id="pr-search" placeholder="Search artists, songs, labels…" oninput="prApply()"
+          style="flex:1;background:none;border:none;outline:none;color:var(--txt);font-size:13px;font-family:inherit">
+      </div>
+      <!-- FILTER CHIPS -->
+      <div id="pr-chips" style="display:flex;gap:7px;overflow-x:auto;padding:0 16px 10px;flex:none;scrollbar-width:none">
+        <span class="pr-chip on" data-f="all" onclick="prFilter(this)">All</span>
+        <span class="pr-chip" data-f="rumor" onclick="prFilter(this)">🫖 Rumors</span>
+        <span class="pr-chip" data-f="chart" onclick="prFilter(this)">📈 Charts</span>
+        <span class="pr-chip" data-f="biz" onclick="prFilter(this)">💼 Business</span>
+        <span class="pr-chip" data-f="feature" onclick="prFilter(this)">⭐ Features</span>
+      </div>
+      <!-- ARTICLE BODY -->
+      <div id="pr-body" style="flex:1;overflow-y:auto;padding:0 16px 20px;-webkit-overflow-scrolling:touch">
+        <div style="text-align:center;padding:40px;color:var(--mut)">Loading…</div>
+      </div>
     </div>
-  `;
-  document.body.insertAdjacentHTML('beforeend', html);
-  
-  // Render combined news on initial load
-  renderCombinedNews();
+  `);
+
+  renderPressRoom();
 }
 
 function _relTime(ts){
@@ -33831,23 +33852,13 @@ function _relTime(ts){
   return mos+'mo ago';
 }
 
-async function renderCombinedNews(searchTerm = ''){
-  const content = document.getElementById('newsTabContent');
-  if(!content) return;
-  
-  // Generate hot topics (AWAIT because it's async!)
-  await generateHotTopics();
-  
-  const sources = {
-    'music-wire': {name:'The Music Wire', color:'#FF6B6B', icon:'M12 2L2 7v10c0 5 5 8 10 10 5-2 10-5 10-10V7l-10-5z'},
-    'beat-report': {name:'Beat Report', color:'#4ECDC4', icon:'M9 18V5l12-2v13M9 13c0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3 3 1.34 3 3z'},
-    'pop-culture': {name:'Pop Culture Daily', color:'#FFE66D', icon:'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z'}
-  };
-  
-  // Show loading
-  content.innerHTML = '<div style="text-align:center;padding:40px;color:#999">Loading articles...</div>';
-  
-  // Load articles from Supabase (universal)
+async function renderPressRoom(searchTerm='', filter='all'){
+  const body = document.getElementById('pr-body');
+  if(!body) return;
+
+  body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--mut)">Loading…</div>';
+
+  // Load articles from Supabase
   let supabaseArticles = [];
   if(GAME_MODE === 'multi' && typeof supabase !== 'undefined'){
     try {
@@ -33856,7 +33867,6 @@ async function renderCombinedNews(searchTerm = ''){
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(50);
-      
       if(!error && data){
         supabaseArticles = data.map(a => ({
           id: a.id,
@@ -33874,147 +33884,222 @@ async function renderCombinedNews(searchTerm = ''){
       console.error('Failed to load articles from Supabase:', e);
     }
   }
-  
-  // Combine and filter articles
-  let allArticles = [];
-  
-  // Store all articles in a global array for easy access
+
+  // Generate hot topics
+  await generateHotTopics();
+
+  // Combine + deduplicate
   window.displayedArticles = [];
-  
-  // Add Supabase articles (universal)
-  supabaseArticles.forEach((article, idx) => {
-    // Filter: Don't show single-player articles in multiplayer
+  let allItems = [];
+
+  supabaseArticles.forEach(article => {
     if(GAME_MODE === 'multi' && article.generatedMode === 'single') return;
     window.displayedArticles.push(article);
-    allArticles.push({
-      type: 'news',
-      index: window.displayedArticles.length - 1,
-      data: article,
-      searchText: (article.headline + ' ' + (article.artistName || '')).toLowerCase()
-    });
+    allItems.push({ kind:'article', data:article, idx:window.displayedArticles.length - 1 });
   });
-  
-  // Add local news articles — in multiplayer only show ones not already in supabaseArticles
+
   const supabaseIds = new Set(supabaseArticles.map(a => a.id).filter(Boolean));
-  (GAME.newsArticles || []).forEach((article, idx) => {
-    // Skip if already shown from Supabase
+  (GAME.newsArticles || []).forEach(article => {
     if(article.id && supabaseIds.has(article.id)) return;
-    // In multiplayer, skip single-player-only articles
     if(GAME_MODE === 'multi' && article.isSystemPost) return;
     window.displayedArticles.push(article);
-    allArticles.push({
-      type: 'news',
-      index: window.displayedArticles.length - 1,
-      data: article,
-      searchText: (article.headline + ' ' + (article.artistName || '')).toLowerCase()
-    });
+    allItems.push({ kind:'article', data:article, idx:window.displayedArticles.length - 1 });
   });
-  
-  // Add hot topics
-  (GAME.hotTopics || []).forEach((topic, idx) => {
+
+  (GAME.hotTopics || []).forEach(topic => {
     window.displayedArticles.push(topic);
-    allArticles.push({
-      type: 'topic',
-      index: window.displayedArticles.length - 1,
-      data: topic,
-      searchText: topic.headline.toLowerCase()
-    });
+    allItems.push({ kind:'topic', data:topic, idx:window.displayedArticles.length - 1 });
   });
-  
-  // Filter by search term
-  if(searchTerm){
-    allArticles = allArticles.filter(a => a.searchText.includes(searchTerm.toLowerCase()));
+
+  // Sort newest first
+  allItems.sort((a,b) => (b.data.timestamp||0) - (a.data.timestamp||0) || (b.data.week||0) - (a.data.week||0));
+
+  // Update ticker with latest headlines
+  const tick = document.getElementById('pr-tick');
+  if(tick && allItems.length > 0){
+    tick.textContent = allItems.slice(0,5).map(i => '"' + i.data.headline + '"').join(' · ');
   }
-  
-  // Sort by week (newest first)
-  allArticles.sort((a, b) => b.data.week - a.data.week);
-  
-  if(allArticles.length === 0){
-    content.innerHTML = `
-      <div style="text-align:center;padding:60px 20px;color:#666">
-        <div style="font-size:48px;margin-bottom:16px;opacity:0.3">${searchTerm ? '🔍' : '📰'}</div>
-        <div style="font-size:16px;font-weight:600;margin-bottom:8px">${searchTerm ? 'No Results' : 'No News Yet'}</div>
-        <div style="font-size:14px">${searchTerm ? 'Try a different search term' : 'Articles will appear as artists reach milestones!'}</div>
+
+  // Apply search filter
+  let filtered = allItems;
+  if(searchTerm){
+    const q = searchTerm.toLowerCase();
+    filtered = filtered.filter(i =>
+      (i.data.headline||'').toLowerCase().includes(q) ||
+      (i.data.artistName||'').toLowerCase().includes(q) ||
+      (i.data.preview||'').toLowerCase().includes(q)
+    );
+  }
+
+  // Apply chip filter
+  if(filter !== 'all'){
+    filtered = filtered.filter(i => {
+      const src = (i.data.source||'').toLowerCase();
+      if(filter === 'rumor') return i.data.type === 'rumor' || i.kind === 'topic';
+      if(filter === 'chart') return src === 'chartwell' || src === 'beat-report' || src === 'airtime';
+      if(filter === 'biz')   return (src === 'chartwell' || src === 'beat-report') && i.data.type === 'biz';
+      if(filter === 'feature') return src === 'velour' || src === 'music-wire' || src === 'undertone';
+      return true;
+    });
+  }
+
+  if(filtered.length === 0){
+    body.innerHTML = `
+      <div style="text-align:center;padding:60px 20px;color:var(--mut)">
+        <div style="font-size:40px;margin-bottom:12px">${searchTerm ? '🔍' : '📭'}</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:var(--txt)">${searchTerm ? 'No stories found.' : 'No News Yet'}</div>
+        <div style="font-size:12px">Make some noise and the press will come.</div>
       </div>
     `;
     return;
   }
-  
-  // Render featured articles (top 2 news articles only)
-  const featuredNews = allArticles.filter(a => a.type === 'news').slice(0, 2);
-  const remainingArticles = allArticles.filter(a => 
-    !(a.type === 'news' && featuredNews.some(f => f.index === a.index))
-  );
-  
+
   let html = '';
-  
-  if(featuredNews.length > 0 && !searchTerm){
-    html += `
-      <div style="margin-bottom:24px">
-        <div style="font-size:12px;font-weight:700;color:#999;margin-bottom:12px;letter-spacing:1px">FEATURED</div>
-        ${featuredNews.map(item => {
-          const article = item.data;
-          const source = sources[article.source];
-          return `
-            <div onclick="viewArticle(${item.index})" style="background:white;border-radius:16px;padding:20px;margin-bottom:16px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.12);border:2px solid ${source.color};transition:all 0.2s" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.16)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 16px rgba(0,0,0,0.12)'">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="${source.color}"><path d="${source.icon}"/></svg>
-                <div style="font-size:13px;font-weight:700;color:${source.color}">${source.name.toUpperCase()}</div>
-                <div style="font-size:11px;color:#999;margin-left:auto">${_relTime(article.timestamp)}</div>
-              </div>
-              <div style="font-size:20px;font-weight:900;color:#000;margin-bottom:10px;line-height:1.2">${article.headline}</div>
-              <div style="font-size:15px;color:#666;line-height:1.6">${article.preview}</div>
-              ${article.artistName ? `<div style="margin-top:12px;display:inline-block;background:${source.color};padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;color:white">${article.artistName}</div>` : ''}
-            </div>
-          `;
-        }).join('')}
-      </div>
-      <div style="font-size:12px;font-weight:700;color:#999;margin-bottom:12px;letter-spacing:1px">ALL STORIES</div>
-    `;
-  }
-  
-  // Render remaining articles
-  html += remainingArticles.map(item => {
-    if(item.type === 'news'){
-      const article = item.data;
-      const source = sources[article.source];
-      return `
-        <div onclick="viewArticle(${item.index})" style="background:white;border-radius:12px;padding:16px;margin-bottom:16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.08);transition:all 0.2s" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px rgba(0,0,0,0.12)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)'">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="${source.color}"><path d="${source.icon}"/></svg>
-            <div style="font-size:12px;font-weight:700;color:${source.color}">${source.name.toUpperCase()}</div>
-            <div style="font-size:11px;color:#999;margin-left:auto">${_relTime(article.timestamp)}</div>
-          </div>
-          <div style="font-size:18px;font-weight:700;color:#000;margin-bottom:8px;line-height:1.3">${article.headline}</div>
-          <div style="font-size:14px;color:#666;line-height:1.5">${article.preview}</div>
-          ${article.artistName ? `<div style="margin-top:8px;display:inline-block;background:#f0f0f0;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;color:#666">${article.artistName}</div>` : ''}
-        </div>
-      `;
+  filtered.forEach((item, i) => {
+    if(item.kind === 'topic'){
+      html += _prHotTopic(item.data, item.idx);
     } else {
-      // Hot topic
-      const topic = item.data;
-      return `
-        <div onclick="viewHotTopic(${item.index})" style="background:white;border-radius:12px;padding:16px;margin-bottom:16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.08);transition:all 0.2s" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px rgba(0,0,0,0.12)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)'">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <div style="font-size:20px">${topic.emoji}</div>
-            <div style="font-size:12px;font-weight:700;color:#FF6B6B">HOT TOPIC</div>
-            <div style="font-size:11px;color:#999;margin-left:auto">${_relTime(topic.timestamp)}</div>
-          </div>
-          <div style="font-size:16px;font-weight:700;color:#000;margin-bottom:6px;line-height:1.3">${topic.headline}</div>
-          <div style="font-size:13px;color:#666;line-height:1.5">${topic.content}</div>
-        </div>
-      `;
+      const art = item.data;
+      const src = (art.source||'').toLowerCase();
+      if(src === 'velour' || src === 'music-wire'){
+        html += _prCover(art, item.idx, i === 0 && !searchTerm);
+      } else if(src === 'room-service' || src === 'pop-culture' || art.type === 'rumor'){
+        html += _prTabloid(art, item.idx);
+      } else if(src === 'undertone'){
+        html += _prCassette(art, item.idx);
+      } else if(src === 'airtime'){
+        html += _prRadio(art, item.idx);
+      } else {
+        html += _prDataCard(art, item.idx);
+      }
     }
-  }).join('');
-  
-  content.innerHTML = html;
+  });
+
+  body.innerHTML = html;
+}
+
+// Card builders for THE PRESS
+function _prCover(art, idx, isFeatured){
+  const t = _relTime(art.timestamp);
+  const h = isFeatured ? 200 : 140;
+  const fs = isFeatured ? '22px' : '17px';
+  return `<div onclick="viewArticle(${idx})" style="border-radius:6px;overflow:hidden;margin-bottom:14px;border:1px solid var(--bord);cursor:pointer">
+    <div style="height:${h}px;background:linear-gradient(145deg,#2a4a7e,#12203a);display:flex;align-items:center;justify-content:center;font-size:${isFeatured?'64px':'40px'};position:relative">
+      🎵
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.15),transparent 30%,rgba(10,10,14,.92) 85%)"></div>
+      <div style="position:absolute;top:10px;left:0;right:0;text-align:center;font-family:var(--fd),'Georgia',serif;letter-spacing:6px;font-size:13px;color:#fff;z-index:2;text-shadow:0 1px 8px rgba(0,0,0,.6)">V E L O U R</div>
+      <div style="position:absolute;bottom:0;left:0;right:0;padding:14px;z-index:2">
+        <div style="font-size:9px;letter-spacing:2px;color:var(--acc,#e8b44c);font-weight:800;text-transform:uppercase">${isFeatured?'The Cover Story':'Feature'}</div>
+        <h3 style="font-family:var(--fd),'Georgia',serif;font-size:${fs};line-height:1.2;margin-top:4px;color:#fff">${art.headline}</h3>
+        ${art.preview && isFeatured ? `<div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:4px;font-style:italic">${art.preview.substring(0,80)}${art.preview.length>80?'…':''}</div>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function _prTabloid(art, idx){
+  const t = _relTime(art.timestamp);
+  const isAboutMe = S && art.artistName && art.artistName === S.artistName;
+  const hasResponded = art.response;
+  const rbtns = isAboutMe && !hasResponded ? `
+    <div style="display:flex;gap:6px;margin-top:11px">
+      <button onclick="event.stopPropagation();prRumorReply('${art.id}','deny')" style="flex:1;font-size:10px;font-weight:800;border-radius:6px;padding:8px 0;border:1.5px solid #1a1410;background:transparent;color:#1a1410;cursor:pointer">🗣 Deny</button>
+      <button onclick="event.stopPropagation();prRumorReply('${art.id}','ignore')" style="flex:1;font-size:10px;font-weight:800;border-radius:6px;padding:8px 0;border:1.5px solid #1a1410;background:transparent;color:#1a1410;cursor:pointer">😶 Ignore</button>
+      <button onclick="event.stopPropagation();prRumorReply('${art.id}','lean')" style="flex:1;font-size:10px;font-weight:800;border-radius:6px;padding:8px 0;border:1.5px solid #1a1410;background:#1a1410;color:#fdf6ec;cursor:pointer">😏 Lean in</button>
+    </div>` : (hasResponded ? `<div style="margin-top:8px;font-size:9px;color:#9a8a7a;font-weight:700;text-transform:uppercase">You responded: ${hasResponded}</div>` : '');
+  return `<div style="background:#fdf6ec;color:#1a1410;border-radius:6px;padding:14px;margin-bottom:14px;position:relative;transform:rotate(-.6deg);box-shadow:4px 4px 0 rgba(232,138,173,.25)">
+    ${(art.type==='rumor'||isAboutMe) ? '<div style="position:absolute;top:-8px;right:12px;background:#e06666;color:#fff;font-size:9px;font-weight:900;letter-spacing:1px;padding:4px 10px;transform:rotate(3deg);border-radius:3px">EXCLUSIVE!!</div>' : ''}
+    <div style="font-size:9px;font-weight:900;letter-spacing:2px;color:#c2185b">🫖 ROOM SERVICE</div>
+    <h4 onclick="viewArticle(${idx})" style="font-family:var(--fd),'Georgia',serif;font-size:16px;line-height:1.25;margin-top:5px;font-weight:900;cursor:pointer">${art.headline}</h4>
+    ${art.preview ? `<p style="font-size:11px;color:#5a4a3a;margin-top:5px;line-height:1.5">${art.preview}</p>` : ''}
+    ${rbtns}
+    <div style="font-size:9px;color:#9a8a7a;margin-top:8px;font-weight:600">${t}${isAboutMe?' · ABOUT YOU':art.artistName?' · re: '+art.artistName:''}</div>
+  </div>`;
+}
+
+function _prDataCard(art, idx){
+  const src = (art.source||'').toLowerCase();
+  const isChartwell = src === 'chartwell' || src === 'beat-report';
+  const color = isChartwell ? '#5a9df3' : 'var(--acc,#e8b44c)';
+  const label = isChartwell ? '▦ CHARTWELL' : src === 'airtime' ? '((·)) AIRTIME' : '▦ BEAT REPORT';
+  const t = _relTime(art.timestamp);
+  return `<div onclick="viewArticle(${idx})" style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:13px 14px;margin-bottom:12px;cursor:pointer">
+    <div style="font-size:9px;font-weight:900;letter-spacing:2px;color:${color}">${label}</div>
+    <h4 style="font-size:14px;font-weight:700;margin-top:5px;line-height:1.35;color:var(--txt)">${art.headline}</h4>
+    ${art.preview ? `<div style="font-size:9.5px;color:var(--mut);margin-top:8px;line-height:1.4">${art.preview.substring(0,110)}${art.preview.length>110?'…':''}</div>` : ''}
+    <div style="font-size:9px;color:var(--mut);margin-top:6px">${t}${art.artistName?' · '+art.artistName:''}</div>
+  </div>`;
+}
+
+function _prCassette(art, idx){
+  const t = _relTime(art.timestamp);
+  return `<div onclick="viewArticle(${idx})" style="background:linear-gradient(160deg,#241a33,var(--card));border:1px solid #3a2a55;border-radius:12px;padding:13px 14px;margin-bottom:12px;display:flex;gap:12px;align-items:center;cursor:pointer">
+    <div style="width:44px;height:44px;border-radius:10px;background:#181024;border:1px solid #3a2a55;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;animation:pr-spin 6s linear infinite">📼</div>
+    <div style="min-width:0">
+      <div style="font-size:9px;font-weight:900;letter-spacing:2px;color:#a97de8">UNDERTONE</div>
+      <h4 style="font-size:13px;font-weight:700;margin-top:3px;line-height:1.35;color:var(--txt)">${art.headline}</h4>
+      <div style="font-size:9.5px;color:var(--mut);margin-top:4px">${art.preview?art.preview.substring(0,55)+(art.preview.length>55?'…':''):''} · ${t}</div>
+    </div>
+  </div>`;
+}
+
+function _prRadio(art, idx){
+  const t = _relTime(art.timestamp);
+  return `<div onclick="viewArticle(${idx})" style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:13px 14px;margin-bottom:12px;cursor:pointer">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:9px;font-weight:900;letter-spacing:2px;color:#4cc98a">((·)) AIRTIME</span>
+      <span style="font-size:9px;font-weight:900;letter-spacing:1.5px;color:#4cc98a;animation:blink 1.6s step-end infinite">● ON AIR</span>
+    </div>
+    <h4 style="font-size:13.5px;font-weight:700;margin-top:8px;line-height:1.35;color:var(--txt)">${art.headline}</h4>
+    <div style="font-size:9.5px;color:var(--mut);margin-top:5px">${t}${art.artistName?' · '+art.artistName:''}</div>
+  </div>`;
+}
+
+function _prHotTopic(topic, idx){
+  const t = _relTime(topic.timestamp);
+  return `<div onclick="viewHotTopic(${idx})" style="background:var(--card);border:1px solid var(--bord);border-left:3px solid #e06666;border-radius:12px;padding:13px 14px;margin-bottom:12px;cursor:pointer">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="font-size:16px">${topic.emoji||'🔥'}</span>
+      <span style="font-size:9px;font-weight:900;letter-spacing:2px;color:#e06666">🔥 HOT TOPIC</span>
+      <span style="font-size:9px;color:var(--mut);margin-left:auto">${t}</span>
+    </div>
+    <div style="font-size:14px;font-weight:700;color:var(--txt);line-height:1.35">${topic.headline}</div>
+    <div style="font-size:11.5px;color:var(--mut);margin-top:5px;line-height:1.5">${(topic.content||'').substring(0,110)}${(topic.content||'').length>110?'…':''}</div>
+  </div>`;
 }
 
 function filterNewsArticles(){
-  const searchInput = document.getElementById('newsSearchInput');
-  if(searchInput){
-    renderCombinedNews(searchInput.value);
-  }
+  prApply();
+}
+
+function prFilter(el){
+  document.querySelectorAll('.pr-chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  prApply();
+}
+
+function prApply(){
+  const q   = (document.getElementById('pr-search')||{}).value||'';
+  const chip = document.querySelector('.pr-chip.on');
+  const f   = chip ? chip.dataset.f : 'all';
+  renderPressRoom(q, f);
+}
+
+function prRumorReply(articleId, choice){
+  const msgs = {
+    deny:   'Statement posted. 70% chance this dies today… 30% it gets louder. 🎲',
+    ignore: 'You said nothing. Mysterious. It will probably fade… 😶',
+    lean:   'You posted 👀 on Y. Hype +6, Stress +4. The tea is now marketing. 🫖'
+  };
+  const fx = { deny:{}, ignore:{}, lean:{hype:6, stress:4} };
+  const e = fx[choice]||{};
+  if(e.hype)   S.hype   = Math.min(100, (S.hype||0)   + e.hype);
+  if(e.stress) S.stress = Math.min(100, (S.stress||0) + e.stress);
+  const article = (GAME.newsArticles||[]).find(a => a.id === articleId);
+  if(article) article.response = choice;
+  saveGame();
+  _toast(msgs[choice]||'Responded.', 3500);
+  prApply();
 }
 
 function viewHotTopic(index){
