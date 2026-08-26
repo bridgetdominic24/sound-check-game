@@ -69,6 +69,25 @@ Build order:
 
 Stub functions to replace: `showLabelLoans()`, `showLabelShowcase()`, `showLabelOwnerSettings()` (currently "Coming Soon" alerts).
 
+## Press article & rumor system
+
+- Edge function `generate-article` (Deno/TypeScript) generates AI press articles in outlet voice, runs them through `moderate-content`, inserts with service role key.
+- Outlets: Velour (prestige), Room Service (gossip), Chartwell (business/charts), Undertone (discovery), AirTime (mainstream pop).
+- Articles are in `industry_articles` table. Clients SELECT only (RLS). Service role inserts.
+- `trigger_key` unique index prevents duplicate articles.
+- **Rumor hard boundaries (NON-NEGOTIABLE — do not loosen)**:
+  - Rumors seed ONLY from real in-game actions (collab accepted, spending event, same-week releases, declined collabs). Never invent from nothing.
+  - Never involve real money, romantic partners/cheating, family, health, or anything cruel or targeting a real person.
+  - Stat effects are ±1–2% range only (e.g. ±hype/fans, never income or skill).
+  - Stored with `type='rumor'`, `target_player_id`, `is_rumor=TRUE`, `expires_week = current_week + 3`.
+  - Expired rumors stop showing effects immediately (check `expires_week > GAME.week`).
+- **Rumor response mechanic**: targeted player gets a notification, one choice allowed:
+  - Deny → 70% expires immediately, 30% one follow-up + effect doubles then expires.
+  - Ignore → 80% quiet expiry, 20% one follow-up article.
+  - Lean in → +hype now, +stress, rumor runs full course.
+  - Choice logged in `response` column on the article row.
+- Weekly server-wide cap: 10 generated articles (rumors count toward cap). Past cap, triggers no-op.
+
 ## Planned later (do not build unless asked)
 
 K-pop Trainee/Idol path (dice-roll stat creation, birth names only for trainees, training + evaluations, comeback cycles), Fandoms app (bot-generated fan community), Visual stat, three-tier charts, band/groups system, monetization (speed tokens, theme shop), year-end taxes.

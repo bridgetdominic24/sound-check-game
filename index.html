@@ -592,75 +592,72 @@ function emergencySkip() {
 </script>
 
 <style>
-@keyframes bounce {
-  0%, 80%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-10px); }
-}
+/* ═══════════════ VENUE LOADING / LANDING SCREENS ═══════════════ */
+@keyframes vn-sweep-l{0%,100%{transform:rotate(-15deg);opacity:.8}50%{transform:rotate(5deg);opacity:1}}
+@keyframes vn-sweep-r{0%,100%{transform:rotate(15deg);opacity:.8}50%{transform:rotate(-5deg);opacity:1}}
+@keyframes vn-mote{0%{transform:translateY(0) scale(1);opacity:.7}100%{transform:translateY(-100px) scale(.3);opacity:0}}
+@keyframes vn-neon{0%,100%{text-shadow:0 0 8px var(--vn-acc,#00f0ff),0 0 24px var(--vn-acc,#00f0ff),0 0 48px var(--vn-acc2,#764ba2)}50%{text-shadow:0 0 16px var(--vn-acc,#00f0ff),0 0 48px var(--vn-acc,#00f0ff),0 0 96px var(--vn-acc2,#764ba2)}}
+@keyframes vn-wave{0%,100%{transform:rotate(-14deg)}50%{transform:rotate(14deg)}}
+@keyframes vn-icon{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.08)}}
+@keyframes vn-sheen{0%{left:-80px}100%{left:calc(100% + 80px)}}
+@keyframes vn-pop{from{opacity:0;transform:scaleY(.85) translateY(4px)}to{opacity:1;transform:scaleY(1) translateY(0)}}
+@keyframes vn-fade{from{opacity:0}to{opacity:1}}
+@keyframes vn-sttxt{from{opacity:0;transform:translateY(4px)}to{opacity:.88;transform:translateY(0)}}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-10px)}}
+/* screen base */
+.vn-screen{position:fixed;inset:0;background:#0a0a0f;overflow:hidden;display:flex;flex-direction:column;align-items:center;font-family:'Syne',sans-serif;color:#fff}
+/* spotlights */
+.vn-spot{position:absolute;bottom:0;width:200px;height:78%;pointer-events:none;background:linear-gradient(to top,rgba(255,255,255,.13) 0%,rgba(255,255,255,.01) 100%);clip-path:polygon(50% 100%,-20% 0%,120% 0%);transform-origin:50% 100%;will-change:transform}
+.vn-spot-l{left:10%;animation:vn-sweep-l 6s ease-in-out infinite}
+.vn-spot-r{right:10%;animation:vn-sweep-r 6s ease-in-out infinite 1.2s}
+/* motes */
+.vn-motes{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.vn-mote{position:absolute;border-radius:50%;background:var(--vn-acc,#00f0ff);opacity:0;animation:vn-mote linear infinite}
+/* crowd */
+.vn-crowd{position:absolute;bottom:0;left:0;right:0;display:flex;flex-direction:column-reverse;align-items:center;pointer-events:none}
+.vn-row{display:flex;align-items:flex-end;justify-content:center;width:100%}
+.vn-fan{position:relative;flex-shrink:0;border-radius:4px 4px 0 0;background:#111;opacity:0;transform-origin:bottom center}
+.vn-fan.on{animation:vn-pop .4s ease forwards}
+.vn-head{position:absolute;border-radius:50%;background:#111;left:50%;transform:translateX(-50%)}
+.vn-arm{position:absolute;border-radius:3px 3px 0 0;background:#1a1a1a;transform-origin:bottom center}
+.vn-arm.wave{animation:vn-wave .9s ease-in-out infinite alternate}
+/* content */
+.vn-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;text-align:center;padding:10vh 20px 0;width:100%;max-width:420px}
+.vn-title{font-size:clamp(36px,10vw,60px);font-weight:900;letter-spacing:-1px;margin:0;animation:vn-neon 3s ease-in-out infinite;color:#fff}
+.vn-sub{font-size:clamp(10px,2.5vw,13px);opacity:.6;letter-spacing:3px;text-transform:uppercase;margin-top:4px}
+.vn-icon{font-size:50px;display:block;margin-top:14px;animation:vn-icon 2.2s ease-in-out infinite}
+.vn-sttxt{font-size:14px;margin-top:8px;min-height:20px;letter-spacing:.3px;animation:vn-sttxt .5s ease forwards}
+.vn-bar-wrap{width:min(300px,75vw);height:5px;background:rgba(255,255,255,.1);border-radius:3px;margin-top:12px;overflow:hidden;position:relative}
+.vn-bar{height:100%;border-radius:3px;width:0%;position:relative;overflow:hidden;background:linear-gradient(90deg,var(--vn-acc2,#764ba2),var(--vn-acc,#00f0ff));transition:width .7s ease}
+.vn-sheen{position:absolute;top:0;bottom:0;width:60px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:vn-sheen 2s linear infinite}
+.vn-skip{background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.25);color:rgba(255,255,255,.75);padding:10px 22px;border-radius:8px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.5px;display:none;margin-top:22px;backdrop-filter:blur(6px)}
+/* landing */
+.vn-tagline{font-size:clamp(16px,4.5vw,21px);font-weight:600;line-height:1.45;max-width:340px;margin-top:20px;opacity:0;transition:opacity .5s ease;min-height:58px;text-align:center}
+.vn-tagline.on{opacity:.92}
+.vn-golive{position:relative;background:transparent;cursor:pointer;overflow:hidden;border:2.5px solid var(--vn-acc,#00f0ff);color:var(--vn-acc,#00f0ff);padding:18px 52px;border-radius:14px;font-family:'Syne',sans-serif;font-size:20px;font-weight:900;letter-spacing:2px;text-transform:uppercase;box-shadow:0 0 18px var(--vn-acc,#00f0ff),inset 0 0 18px color-mix(in srgb,var(--vn-acc,#00f0ff) 5%,transparent);transition:box-shadow .2s,background .2s;margin-top:40px}
+.vn-golive:hover{background:color-mix(in srgb,var(--vn-acc,#00f0ff) 8%,transparent);box-shadow:0 0 32px var(--vn-acc,#00f0ff),inset 0 0 28px color-mix(in srgb,var(--vn-acc,#00f0ff) 8%,transparent)}
+.vn-golive:active{opacity:.85}
+.vn-golive-sub{font-size:13px;opacity:.55;margin-top:10px;letter-spacing:.5px}
+.vn-ver{position:absolute;bottom:14px;font-size:11px;opacity:.35;letter-spacing:.5px}
+@media(prefers-reduced-motion:reduce){.vn-spot,.vn-mote,.vn-arm.wave,.vn-title,.vn-icon,.vn-sheen,.vn-fan{animation:none!important}}
 </style>
 
-<div class="screen" id="landingScreen" style="
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color:white;
-  text-align:center;
-  padding:40px 20px;
-  min-height:100vh;
-  z-index:100;
-">
-  <div style="font-size:72px;margin-bottom:20px;animation:pulse 2s infinite">🎸</div>
-  <h1 style="
-    font-size:48px;
-    font-weight:900;
-    margin:0 0 16px 0;
-    letter-spacing:-1px;
-    text-shadow:0 4px 20px rgba(0,0,0,0.3);
-    font-family:'Syne',sans-serif;
-  ">SOUND CHECK</h1>
-  <p style="
-    font-size:20px;
-    opacity:0.95;
-    margin:0 0 60px 0;
-    max-width:400px;
-    font-weight:600;
-    line-height:1.6;
-  ">Are you listening?<br>Your career starts now.</p>
-  
-  <div style="display:flex;flex-direction:column;gap:20px;width:100%;max-width:400px">
-    <button onclick="startMultiplayer()" style="
-      background:rgba(255,255,255,0.2);
-      color:white;
-      border:2px solid white;
-      padding:20px 40px;
-      border-radius:16px;
-      font-size:18px;
-      font-weight:700;
-      cursor:pointer;
-      backdrop-filter:blur(10px);
-      transition:all 0.2s;
-      font-family:'Syne',sans-serif;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap:8px;
-    " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
-       onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-      <div style="font-size:24px">🌐 LIVE</div>
-      <div style="font-size:13px;opacity:0.9;font-weight:500">Play with others · Real time</div>
-    </button>
+<div class="screen" id="landingScreen" style="display:flex;position:fixed;inset:0;background:#0a0a0f;overflow:hidden;flex-direction:column;align-items:center;color:#fff;font-family:'Syne',sans-serif;z-index:100;padding-bottom:0;">
+  <!-- venue bg -->
+  <div class="vn-spot vn-spot-l"></div>
+  <div class="vn-spot vn-spot-r"></div>
+  <div class="vn-motes" id="vnLandMotes"></div>
+  <div class="vn-crowd" id="vnLandCrowd"></div>
+  <!-- content -->
+  <div class="vn-content" style="flex:1;justify-content:center;padding-top:8vh;">
+    <h1 class="vn-title">SOUND CHECK</h1>
+    <div class="vn-sub">THE MUSIC INDUSTRY SIM</div>
+    <div class="vn-tagline" id="vnLandTag"></div>
+    <button class="vn-golive" onclick="startMultiplayer()">GO LIVE</button>
+    <div class="vn-golive-sub">Play with others · Real time</div>
   </div>
-  
-  <div style="margin-top:60px;font-size:12px;opacity:0.7">v1.0 · Made with 💜</div>
+  <div class="vn-ver">v1.0 · Made with 💜</div>
 </div>
-
-<style>
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-}
-</style>
 
 <div class="screen" id="themeScreen">
   <div style="padding:20px 20px 0 20px;position:relative;z-index:100">
@@ -2841,6 +2838,7 @@ async function onAuthSuccess(){
   setTimeout(async () => {
     const loadingOverlay = document.getElementById('loadingOverlay');
     let hasExistingSave = false;
+    if(window._setLoadProgress) window._setLoadProgress(50,'Tuning the room…');
 
     try {
       // ── WIPE CHECK ────────────────────────────────────────────
@@ -2873,6 +2871,7 @@ async function onAuthSuccess(){
       console.error('❌ Error in checkAndLoadSave:', error);
       hasExistingSave = false;
     } finally {
+      if(window._setLoadProgress) window._setLoadProgress(100,'SHOWTIME 🎶');
       if(loadingOverlay) loadingOverlay.style.display = 'none';
       _authSuccessRunning = false;
     }
@@ -13719,6 +13718,39 @@ async function confirmCreateLabel(){
   GAME.ownedLabel = label;
   GAME.money -= 25000;
 
+  // ── Trigger: new label founded → Chartwell brief ──────────────────────────
+  (function(){
+    var _foundArtist = GAME.artistName || GAME.sn || 'Artist';
+    var _foundName   = label.name || 'New Label';
+    var _foundTier   = label.tier || 'indie';
+    var _foundTkey   = 'label_founded_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local');
+    _fireArticleTrigger({
+      triggerType: 'label_founded',
+      triggerKey:  _foundTkey,
+      outlet:      'Chartwell',
+      facts: {
+        artist:     _foundArtist,
+        label:      _foundName,
+        tier:       _foundTier,
+        game_week:  GAME.week || 1,
+        player_id:  (currentUser && currentUser.id) || null
+      },
+      fallback: {
+        headline: _foundArtist+' Launches '+_foundName,
+        content: _foundArtist+' has entered the business side of the industry, founding '+_foundName+' as an independent '+_foundTier+'-tier imprint. The move signals a strategic push toward artist ownership and long-term catalog control.'
+      },
+      onSuccess: function(art){
+        _addLocalArticle({
+          source: 'chartwell', outlet: 'Chartwell',
+          week: GAME.week, timestamp: Date.now(),
+          type: 'label_founded', artistName: _foundArtist,
+          headline: art.headline, content: art.content
+        });
+        // No stat delta — prestige only
+      }
+    });
+  })();
+
   // Auto-sign the owner to their own label (owner is always on the roster)
   GAME.signedLabel = {
     labelId: label.id,
@@ -14409,8 +14441,36 @@ function processLabelWeekly(){
 
     // Check expiry
     if((GAME.week||1) >= sl.expiresWeek){
+      var _exitArtist = GAME.artistName || GAME.sn || 'Artist';
+      var _exitLabel  = sl.labelName || 'label';
       GAME.signedLabel = null;
       addNotification('📄 Contract Expired',`Your contract with ${sl.labelName} has ended. You are now a free agent.`,'label');
+
+      // ── Trigger: artist exits label → Chartwell brief ───────────────────
+      var _exitTkey = 'label_exit_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local')+'_w'+(GAME.week||1);
+      _fireArticleTrigger({
+        triggerType: 'label_exit',
+        triggerKey:  _exitTkey,
+        outlet:      'Chartwell',
+        facts: {
+          artist:    _exitArtist,
+          label:     _exitLabel,
+          game_week: GAME.week || 1,
+          player_id: (currentUser && currentUser.id) || null
+        },
+        fallback: {
+          headline: _exitArtist+' Parts Ways with '+_exitLabel,
+          content: _exitArtist+'\'s contract with '+_exitLabel+' has come to a close. The artist is now operating as a free agent, with several imprints understood to be circling. Sources describe the split as amicable and contractually straightforward.'
+        },
+        onSuccess: function(art){
+          _addLocalArticle({
+            source: 'chartwell', outlet: 'Chartwell',
+            week: GAME.week, timestamp: Date.now(),
+            type: 'label_exit', artistName: _exitArtist,
+            headline: art.headline, content: art.content
+          });
+        }
+      });
     }
   }
 
@@ -14445,6 +14505,39 @@ function _checkLabelTierUpgrade(ol){
     ol.activity = ol.activity||[];
     ol.activity.unshift({text:`🎉 <strong>${ol.name}</strong> upgraded to <strong>${tierDef.name}</strong> tier!`,color:'#f59e0b',time:'now'});
     addNotification('🎉 Label Upgraded!',`${ol.name} is now a ${tierDef.name} label. New perks unlocked.`,'label');
+
+    // ── Trigger: label tier upgrade → Chartwell brief ─────────────────────
+    (function(_ol, _newTier, _tierDef){
+      var _tuArtist = GAME.artistName || GAME.sn || 'Label Owner';
+      var _tuLabel  = _ol.name || 'Label';
+      var _tuTkey   = 'label_tier_up_'+(_ol.id||'local')+'_'+_newTier;
+      _fireArticleTrigger({
+        triggerType: 'label_tier_up',
+        triggerKey:  _tuTkey,
+        outlet:      'Chartwell',
+        facts: {
+          artist:    _tuArtist,
+          label:     _tuLabel,
+          old_tier:  current,
+          new_tier:  _newTier,
+          tier_name: _tierDef ? _tierDef.name : _newTier,
+          game_week: GAME.week || 1,
+          player_id: (currentUser && currentUser.id) || null
+        },
+        fallback: {
+          headline: _tuLabel+' Advances to '+(_tierDef ? _tierDef.name : _newTier)+' Tier',
+          content: _tuLabel+', the imprint helmed by '+_tuArtist+', has crossed the threshold into '+(_tierDef ? _tierDef.name : _newTier)+' status. The upgrade comes on the back of improved roster performance and streaming figures that signal genuine commercial momentum.'
+        },
+        onSuccess: function(art){
+          _addLocalArticle({
+            source: 'chartwell', outlet: 'Chartwell',
+            week: GAME.week, timestamp: Date.now(),
+            type: 'label_tier_up', artistName: _tuArtist,
+            headline: art.headline, content: art.content
+          });
+        }
+      });
+    })(ol, newTier, tierDef);
   }
 }
 
@@ -18110,7 +18203,15 @@ async function respondCollab(requestId,action){
       if(GAME_MODE==='multi'){
         await syncAcceptedCollabs();
       }
-      
+
+      // ── Rumor: studio tease — both artists were spotted "together" ────────
+      _seedStudioTease(
+        GAME.sn || GAME.artistName || 'You',
+        req.from_artist_name || 'a collaborator',
+        currentUser ? currentUser.id : null,
+        req.from_user_id || null
+      );
+
       setTimeout(()=>{if(document.getElementById('messagesOverlay')) showMessages('collabs');},500);
     }catch(e){
       console.error('Error accepting collab:', e);
@@ -18148,6 +18249,35 @@ async function respondCollab(requestId,action){
         time:new Date(),
         subType:'collab'
       });
+
+      // ── Rumor: track declined collabs; if ≥3 in a window → "difficult to work with?" ──
+      if(!GAME._declinedCollabs) GAME._declinedCollabs = [];
+      var _currentWeek = GAME.week || 1;
+      // Keep only declines in the last 4 game weeks
+      GAME._declinedCollabs = GAME._declinedCollabs.filter(function(d){ return _currentWeek - d.week <= 4; });
+      GAME._declinedCollabs.push({ week: _currentWeek, id: requestId });
+      if(GAME._declinedCollabs.length >= 3){
+        var _difficultArtist = GAME.artistName || GAME.sn || 'Artist';
+        var _difficultTkey   = 'difficult_rep_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local')+'_w'+_currentWeek;
+        _seedRumor({
+          seedType:       'difficult_rep',
+          triggerKey:     _difficultTkey,
+          targetArtist:   _difficultArtist,
+          targetPlayerId: (currentUser && currentUser.id) || null,
+          facts: {
+            artist:    _difficultArtist,
+            declines:  GAME._declinedCollabs.length,
+            game_week: _currentWeek,
+            player_id: (currentUser && currentUser.id) || null
+          },
+          fallback: {
+            headline: 'Is '+_difficultArtist+' Becoming Difficult to Work With?',
+            content: 'Industry chatter is quietly circulating that '+_difficultArtist+' has turned down several collaborative opportunities in a short period. "They\'re very selective," one insider says diplomatically. Others are less charitable. We\'re just asking questions!'
+          }
+        });
+        GAME._declinedCollabs = []; // reset window after firing
+      }
+
       saveToCloud();
       closeMenu();
       showEvent('✗','Request Declined','You declined the collab request.',['OK']);
@@ -34000,19 +34130,24 @@ async function _pushArticle(article){
 
 // ── PRESS ARTICLE GENERATION SYSTEM ──────────────────────────────────────────
 // Calls the generate-article edge function, which writes AI prose in the
-// outlet's voice and inserts the result into industry_articles (service role).
-// The client NEVER inserts articles directly — RLS blocks client writes.
+// outlet's voice, runs it through moderate-content, and inserts the result
+// into industry_articles (service role). The client NEVER inserts articles
+// directly — RLS blocks client writes.
 //
 // opts: {
-//   triggerType  string   e.g. 'number_one_streak'
-//   triggerKey   string   unique dedup key — edge fn ignores duplicate calls
-//   outlet       string   'Velour'|'Room Service'|'Chartwell'|'Undertone'|'AirTime'
-//   facts        object   context passed to the AI (never shown in-game)
-//   fallback     {headline, content}  used offline / on edge-fn failure
-//   onSuccess    fn({headline, content})  called when an article is live
+//   triggerType      string    e.g. 'number_one_streak'
+//   triggerKey       string    unique dedup key — edge fn ignores duplicate calls
+//   outlet           string    'Velour'|'Room Service'|'Chartwell'|'Undertone'|'AirTime'
+//   facts            object    context passed to the AI (never shown in-game)
+//   fallback         {headline, content}  used offline / on edge-fn failure
+//   onSuccess        fn({headline, content})  called when an article is live
+//   // Rumor-only optional fields:
+//   targetPlayerId   string?   player this rumor is about
+//   expiresWeek      number?   game week the rumor expires (current + 3)
+//   isRumor          boolean?  true → stored as type='rumor'
 // }
 // onSuccess is called both on a successful edge-fn response and on fallback,
-// but NOT on dedup or cap hits (no article = no effect).
+// but NOT on dedup, cap, or moderation hits (no article = no effect).
 async function _fireArticleTrigger(opts){
   if(!opts || !opts.triggerKey || !opts.onSuccess) return;
   var EDGE = 'https://pvxrciebegirmrrrzkor.supabase.co/functions/v1/generate-article';
@@ -34029,24 +34164,29 @@ async function _fireArticleTrigger(opts){
     var controller = new AbortController();
     var tid = setTimeout(function(){ controller.abort(); }, 18000);
 
+    var body = {
+      trigger_type: opts.triggerType,
+      trigger_key:  opts.triggerKey,
+      outlet:       opts.outlet,
+      facts:        opts.facts || {}
+    };
+    if(opts.targetPlayerId) body.target_player_id = opts.targetPlayerId;
+    if(typeof opts.expiresWeek === 'number') body.expires_week = opts.expiresWeek;
+    if(opts.isRumor) body.is_rumor = true;
+
     var res = await fetch(EDGE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+token },
-      body: JSON.stringify({
-        trigger_type: opts.triggerType,
-        trigger_key:  opts.triggerKey,
-        outlet:       opts.outlet,
-        facts:        opts.facts || {}
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal
     });
     clearTimeout(tid);
 
     var json = await res.json();
 
-    if(json.duplicate || json.capped){
+    if(json.duplicate || json.capped || json.blocked){
       // No article generated — no-op (no effect applied either)
-      console.log('[Article] '+opts.triggerKey+': '+(json.duplicate?'dedup':'cap'));
+      console.log('[Article] '+opts.triggerKey+': '+(json.duplicate?'dedup':json.capped?'cap':'blocked'));
       return;
     }
     if(json.error){
@@ -34075,6 +34215,208 @@ function _addLocalArticle(article){
   if(!article.timestamp) article.timestamp = Date.now();
   if(GAME.newsArticles.find(function(a){ return a.id === article.id; })) return;
   GAME.newsArticles.unshift(article);  // newest first
+}
+
+// ── RUMOR SYSTEM ──────────────────────────────────────────────────────────────
+// Rumors are seeded ONLY from real in-game events and fire through the same
+// generate-article edge function with is_rumor=true. Hard boundaries:
+//   • Only reference real in-game actions — never invent from nothing
+//   • Never involve real money, partners/cheating, family, health, or cruelty
+//   • Stat effects ±1–2% range only
+//   • Expired rumors (expires_week < GAME.week) have no effect
+//
+// opts: {
+//   seedType         string   e.g. 'studio_tease', 'difficult_rep', 'money_troubles', 'rivalry'
+//   triggerKey       string   dedup key
+//   targetArtist     string   name of the artist the rumor is about
+//   targetPlayerId   string?  Supabase user ID (for response mechanic in multiplayer)
+//   facts            object   fed to AI prompt
+//   fallback         {headline, content}
+// }
+function _seedRumor(opts){
+  if(!opts || !opts.triggerKey) return;
+  var _expiresWeek = (GAME.week || 1) + 3;
+  _fireArticleTrigger({
+    triggerType:    opts.seedType || 'rumor',
+    triggerKey:     opts.triggerKey,
+    outlet:         'Room Service',
+    facts:          opts.facts || {},
+    fallback:       opts.fallback || { headline: 'Industry Whispers...', content: 'Word on the street is that things are shifting for '+opts.targetArtist+'. Sources close to the camp are staying tight-lipped — for now.' },
+    targetPlayerId: opts.targetPlayerId || null,
+    expiresWeek:    _expiresWeek,
+    isRumor:        true,
+    onSuccess: function(art){
+      // Store locally as a rumor article (is_rumor=true, expires_week set)
+      _addLocalArticle({
+        source:          'room-service', outlet: 'Room Service',
+        week:            GAME.week, timestamp: Date.now(),
+        type:            'rumor',
+        artistName:      opts.targetArtist || '',
+        headline:        art.headline, content: art.content,
+        is_rumor:        true,
+        expires_week:    _expiresWeek,
+        target_player_id: opts.targetPlayerId || null,
+        rumor_type:      opts.seedType
+      });
+      // Tiny hype/fan flutter — rumors have small passive effect
+      // ±1–2% of current hype, floored at ±1
+      var _hype = GAME.buzz || GAME.hype || 50;
+      var _delta = Math.max(1, Math.round(_hype * 0.015)) * (Math.random() < 0.5 ? 1 : -1);
+      addHype(_delta);
+      if(typeof opts.onEffect === 'function') opts.onEffect();
+      updateStats();
+      markDirty();
+    }
+  });
+}
+
+// Returns true if this rumor is still "active" (not yet expired)
+function _rumorActive(article){
+  if(!article || !article.is_rumor) return false;
+  if(!article.expires_week) return true; // no expiry set → permanent
+  return (article.expires_week || 0) >= (GAME.week || 1);
+}
+
+// Called when a player responds to a rumor targeted at them.
+// choice: 'deny' | 'ignore' | 'lean_in'
+// articleId: id of the industry_articles row
+async function _handleRumorResponse(articleId, choice){
+  if(!articleId || !choice) return;
+
+  // Find the rumor article locally
+  var rumor = (GAME.newsArticles || []).find(function(a){ return a.id === articleId; });
+
+  // Log the response on the Supabase row if online
+  if(typeof supabase !== 'undefined' && GAME_MODE === 'multi'){
+    try {
+      await supabase.from('industry_articles')
+        .update({ response: choice })
+        .eq('id', articleId);
+    } catch(e){ console.warn('[Rumor] Could not save response:', e); }
+  }
+
+  // Mark locally so the notification doesn't re-appear
+  if(rumor) rumor.response = choice;
+
+  var _artist = GAME.artistName || GAME.sn || 'Artist';
+
+  if(choice === 'deny'){
+    // 70% → rumor expires immediately; 30% → intensifies (one follow-up, effect doubles, then expires)
+    if(Math.random() < 0.70){
+      if(rumor) rumor.expires_week = (GAME.week || 1) - 1; // expired immediately
+      addNotification('📢 Statement Out','You addressed the rumor directly. It fizzled — the story died almost immediately.','social');
+      addHype(3); // slight relief
+    } else {
+      // Follow-up piece
+      addNotification('📣 It Backfired...','Your denial drew MORE attention. The story just got louder.','social');
+      if(rumor) rumor.expires_week = (GAME.week || 1) + 1; // shortened but still active
+      // Doubled negative effect
+      var _hype2 = GAME.buzz || GAME.hype || 50;
+      addHype(-Math.max(2, Math.round(_hype2 * 0.02)));
+    }
+  } else if(choice === 'ignore'){
+    // 80% → quiet expiry; 20% → one follow-up article
+    if(Math.random() < 0.80){
+      if(rumor) rumor.expires_week = (GAME.week || 1) + 1; // still expires soon
+      addNotification('🤫 Story Faded','By staying quiet, you let the rumor die on its own.','social');
+    } else {
+      addNotification('👀 It\'s Still Going','Your silence was taken as confirmation by some. A follow-up piece hit the wire.','social');
+      if(rumor) rumor.expires_week = (GAME.week || 1) + 2; // slight extension
+    }
+  } else if(choice === 'lean_in'){
+    // +hype now, +stress, rumor runs full course
+    var _hype3 = GAME.buzz || GAME.hype || 50;
+    addHype(Math.max(5, Math.round(_hype3 * 0.02)));
+    GAME.stress = Math.min(100, (GAME.stress || 0) + 8);
+    addNotification('🔥 Leaning In!','You turned the rumor into press. Hype up, stress up — the story runs its full course.','social');
+    // expires_week unchanged — rumor plays out normally
+  }
+
+  updateStats();
+  markDirty();
+  closeMenu();
+}
+
+// Shows the rumor response overlay for the targeted player.
+function _showRumorResponseOverlay(rumor){
+  if(!rumor) return;
+  // Only show once per rumor
+  if(rumor._responseOverlayShown) return;
+  rumor._responseOverlayShown = true;
+
+  var _artist = GAME.artistName || GAME.sn || 'Artist';
+  var html = ''
+    + '<div style="padding:20px;padding-bottom:100px">'
+    + '<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:18px">'
+    + '<div style="font-size:10px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Room Service — Rumor About You</div>'
+    + '<div style="font-size:15px;font-weight:700;color:var(--txt);margin-bottom:8px">'+rumor.headline+'</div>'
+    + '<div style="font-size:12px;color:var(--mut);line-height:1.5">'+rumor.content+'</div>'
+    + '</div>'
+    + '<div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:12px">How do you respond?</div>'
+
+    + '<div onclick="_handleRumorResponse(\''+rumor.id+'\',\'deny\')" style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--txt)">📢 Deny It</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-top:4px">Post a public statement. 70% chance it dies; 30% it intensifies first.</div>'
+    + '</div>'
+
+    + '<div onclick="_handleRumorResponse(\''+rumor.id+'\',\'ignore\')" style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--txt)">🤫 Ignore It</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-top:4px">Stay quiet. 80% fades on its own; 20% a follow-up runs.</div>'
+    + '</div>'
+
+    + '<div onclick="_handleRumorResponse(\''+rumor.id+'\',\'lean_in\')" style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--txt)">🔥 Lean In</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-top:4px">Turn it into press. +Hype now, +Stress, rumor runs full course.</div>'
+    + '</div>'
+
+    + '</div>';
+
+  _insertOverlay({
+    id: 'rumorResponseOverlay_'+rumor.id,
+    title: '🗞️ Rumor Spotted',
+    html: html
+  });
+}
+
+// Checks loaded articles for any active, unanswered rumors targeting this player
+function _checkForRumorsTargetingMe(){
+  if(!GAME || !GAME.newsArticles) return;
+  var myId = currentUser && currentUser.id ? currentUser.id : null;
+  if(!myId) return;
+  (GAME.newsArticles || []).forEach(function(a){
+    if(!a.is_rumor) return;
+    if(a.target_player_id !== myId) return;
+    if(a.response) return;           // already responded
+    if(!_rumorActive(a)) return;     // expired
+    _showRumorResponseOverlay(a);    // shows once per session (flag inside)
+  });
+}
+
+// ── RUMOR SEEDING TRIGGERS ────────────────────────────────────────────────────
+
+// Seed a "studio tease" rumor after a collab is accepted in multiplayer.
+// Called from the collab acceptance flow.
+function _seedStudioTease(myArtist, partnerArtist, myUserId, partnerUserId){
+  if(!myArtist || !partnerArtist) return;
+  // Only in multiplayer and with real partner IDs
+  if(GAME_MODE !== 'multi' || !myUserId || !partnerUserId) return;
+  var _tkey = 'studio_tease_'+[myUserId, partnerUserId].sort().join('_')+'_w'+(GAME.week||1);
+  _seedRumor({
+    seedType:       'studio_tease',
+    triggerKey:     _tkey,
+    targetArtist:   myArtist,
+    targetPlayerId: myUserId,
+    facts: {
+      artist:      myArtist,
+      partner:     partnerArtist,
+      game_week:   GAME.week || 1,
+      player_id:   myUserId
+    },
+    fallback: {
+      headline: myArtist+' and '+partnerArtist+' Spotted Together?',
+      content: 'Word on the street says '+myArtist+' and '+partnerArtist+' have been spending some quality time in the studio lately. Sources close to both camps are being very cagey — we\'re just saying the timing is interesting. New music, perhaps?'
+    }
+  });
 }
 
 async function generateNewsArticles(){
@@ -34114,11 +34456,18 @@ async function generateNewsArticles(){
             artistName: a.artist_name,
             headline: a.headline,
             preview: a.preview,
-            content: a.content
+            content: a.content,
+            // Rumor fields (null for normal articles)
+            is_rumor: a.is_rumor || false,
+            target_player_id: a.target_player_id || null,
+            expires_week: a.expires_week || null,
+            response: a.response || null
           });
         });
         // Sort newest first
         GAME.newsArticles.sort((a,b) => (b.timestamp||0) - (a.timestamp||0));
+        // Check for active rumors targeting this player and show response overlay
+        _checkForRumorsTargetingMe();
         // Don't return — still need to generate this player's own milestone articles below
       }
     } catch(err){
@@ -35276,6 +35625,91 @@ function checkDailyEconomy(){
           song.peakPosition = song.chartPosition;
         }
 
+        // ── New trigger: chart debut entry → AirTime ─────────────────────
+        if(song.weeksOnChart === 1){
+          var _debutKey = 'chart_debut_'+(song.id);
+          if(!song._articleFiredFor) song._articleFiredFor = {};
+          if(!song._articleFiredFor[_debutKey]){
+            song._articleFiredFor[_debutKey] = true;
+            var _debutArtist = GAME.artistName || GAME.sn || 'Artist';
+            var _debutTitle  = song.title || 'the track';
+            var _debutPos    = song.chartPosition;
+            _fireArticleTrigger({
+              triggerType: 'chart_debut',
+              triggerKey:  _debutKey,
+              outlet:      'AirTime',
+              facts: {
+                artist:    _debutArtist,
+                song:      _debutTitle,
+                position:  _debutPos,
+                game_week: GAME.week || 1,
+                player_id: (currentUser && currentUser.id) || null
+              },
+              fallback: {
+                headline: '"'+_debutTitle+'" Makes the Charts for '+_debutArtist,
+                content: _debutArtist+'\'s "'+_debutTitle+'" enters the chart at #'+_debutPos+' this week! That\'s a debut you do NOT sleep on — streams are rolling in and the fanbase is talking. Watch this one climb!'
+              },
+              onSuccess: function(art){
+                _addLocalArticle({
+                  source: 'airtime', outlet: 'AirTime',
+                  week: GAME.week, timestamp: Date.now(),
+                  type: 'chart_debut', artistName: _debutArtist,
+                  headline: art.headline, content: art.content
+                });
+                // Small hype boost — debut visibility
+                addHype(5);
+                updateStats();
+                markDirty();
+              }
+            });
+          }
+        }
+
+        // ── New trigger: fastest riser (jumped ≥10 places) → Chartwell ───
+        if(song.weeksOnChart > 1 && song.lastChartPosition && song.chartPosition){
+          var _riseGap = song.lastChartPosition - song.chartPosition; // positive = moved up
+          if(_riseGap >= 10){
+            var _riserKey = 'chart_riser_'+(song.id)+'_w'+(song.weeksOnChart);
+            if(!song._articleFiredFor) song._articleFiredFor = {};
+            if(!song._articleFiredFor[_riserKey]){
+              song._articleFiredFor[_riserKey] = true;
+              var _riserArtist = GAME.artistName || GAME.sn || 'Artist';
+              var _riserTitle  = song.title || 'the track';
+              _fireArticleTrigger({
+                triggerType: 'fastest_riser',
+                triggerKey:  _riserKey,
+                outlet:      'Chartwell',
+                facts: {
+                  artist:        _riserArtist,
+                  song:          _riserTitle,
+                  from_position: song.lastChartPosition,
+                  to_position:   song.chartPosition,
+                  gain:          _riseGap,
+                  game_week:     GAME.week || 1,
+                  player_id:     (currentUser && currentUser.id) || null
+                },
+                fallback: {
+                  headline: '"'+_riserTitle+'" Jumps '+_riseGap+' Places on the Chart',
+                  content: _riserArtist+'\'s "'+_riserTitle+'" rose '+_riseGap+' positions this week, climbing from #'+song.lastChartPosition+' to #'+song.chartPosition+'. The surge tracks a meaningful uptick in daily stream volume, suggesting renewed algorithmic placement or organic playlist adoption.'
+                },
+                onSuccess: function(art){
+                  _addLocalArticle({
+                    source: 'chartwell', outlet: 'Chartwell',
+                    week: GAME.week, timestamp: Date.now(),
+                    type: 'fastest_riser', artistName: _riserArtist,
+                    headline: art.headline, content: art.content
+                  });
+                  // Small fan boost — chart momentum drives discovery
+                  var _riserRegion = (S && S.country) || 'North America';
+                  if(GAME.fansByRegion) GAME.fansByRegion[_riserRegion] = (GAME.fansByRegion[_riserRegion]||0) + 400;
+                  updateStats();
+                  markDirty();
+                }
+              });
+            }
+          }
+        }
+
         // ── Trigger (a): player song holds #1 for 2+ weeks → Chartwell ──
         if(song.chartPosition === 1 && song.weeksOnChart >= 2){
           var _reignKey = 'chart_reign_'+(song.id)+'_w'+(song.weeksOnChart);
@@ -35318,6 +35752,53 @@ function checkDailyEconomy(){
             });
           }
         }
+
+        // ── New trigger: flop detection → Room Service gossip ────────────
+        // Fires once when a song completes its SECOND charting week with
+        // consistently low streams AND the artist spent significantly on promo.
+        // (Second week avoids misfiring on legitimate slow builds.)
+        if(song.weeksOnChart === 2 && !song._flopArticleFired){
+          var _flopPromoSpend = song.promotions
+            ? Object.values(song.promotions).reduce(function(s,p){ return s + (p.cost||0); }, 0)
+            : 0;
+          // "High promo spend": ≥$5,000 spent on promotion
+          // "Flop streams": still below 30K total after 2 weeks on chart
+          if(_flopPromoSpend >= 5000 && (song.streams||0) < 30000){
+            song._flopArticleFired = true;
+            var _flopArtist = GAME.artistName || GAME.sn || 'Artist';
+            var _flopTitle  = song.title || 'the release';
+            var _flopTkey   = 'flop_'+(song.id)+'_w'+(song.weeksOnChart);
+            _fireArticleTrigger({
+              triggerType: 'flop',
+              triggerKey:  _flopTkey,
+              outlet:      'Room Service',
+              facts: {
+                artist:     _flopArtist,
+                song:       _flopTitle,
+                streams:    song.streams || 0,
+                promo_spend: _flopPromoSpend,
+                game_week:  GAME.week || 1,
+                player_id:  (currentUser && currentUser.id) || null
+              },
+              fallback: {
+                headline: 'Is '+_flopArtist+'\'s New Single Underperforming?',
+                content: 'Despite a heavy promo push, "'+_flopTitle+'" by '+_flopArtist+' hasn\'t moved the needle the way insiders expected. Sources close to the camp are "staying positive," but the numbers are telling a quieter story. Time to regroup, babe.'
+              },
+              onSuccess: function(art){
+                _addLocalArticle({
+                  source: 'room-service', outlet: 'Room Service',
+                  week: GAME.week, timestamp: Date.now(),
+                  type: 'flop', artistName: _flopArtist,
+                  headline: art.headline, content: art.content
+                });
+                // Small hype loss — disappointing rollout dents momentum
+                addHype(-8);
+                updateStats();
+                markDirty();
+              }
+            });
+          }
+        }
       }
       // Drop off chart if streams stall
       if(weeklyStreams < 5000){
@@ -35352,6 +35833,81 @@ function checkDailyEconomy(){
 
   if(typeof checkViralMoment==='function') checkViralMoment();
   if(info.dow === 0 && typeof processPromoCampaigns==='function') processPromoCampaigns();
+
+  // ── Rumor: large single-week spending → "money troubles?" ─────────────────
+  // Fires at most once per 4 game weeks. "Large" = spent >$15K in a single week
+  // (tracked as GAME.money delta since week start, already stored in weekStartMoney).
+  if(info.dow === 0 && GAME_MODE === 'multi'){
+    var _weekSpend = Math.max(0, (GAME.weekStartMoney||0) - (GAME.money||0));
+    if(_weekSpend >= 15000){
+      var _moneyWeek = GAME.week || 1;
+      var _lastMoneyRumor = GAME._lastMoneyRumorWeek || 0;
+      if(_moneyWeek - _lastMoneyRumor >= 4){
+        GAME._lastMoneyRumorWeek = _moneyWeek;
+        var _moneyArtist = GAME.artistName || GAME.sn || 'Artist';
+        var _moneyTkey   = 'money_troubles_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local')+'_w'+_moneyWeek;
+        _seedRumor({
+          seedType:       'money_troubles',
+          triggerKey:     _moneyTkey,
+          targetArtist:   _moneyArtist,
+          targetPlayerId: (currentUser && currentUser.id) || null,
+          facts: {
+            artist:    _moneyArtist,
+            spend:     Math.round(_weekSpend / 1000) + 'K this week',
+            game_week: _moneyWeek,
+            player_id: (currentUser && currentUser.id) || null
+          },
+          fallback: {
+            headline: 'Spending Spree: Is '+_moneyArtist+' OK Financially?',
+            content: _moneyArtist+' has been moving serious money around this week, and industry sources are raising an eyebrow. "They\'re investing heavily," one contact tells us — though whether that\'s confidence or desperation, we couldn\'t possibly say. We\'re just asking!'
+          }
+        });
+      }
+    }
+  }
+
+  // ── Rumor: two artists releasing in the same week with chart overlap → rivalry ─
+  // Check for any NPC/player songs releasing in the same week as the player's songs.
+  // Only fires once per week, only in multiplayer.
+  if(info.dow === 0 && GAME_MODE === 'multi' && GAME.songs){
+    var _playerSongsThisWeek = GAME.songs.filter(function(s){
+      return s.released && s.releaseWeek === (GAME.week||1) && s.chartPosition;
+    });
+    if(_playerSongsThisWeek.length > 0 && !GAME._rivalryRumorWeek_set){
+      // Look for NPC competitor songs on the chart in the same position band
+      var _charted = GAME.songs.filter(function(s){
+        return s.released && s.chartPosition && !_playerSongsThisWeek.includes(s);
+      });
+      var _playerPos = Math.min.apply(null, _playerSongsThisWeek.map(function(s){ return s.chartPosition || 999; }));
+      var _rival = _charted.find(function(s){ return Math.abs((s.chartPosition||999) - _playerPos) <= 5; });
+      if(_rival){
+        GAME._rivalryRumorWeek_set = GAME.week;
+        var _rivalArtist = GAME.artistName || GAME.sn || 'Artist';
+        var _rivalName   = (_rival.collaborators && _rival.collaborators[0] && _rival.collaborators[0].name) || 'a competitor';
+        var _rivalTkey   = 'rivalry_'+(currentUser&&currentUser.id ? currentUser.id : GAME.playerId||'local')+'_w'+(GAME.week||1);
+        _seedRumor({
+          seedType:       'rivalry',
+          triggerKey:     _rivalTkey,
+          targetArtist:   _rivalArtist,
+          targetPlayerId: (currentUser && currentUser.id) || null,
+          facts: {
+            artist:  _rivalArtist,
+            rival:   _rivalName,
+            game_week: GAME.week || 1,
+            player_id: (currentUser && currentUser.id) || null
+          },
+          fallback: {
+            headline: _rivalArtist+' vs '+_rivalName+': A Chart Battle is Brewing',
+            content: 'With both '+_rivalArtist+' and '+_rivalName+' dropping music in the same week, the internet has already decided there\'s a rivalry. Neither camp is commenting — but the numbers will do the talking soon enough.'
+          }
+        });
+      }
+    }
+    // Reset the rivalry flag each week so it can fire again
+    if(GAME._rivalryRumorWeek_set && GAME._rivalryRumorWeek_set < (GAME.week||1)){
+      GAME._rivalryRumorWeek_set = null;
+    }
+  }
 
   // ── Trigger (b): stress ≥ 85 → Room Service concern piece ─────────────────
   // Max once per 2 game weeks per artist. Effect: small fan loss (gossip hurts).
@@ -39913,32 +40469,244 @@ async function openRegionChart(region) {
 
 
 <!-- LOADING OVERLAY (outside phone div so it's not clipped) -->
-<div id="loadingOverlay" style="
-  position:fixed;
-  top:0;left:0;right:0;bottom:0;
-  background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  z-index:200000;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  color:white;
-">
-  <div style="font-size:72px;margin-bottom:20px;animation:pulse 2s infinite">🎸</div>
-  <h1 style="font-size:32px;font-weight:900;margin:0 0 12px 0;font-family:'Syne',sans-serif">SOUND CHECK</h1>
-  <p style="font-size:16px;opacity:0.9;margin:0">Checking for saved game...</p>
-  <div style="margin-top:30px;display:flex;gap:8px">
-    <div style="width:10px;height:10px;background:white;border-radius:50%;animation:bounce 1s infinite 0s"></div>
-    <div style="width:10px;height:10px;background:white;border-radius:50%;animation:bounce 1s infinite 0.2s"></div>
-    <div style="width:10px;height:10px;background:white;border-radius:50%;animation:bounce 1s infinite 0.4s"></div>
+<div id="loadingOverlay" class="vn-screen" style="z-index:200000;">
+  <div class="vn-spot vn-spot-l"></div>
+  <div class="vn-spot vn-spot-r"></div>
+  <div class="vn-motes" id="vnLoadMotes"></div>
+  <div class="vn-crowd" id="vnLoadCrowd"></div>
+  <div class="vn-content">
+    <h1 class="vn-title">SOUND CHECK</h1>
+    <div class="vn-sub">THE MUSIC INDUSTRY SIM</div>
+    <span class="vn-icon" id="vnLoadIcon">🎸</span>
+    <div class="vn-sttxt" id="vnLoadSt">Checking for saved game…</div>
+    <div class="vn-bar-wrap"><div class="vn-bar" id="vnLoadBar"><div class="vn-sheen"></div></div></div>
+    <button class="vn-skip" id="vnSkip" onclick="emergencySkip()">🎟 Skip — Admit One</button>
   </div>
-  
-  <!-- EMERGENCY SKIP BUTTON -->
-  <button onclick="emergencySkip()" style="margin-top:40px;padding:12px 24px;background:rgba(255,255,255,0.2);border:2px solid white;color:white;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;border-radius:8px;cursor:pointer;backdrop-filter:blur(10px)">
-    🚨 SKIP (If Stuck)
-  </button>
-  <p style="font-size:11px;opacity:0.6;margin-top:8px">Click if loading doesn't finish</p>
 </div>
+
+<script>
+/* ── Venue Screen System ──────────────────────────────────────────
+   Runs at end of body so both #loadingOverlay and #landingScreen exist.
+   Sets up: theme colours, crowd silhouettes, mote particles, progress
+   bar, icon rotation, status text rotation, skip reveal, taglines.
+   Does NOT touch any loading logic — only presentation.
+*/
+(function(){
+  'use strict';
+
+  // ── Theme accent palette ──────────────────────────────────────
+  var VT = {
+    ed:     {a:'#e85545', b:'#7a1515'},
+    neon:   {a:'#00f0ff', b:'#6200ea'},
+    lofi:   {a:'#e07030', b:'#7a3a10'},
+    sk:     {a:'#4a80d4', b:'#1a2855'},
+    modern: {a:'#3d8ef0', b:'#0a2d6e'},
+    pastel: {a:'#a8c9e8', b:'#4a70a0'},
+  };
+  var tk = (localStorage.getItem('sc_theme_cache') || 'neon').replace(/^t-/, '');
+  var vt = VT[tk] || VT.neon;
+
+  function setVars(el) {
+    if (!el) return;
+    el.style.setProperty('--vn-acc',  vt.a);
+    el.style.setProperty('--vn-acc2', vt.b);
+  }
+
+  // ── Login icon counter ────────────────────────────────────────
+  var ICONS = ['🎸','🎹','🎧','🎤','🥁','💿','📻','🎷'];
+  var n = parseInt(localStorage.getItem('sc_load_n') || '0');
+  localStorage.setItem('sc_load_n', String(n + 1));
+
+  var rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches);
+
+  // ── Crowd builder ─────────────────────────────────────────────
+  // 4 rows: far → back → mid → front (column-reverse stacks front at bottom)
+  var ROWS = [
+    {n:10, hMin:18, hMax:24, op:.22, wave:false},
+    {n:15, hMin:26, hMax:33, op:.38, wave:false},
+    {n:18, hMin:34, hMax:42, op:.58, wave:true },
+    {n:22, hMin:44, hMax:56, op:.82, wave:true },
+  ];
+
+  function buildCrowd(wrap) {
+    if (!wrap) return [];
+    var fans = [];
+    ROWS.forEach(function(row) {
+      var rowEl = document.createElement('div');
+      rowEl.className = 'vn-row';
+      for (var i = 0; i < row.n; i++) {
+        var h = (row.hMin + Math.random() * (row.hMax - row.hMin)) | 0;
+        var w = (h * 0.52) | 0;
+
+        var fan = document.createElement('div');
+        fan.className = 'vn-fan';
+        fan.style.width  = w + 'px';
+        fan.style.height = h + 'px';
+        fan.style.marginLeft  = ((Math.random() * 3) | 0) + 'px';
+        fan.style.marginRight = ((Math.random() * 3) | 0) + 'px';
+        fan.style.filter = 'brightness(' + (0.65 + Math.random() * 0.35).toFixed(2) + ')';
+
+        // head circle
+        var hw = (w * 0.72) | 0;
+        var hd = document.createElement('div');
+        hd.className  = 'vn-head';
+        hd.style.width  = hw + 'px';
+        hd.style.height = hw + 'px';
+        hd.style.top    = '-' + ((hw * 0.82) | 0) + 'px';
+        fan.appendChild(hd);
+
+        // waving arms (mid + front rows only, skip if reduced-motion)
+        if (row.wave && !rm) {
+          var armH = (h * 0.38) | 0;
+          var armTop = '-' + ((h * 0.22) | 0) + 'px';
+          var la = document.createElement('div');
+          la.className  = 'vn-arm wave';
+          la.style.cssText = 'width:4px;height:' + armH + 'px;left:2px;top:' + armTop + ';animation-delay:' + (Math.random() * 0.6).toFixed(2) + 's;';
+          fan.appendChild(la);
+          var ra = document.createElement('div');
+          ra.className  = 'vn-arm wave';
+          ra.style.cssText = 'width:4px;height:' + armH + 'px;right:2px;top:' + armTop + ';animation-delay:' + (Math.random() * 0.6 + 0.3).toFixed(2) + 's;animation-direction:alternate-reverse;';
+          fan.appendChild(ra);
+        }
+
+        rowEl.appendChild(fan);
+        fans.push(fan);
+      }
+      wrap.appendChild(rowEl);
+    });
+    return fans;
+  }
+
+  function buildMotes(wrap, count) {
+    if (!wrap || count < 1) return;
+    for (var i = 0; i < count; i++) {
+      var m = document.createElement('div');
+      m.className = 'vn-mote';
+      var sz = ((2 + Math.random() * 3) | 0);
+      m.style.width    = sz + 'px';
+      m.style.height   = sz + 'px';
+      m.style.left     = ((5 + Math.random() * 90) | 0) + '%';
+      m.style.bottom   = ((25 + Math.random() * 20) | 0) + '%';
+      m.style.animationDuration = (3 + Math.random() * 3).toFixed(1) + 's';
+      m.style.animationDelay    = (Math.random() * 4).toFixed(1) + 's';
+      wrap.appendChild(m);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // LOADING SCREEN
+  // ══════════════════════════════════════════════════════════════
+  var loadOv  = document.getElementById('loadingOverlay');
+  var iconEl  = document.getElementById('vnLoadIcon');
+  var stEl    = document.getElementById('vnLoadSt');
+  var barEl   = document.getElementById('vnLoadBar');
+
+  setVars(loadOv);
+  if (iconEl) iconEl.textContent = ICONS[n % ICONS.length];
+
+  var loadFans   = buildCrowd(document.getElementById('vnLoadCrowd'));
+  buildMotes(document.getElementById('vnLoadMotes'), rm ? 0 : 16);
+
+  // Shuffle for progressive reveal
+  var shuffled = loadFans.slice().sort(function() { return Math.random() - 0.5; });
+  var total    = shuffled.length;
+  var curPct   = 0;
+
+  function revealTo(pct) {
+    var count = Math.round(pct / 100 * total);
+    for (var i = 0; i < count; i++) {
+      if (!shuffled[i].classList.contains('on')) shuffled[i].classList.add('on');
+    }
+  }
+
+  // Global: called from auth milestones
+  window._setLoadProgress = function(pct, txt) {
+    pct = Math.max(curPct, Math.min(100, pct));
+    curPct = pct;
+    if (barEl) barEl.style.width = pct + '%';
+    if (txt && stEl) {
+      stEl.style.animation = 'none';
+      void stEl.offsetHeight;
+      stEl.textContent = txt;
+      stEl.style.animation = 'vn-sttxt .5s ease forwards';
+    }
+    revealTo(pct);
+  };
+
+  // Pulse to 12% on first tick so the bar shows immediately
+  setTimeout(function() {
+    if (window._setLoadProgress) window._setLoadProgress(12, 'Checking for saved game…');
+  }, 300);
+
+  // Rotate status text every 3.5 s while loading
+  var STS = [
+    'Checking for saved game…',
+    'Tuning the room…',
+    'Sound check, one two…',
+    "Crowd's filling in…",
+    'House lights down…',
+  ];
+  var stIdx = 0;
+  if (!rm) {
+    setInterval(function() {
+      if (curPct < 95 && stEl) {
+        stIdx = (stIdx + 1) % STS.length;
+        stEl.style.animation = 'none';
+        void stEl.offsetHeight;
+        stEl.textContent = STS[stIdx];
+        stEl.style.animation = 'vn-sttxt .5s ease forwards';
+      }
+    }, 3500);
+  }
+
+  // Skip button fades in after 8 s
+  setTimeout(function() {
+    var sk = document.getElementById('vnSkip');
+    if (sk && loadOv && loadOv.style.display !== 'none') {
+      sk.style.display = 'block';
+      sk.style.animation = 'vn-fade .6s ease forwards';
+    }
+  }, 8000);
+
+  // ══════════════════════════════════════════════════════════════
+  // LANDING SCREEN
+  // ══════════════════════════════════════════════════════════════
+  var landEl = document.getElementById('landingScreen');
+  setVars(landEl);
+
+  var landFans = buildCrowd(document.getElementById('vnLandCrowd'));
+  buildMotes(document.getElementById('vnLandMotes'), rm ? 0 : 12);
+
+  // Reveal all landing fans after a short tick
+  setTimeout(function() {
+    for (var i = 0; i < landFans.length; i++) landFans[i].classList.add('on');
+  }, 60);
+
+  // Tagline rotation
+  var TAGS = [
+    'Are you listening?<br>Your career starts now.',
+    'Drop the track.<br>Own the charts.',
+    'From bedroom producer<br>to arena headliner.',
+    'Every legend started<br>with a sound check.',
+    "It's not about the music.<br>It's about the moment.",
+  ];
+  var tagEl  = document.getElementById('vnLandTag');
+  var tagIdx = 0;
+  if (tagEl) {
+    tagEl.innerHTML = TAGS[0];
+    tagEl.classList.add('on');
+    setInterval(function() {
+      tagEl.classList.remove('on');
+      setTimeout(function() {
+        tagIdx = (tagIdx + 1) % TAGS.length;
+        tagEl.innerHTML = TAGS[tagIdx];
+        tagEl.classList.add('on');
+      }, 500);
+    }, 4000);
+  }
+
+})();
+</script>
 
 </body>
 </html>
