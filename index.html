@@ -9813,6 +9813,12 @@ function updateSkillRings(){
     var isDecaying = cfg.decays && val > 0 && idleDays >= 14;
     var border = isDecaying ? '2px solid rgba(255,100,100,0.5)' : '1px solid var(--bord)';
 
+    // Gate sub-line for compact ring pill
+    var gateText, gateColor;
+    if(val >= 75){ gateText='🎓 Masterclass'; gateColor='#ffd479'; }
+    else if(val >= 40){ gateText='Gate: 75 🔒'; gateColor='var(--mut)'; }
+    else { gateText='Gate: 40 🔒'; gateColor='var(--mut)'; }
+
     return '<div onclick="showSkillDetail(\''+key+'\')" style="flex-shrink:0;display:flex;align-items:center;gap:8px;'
       +'background:var(--surf);border-radius:24px;padding:8px 14px 8px 9px;border:'+border+';cursor:pointer;touch-action:manipulation;active-opacity:0.7">'
       +'<svg width="30" height="30" viewBox="0 0 30 30" style="flex-shrink:0">'
@@ -9822,8 +9828,11 @@ function updateSkillRings(){
       +'stroke-linecap="round" transform="rotate(-90 15 15)"/>'
       +'<text x="15" y="19" text-anchor="middle" font-size="9" font-weight="700" fill="'+color+'" font-family="system-ui">'+parseFloat(val.toFixed(1))+'</text>'
       +'</svg>'
+      +'<div style="display:flex;flex-direction:column;gap:1px">'
       +'<span style="font-size:13px;font-weight:700;color:var(--txt);white-space:nowrap">'
       +cfg.label+(isDecaying?' ⚠️':'')+'</span>'
+      +'<span style="font-size:10px;color:'+gateColor+';white-space:nowrap">'+gateText+'</span>'
+      +'</div>'
       +'</div>';
   }).join('');
 
@@ -16842,90 +16851,415 @@ function showSkillsDetail(){
   openMenu('Your Skills',html);
 }
 
+// ── TRAINING SYSTEM v2 ──────────────────────────────────────────────────────
+// Three training methods per skill, streak bonuses, diminishing returns,
+// and a session result screen.
+
+// Small pool of coach first/last names — one pair is randomly assigned per skill
+// per player and persisted in GAME.coachNames so coaches feel recurring.
+var _COACH_FIRST = ['Marcus','Aaliyah','Diego','Priya','Jin','Amara','Luca','Fatou','James','Suki',
+                    'André','Nadia','Kofi','Yuki','Rafael','Solange','Emil','Zara','Tobias','Leila'];
+var _COACH_LAST  = ['Webb','Santos','Kim','Osei','Jensen','Patel','Nakamura','Diallo','Chen','Martins',
+                    'Reyes','Tanaka','Sousa','Vasquez','Okeke','Flynn','Dupont','Ito','Haile','Berg'];
+
+function _getCoachName(skillKey){
+  if(!GAME.coachNames) GAME.coachNames = {};
+  if(!GAME.coachNames[skillKey]){
+    // Use a numeric seed derived from skill key + artistName so names differ per player
+    var seed = (GAME.artistName||'x').split('').reduce(function(a,c){ return a+c.charCodeAt(0); }, 0);
+    var skillIdx = Object.keys(SKILL_CONFIG).indexOf(skillKey);
+    var fi = (seed + skillIdx * 7) % _COACH_FIRST.length;
+    var li = (seed + skillIdx * 11 + 3) % _COACH_LAST.length;
+    GAME.coachNames[skillKey] = _COACH_FIRST[fi] + ' ' + _COACH_LAST[li];
+    markDirty();
+  }
+  return GAME.coachNames[skillKey];
+}
+
 function showSkillPractice(){
-  // Calculate costs for each skill
-  const vocalsCost = Math.floor(500 + (GAME.skills.vocals * 15));
-  const productionCost = Math.floor(500 + (GAME.skills.production * 15));
-  const performanceCost = Math.floor(500 + (GAME.skills.performance * 15));
-  const writingCost = Math.floor(500 + (GAME.skills.writing * 15));
-  const negotiationCost = Math.floor(500 + ((GAME.negotiation || 0) * 15));
-  
-  let html=`<div class="menu-list">
-    <div class="menu-item" onclick="practiceSkill('vocals')">
-      <div class="menu-item-title">🎤 Vocals</div>
-      <div class="menu-item-sub">Level: ${GAME.skills.vocals.toFixed(1)}/100 · Cost: $${vocalsCost.toLocaleString()} + 15 energy</div>
-    </div>
-    <div class="menu-item" onclick="practiceSkill('production')">
-      <div class="menu-item-title">🎛️ Production</div>
-      <div class="menu-item-sub">Level: ${GAME.skills.production.toFixed(1)}/100 · Cost: $${productionCost.toLocaleString()} + 15 energy</div>
-    </div>
-    <div class="menu-item" onclick="practiceSkill('performance')">
-      <div class="menu-item-title">🎭 Performance</div>
-      <div class="menu-item-sub">Level: ${GAME.skills.performance.toFixed(1)}/100 · Cost: $${performanceCost.toLocaleString()} + 15 energy</div>
-    </div>
-    <div class="menu-item" onclick="practiceSkill('writing')">
-      <div class="menu-item-title">✍️ Writing</div>
-      <div class="menu-item-sub">Level: ${GAME.skills.writing.toFixed(1)}/100 · Cost: $${writingCost.toLocaleString()} + 15 energy</div>
-    </div>
-    <div class="menu-item" onclick="practiceSkill('negotiation')">
-      <div class="menu-item-title">💼 Negotiation</div>
-      <div class="menu-item-sub">Level: ${(GAME.negotiation||0).toFixed(1)}/100 · Cost: $${negotiationCost.toLocaleString()} + 15 energy</div>
-    </div>
-  </div>`;
-  
-  openMenu('Practice Skills',html);
+  _ensureSkills();
+  var items = Object.keys(SKILL_CONFIG).map(function(key){
+    var cfg = SKILL_CONFIG[key];
+    var val = GAME.skills[key] || 0;
+    var streak = (GAME.trainingStreak && GAME.trainingStreak[key]) || { count:0 };
+    var streakBadge = streak.count >= 2 ? ' 🔥'+streak.count : '';
+    var gateLabel = val>=75 ? 'Masterclass ready' : val>=40 ? 'Gate: 75' : 'Gate: 40';
+    var colors = { writing:'#ffd479',singing:'#c8aaff',production:'#8cb4ff',
+                   stagePresence:'#ff96aa',dance:'#9fffb0',performance:'#ffb347',negotiation:'#a0e7e5' };
+    var c = colors[key] || 'var(--acc)';
+    var today = GAME.day || 1;
+    var lastUsed = (GAME.skillLastUsed && GAME.skillLastUsed[key]) || today;
+    var isDecaying = cfg.decays && val > 0 && (today - lastUsed) >= 14;
+    return '<div class="menu-item" onclick="showSkillTrainMenu(\''+key+'\')">'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+      +'<span style="font-size:22px">'+cfg.icon+'</span>'
+      +'<div style="flex:1">'
+      +'<div class="menu-item-title">'+cfg.label+streakBadge+(isDecaying?' ⚠️':'')+'</div>'
+      +'<div class="menu-item-sub">Level <b style="color:'+c+'">'+val.toFixed(1)+'</b> · '+gateLabel+'</div>'
+      +'</div>'
+      +'<span style="font-size:18px;color:var(--mut)">›</span>'
+      +'</div></div>';
+  }).join('');
+  openMenu('🎓 Training',items);
 }
 
 function practiceSkill(skill){
-  // Calculate cost based on skill level (higher skill = more expensive)
-  let skillLevel;
-  if(skill === 'negotiation'){
-    skillLevel = GAME.negotiation || 0;
+  // Legacy shim — redirect to new training menu
+  showSkillTrainMenu(skill);
+}
+
+function showSkillTrainMenu(skillKey){
+  if(!GAME || !SKILL_CONFIG[skillKey]) return;
+  _ensureSkills();
+  var cfg = SKILL_CONFIG[skillKey];
+  var val = GAME.skills[skillKey] || 0;
+  var today = GAME.day || 1;
+  var lastUsed = (GAME.skillLastUsed && GAME.skillLastUsed[skillKey]) || today;
+  var isDecaying = cfg.decays && val > 0 && (today - lastUsed) >= 14;
+  var coachName = _getCoachName(skillKey);
+
+  // Streak status
+  if(!GAME.trainingStreak) GAME.trainingStreak = {};
+  var streak = GAME.trainingStreak[skillKey] || { count:0, lastDay:0 };
+  var streakBonus = Math.min(streak.count * 5, 25);
+  var streakLine = streak.count >= 2
+    ? '<div style="text-align:center;font-size:13px;color:#fbbf24;font-weight:700;margin-bottom:14px">🔥 '+streak.count+'-day streak active · +'+streakBonus+'% gains</div>'
+    : '';
+
+  // Coaching cost (existing formula: $500 + skill*15)
+  var coachCost = Math.floor(500 + val * 15);
+
+  // Masterclass unlock check
+  var totalFans = getTotalFans();
+  var hasSponsor = !!(GAME.signedLabel && !GAME.signedLabel.isOwner);
+  var masterclassUnlocked = totalFans >= 50000 || hasSponsor || (GAME.industryRep||5) >= 4.8;
+  if(!GAME.lastMasterclassWeek) GAME.lastMasterclassWeek = {};
+  var lastMCWeek = GAME.lastMasterclassWeek[skillKey] || 0;
+  var mcOnCooldown = (GAME.week||1) - lastMCWeek < 4;
+
+  function _methodCard(id, icon, title, desc, costLine, energyLine, gainLine, gainCap, locked, lockReason){
+    var capOk = val < gainCap;
+    var isLocked = locked || !capOk;
+    var lockMsg = !capOk ? ('Skill capped at '+gainCap+' for this method') : (lockReason||'');
+    var bg = isLocked ? 'var(--surf)' : 'var(--card)';
+    var opacity = isLocked ? '0.55' : '1';
+    var clickAttr = isLocked ? '' : 'onclick="doSkillTrain(\''+skillKey+'\',\''+id+'\')"';
+    return '<div '+clickAttr+' style="background:'+bg+';border:1px solid var(--bord);border-radius:14px;padding:14px 14px 12px;margin-bottom:10px;opacity:'+opacity+';'+(isLocked?'':'cursor:pointer;touch-action:manipulation')+';">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      +'<span style="font-size:20px">'+icon+'</span>'
+      +'<div style="font-size:15px;font-weight:700;color:var(--txt)">'+title+'</div>'
+      +(isLocked?'<span style="margin-left:auto;font-size:18px">🔒</span>':'<span style="margin-left:auto;font-size:18px;color:var(--acc)">›</span>')
+      +'</div>'
+      +'<div style="font-size:12px;color:var(--mut);margin-bottom:8px;line-height:1.4">'+desc+'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +(costLine?'<span style="font-size:11px;padding:3px 8px;border-radius:8px;background:rgba(239,68,68,0.1);color:#f87171;font-weight:600">'+costLine+'</span>':'')
+      +'<span style="font-size:11px;padding:3px 8px;border-radius:8px;background:rgba(99,102,241,0.1);color:#818cf8;font-weight:600">'+energyLine+'</span>'
+      +'<span style="font-size:11px;padding:3px 8px;border-radius:8px;background:rgba(74,222,128,0.1);color:#4ade80;font-weight:600">'+gainLine+'</span>'
+      +'</div>'
+      +(isLocked&&lockMsg?'<div style="font-size:11px;color:var(--mut);margin-top:6px">'+lockMsg+'</div>':'')
+      +'</div>';
+  }
+
+  var selfCard = _methodCard('self','🎯','Self-Practice','Solo drills — free, unlimited.',
+    'Free', '−10 energy', '+1–2 pts', 40, false, '');
+
+  var coachCard = _methodCard('coach','🎧','Coaching Session','1-on-1 with '+coachName+'. Costs money but gets results.',
+    '$'+coachCost.toLocaleString(), '−15 energy', '+2–4 pts', 75,
+    val < 40, 'Reach level 40 to unlock coaching');
+
+  var mcLockReason = !masterclassUnlocked
+    ? 'Need 50K fans, a label deal, or top industry rep'
+    : mcOnCooldown ? 'Available again in '+(4-((GAME.week||1)-lastMCWeek))+' week(s)'
+    : '';
+  var mcCard = _methodCard('masterclass','🌟','Masterclass','Elite session with an industry legend. Rare and expensive.',
+    '$6,500', '−25 energy', '+3–6 pts', 100,
+    !masterclassUnlocked || mcOnCooldown || val < 75, mcLockReason);
+
+  var refresherCard = '';
+  if(isDecaying){
+    refresherCard = '<div onclick="doSkillRefresher(\''+skillKey+'\')" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer;touch-action:manipulation">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      +'<span style="font-size:20px">🔄</span>'
+      +'<div style="font-size:15px;font-weight:700;color:#f87171">Refresher Session</div>'
+      +'<span style="margin-left:auto;font-size:18px;color:#f87171">›</span>'
+      +'</div>'
+      +'<div style="font-size:12px;color:var(--mut);margin-bottom:8px">Your skill has been getting rusty. A quick refresher restores up to 3 lost points.</div>'
+      +'<div style="display:flex;gap:6px">'
+      +'<span style="font-size:11px;padding:3px 8px;border-radius:8px;background:rgba(239,68,68,0.1);color:#f87171;font-weight:600">$300</span>'
+      +'<span style="font-size:11px;padding:3px 8px;border-radius:8px;background:rgba(74,222,128,0.1);color:#4ade80;font-weight:600">Restore up to +3 pts</span>'
+      +'</div></div>';
+  }
+
+  var colors = { writing:'#ffd479',singing:'#c8aaff',production:'#8cb4ff',
+                 stagePresence:'#ff96aa',dance:'#9fffb0',performance:'#ffb347',negotiation:'#a0e7e5' };
+  var color = colors[skillKey] || 'var(--acc)';
+  var RING_R2 = 32, RING_C2 = 2 * Math.PI * RING_R2;
+  var offset2 = RING_C2 - ((val/100) * RING_C2);
+
+  var html = '<div style="padding:0 0 100px">'
+    +'<div style="position:sticky;top:0;background:var(--bg);z-index:10;padding:14px 16px 12px;border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:12px">'
+    +'<button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--acc);font-size:26px;cursor:pointer;padding:0;line-height:1;touch-action:manipulation">←</button>'
+    +'<div style="font-size:17px;font-weight:700;color:var(--txt)">'+cfg.icon+' '+cfg.label+'</div>'
+    +'<div style="margin-left:auto;font-size:14px;font-weight:700;color:'+color+'">'+val.toFixed(1)+'/100</div>'
+    +'</div>'
+
+    +'<div style="padding:20px 16px 0;display:flex;flex-direction:column;align-items:center">'
+    +'<svg width="88" height="88" viewBox="0 0 88 88" style="margin-bottom:8px">'
+    +'<circle cx="44" cy="44" r="'+RING_R2+'" fill="none" stroke="var(--bord)" stroke-width="5"/>'
+    +'<circle cx="44" cy="44" r="'+RING_R2+'" fill="none" stroke="'+color+'" stroke-width="5" '
+    +'stroke-dasharray="'+RING_C2.toFixed(1)+'" stroke-dashoffset="'+offset2.toFixed(1)+'" '
+    +'stroke-linecap="round" transform="rotate(-90 44 44)"/>'
+    +'<text x="44" y="39" text-anchor="middle" font-size="18" font-weight="800" fill="var(--txt)" font-family="system-ui">'+parseFloat(val.toFixed(1))+'</text>'
+    +'<text x="44" y="55" text-anchor="middle" font-size="10" fill="var(--mut)" font-family="system-ui">/ 100</text>'
+    +'</svg>'
+    +streakLine
+    +'</div>'
+
+    +'<div style="padding:0 16px">'
+    +(isDecaying?'<div style="background:rgba(255,100,100,0.1);border:1px solid rgba(255,100,100,0.3);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#f87171">⚠️ This skill is rusty — practice soon or it will keep declining.</div>':'')
+    +refresherCard
+    +'<div style="font-size:12px;font-weight:700;color:var(--mut);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px">Choose a method</div>'
+    +selfCard
+    +coachCard
+    +mcCard
+    +'</div></div>';
+
+  _insertOverlay(html);
+}
+
+function doSkillRefresher(skillKey){
+  if(!GAME || !SKILL_CONFIG[skillKey]) return;
+  _ensureSkills();
+  if(GAME.money < 300){
+    showToast('Need $300 for the refresher session','red');
+    return;
+  }
+  var oldVal = GAME.skills[skillKey] || 0;
+  GAME.money -= 300;
+  // Restores up to 3 points — no cap check
+  var restore = Math.min(3, Math.random() < 0.5 ? 2 : 3);
+  GAME.skills[skillKey] = Math.min(100, oldVal + restore);
+  if(SKILL_CONFIG[skillKey]) GAME.skillLastUsed[skillKey] = GAME.day || 1;
+  // Reset decay warning flag
+  updateStats(); markDirty();
+  var cfg = SKILL_CONFIG[skillKey];
+  _showTrainingResult({
+    skillKey: skillKey,
+    method: 'refresher',
+    methodLabel: 'Refresher Session',
+    methodIcon: '🔄',
+    oldVal: oldVal,
+    newVal: GAME.skills[skillKey],
+    gain: GAME.skills[skillKey] - oldVal,
+    baseGain: restore,
+    streakBonus: 0,
+    streakCount: 0,
+    dimApplied: false,
+    moneyCost: 300,
+    energyCost: 0,
+    gateUnlocked: null
+  });
+}
+
+function doSkillTrain(skillKey, method){
+  if(!GAME || !SKILL_CONFIG[skillKey]) return;
+  _ensureSkills();
+  var cfg = SKILL_CONFIG[skillKey];
+  var val = GAME.skills[skillKey] || 0;
+
+  // Method params
+  var energyCost, moneyCost, minGain, maxGain, cap, methodLabel, methodIcon;
+  if(method === 'self'){
+    energyCost=10; moneyCost=0; minGain=1; maxGain=2; cap=40;
+    methodLabel='Self-Practice'; methodIcon='🎯';
+  } else if(method === 'coach'){
+    energyCost=15; moneyCost=Math.floor(500+(val*15)); minGain=2; maxGain=4; cap=75;
+    methodLabel='Coaching Session'; methodIcon='🎧';
+  } else if(method === 'masterclass'){
+    energyCost=25; moneyCost=6500; minGain=3; maxGain=6; cap=100;
+    methodLabel='Masterclass'; methodIcon='🌟';
+  } else { return; }
+
+  // Checks
+  if(val >= cap){
+    showToast('Skill already at cap ('+cap+') for this method. Try a higher-tier session.','red');
+    return;
+  }
+  if(moneyCost > 0 && GAME.money < moneyCost){
+    showToast('Need $'+moneyCost.toLocaleString()+' for this session','red');
+    return;
+  }
+  if(!spendEnergy(energyCost)) return;
+  if(moneyCost > 0) GAME.money -= moneyCost;
+
+  // Streak calculation
+  if(!GAME.trainingStreak) GAME.trainingStreak = {};
+  var streak = GAME.trainingStreak[skillKey] || { count:0, lastDay:0 };
+  var today = GAME.day || 1;
+  if(today === streak.lastDay + 1){
+    streak.count = (streak.count || 0) + 1;
+  } else if(today === streak.lastDay){
+    // Same day — streak holds but no extra count
   } else {
-    skillLevel = GAME.skills[skill] || 1;
+    streak.count = 1;
   }
-  
-  // Cost scales with skill level: $500 at level 1, up to $2000 at level 100
-  const moneyCost = Math.floor(500 + (skillLevel * 15));
-  
-  // Check if can afford
-  if(GAME.money < moneyCost){
-    showEvent('💸', 'Not Enough Money', `Practicing ${skill} costs $${moneyCost.toLocaleString()}. You need $${(moneyCost - GAME.money).toLocaleString()} more.`, ['OK']);
-    return;
+  streak.lastDay = today;
+  GAME.trainingStreak[skillKey] = streak;
+  var streakCount = streak.count;
+  var streakBonus = Math.min(streakCount * 0.05, 0.25); // 0–25%
+
+  // Base gain (integer in [minGain, maxGain])
+  var baseGain = minGain + Math.floor(Math.random() * (maxGain - minGain + 1));
+
+  // Diminishing returns when skill >= 80
+  var dimApplied = val >= 80;
+  var dimFactor = dimApplied ? 0.5 : 1.0;
+
+  // Final gain — round to nearest 0.5, minimum 0.5
+  var rawGain = baseGain * (1 + streakBonus) * dimFactor;
+  var finalGain = Math.max(0.5, Math.round(rawGain * 2) / 2);
+
+  var oldVal = val;
+  // Cap gain so skill doesn't exceed cap
+  var newVal = Math.min(cap, val + finalGain);
+  GAME.skills[skillKey] = newVal;
+  GAME.skill = Math.min(100, (GAME.skill||0) + (finalGain * 0.3));
+  GAME.inspiration = Math.min(100, (GAME.inspiration||0) + 5);
+
+  // Update skillLastUsed
+  if(!GAME.skillLastUsed) GAME.skillLastUsed = {};
+  GAME.skillLastUsed[skillKey] = today;
+  if(skillKey === 'singing' || skillKey === 'dance' || skillKey === 'stagePresence'){
+    GAME.skillLastUsed.performance = today;
   }
-  
-  if(!spendEnergy(15))return; // Costs 15 energy
-  
-  // Charge money
-  GAME.money -= moneyCost;
-  
-  GAME.inspiration+=5;
-  
-  // Handle negotiation separately
-  if(skill==='negotiation'){
-    const oldLevel=GAME.negotiation||0;
-    const gain=Math.floor(Math.random()*5)+1; // 1-5 points
-    GAME.negotiation=Math.min(100,(GAME.negotiation||0)+gain);
-    GAME.skill=Math.min(100,(GAME.skill||0)+(gain*0.5)); // Also increases general skill
-    const newLevel=GAME.negotiation;
-    
-    closeMenu();
-    updateStats();
-    showEvent('💼','Negotiation Practice',`Spent $${moneyCost.toLocaleString()} on lessons. +${gain} skill (${oldLevel.toFixed(1)} → ${newLevel.toFixed(1)})`,['Nice']);
-    return;
+
+  // Masterclass cooldown
+  if(method === 'masterclass'){
+    if(!GAME.lastMasterclassWeek) GAME.lastMasterclassWeek = {};
+    GAME.lastMasterclassWeek[skillKey] = GAME.week || 1;
   }
-  
-  // Music skills
-  if(!GAME.skills) GAME.skills = {};
-  const oldLevel = GAME.skills[skill] || 0;
-  const gain=Math.floor(Math.random()*5)+1; // 1-5 points per practice
-  GAME.skills[skill]=Math.min(100,(GAME.skills[skill]||0)+gain);
-  GAME.skill=Math.min(100,(GAME.skill||0)+(gain*0.3)); // Also increases general skill
-  const newLevel=GAME.skills[skill];
-  
-  closeMenu();
-  updateStats();
-  showEvent('🎸','Practice Session',`Spent $${moneyCost.toLocaleString()} on lessons. +${gain} ${skill} (${oldLevel.toFixed(1)} → ${newLevel.toFixed(1)})`,['Continue']);
+
+  // Gate unlock check (did we cross 40 or 75?)
+  var gateUnlocked = null;
+  if(oldVal < 40 && newVal >= 40) gateUnlocked = 40;
+  else if(oldVal < 75 && newVal >= 75) gateUnlocked = 75;
+  else if(oldVal < 100 && newVal >= 100) gateUnlocked = 100;
+
+  updateStats(); markDirty();
+  if(GAME_MODE === 'multi') saveToCloud(true);
+
+  _showTrainingResult({
+    skillKey, method, methodLabel, methodIcon,
+    oldVal, newVal: GAME.skills[skillKey],
+    gain: GAME.skills[skillKey] - oldVal,
+    baseGain, streakBonus, streakCount,
+    dimApplied, moneyCost, energyCost, gateUnlocked
+  });
+}
+
+function _showTrainingResult(opts){
+  var cfg = SKILL_CONFIG[opts.skillKey];
+  var colors = { writing:'#ffd479',singing:'#c8aaff',production:'#8cb4ff',
+                 stagePresence:'#ff96aa',dance:'#9fffb0',performance:'#ffb347',negotiation:'#a0e7e5' };
+  var color = colors[opts.skillKey] || 'var(--acc)';
+
+  // Format gain for display — show incremental, always at least +0.5
+  var gainDisplay = opts.gain >= 0.95 ? '+'+Math.round(opts.gain) : (opts.gain > 0 ? '+'+opts.gain.toFixed(1) : '+0.5');
+
+  // Itemized lines
+  var lines = [];
+  // Session description
+  var focusLabel = { writing:'lyric craft', singing:'vocal technique', production:'beat construction',
+    stagePresence:'stage energy', dance:'choreography drills', performance:'performance review',
+    negotiation:'deal strategy' }[opts.skillKey] || opts.skillKey;
+  lines.push({ label: 'Focus area', value: focusLabel });
+  lines.push({ label: 'Base gain', value: '+'+opts.baseGain+' pts' });
+  if(opts.streakCount >= 2){
+    lines.push({ label: '🔥 Streak bonus ('+opts.streakCount+' days)', value: '+'+(opts.streakBonus*100).toFixed(0)+'%', highlight:'#fbbf24' });
+  }
+  if(opts.dimApplied){
+    lines.push({ label: 'Diminishing returns (skill ≥80)', value: '×0.5', highlight:'#f87171' });
+  }
+  lines.push({ label: 'Total gain', value: gainDisplay, highlight: color, bold: true });
+  if(opts.moneyCost > 0){
+    lines.push({ label: 'Fee paid', value: '−$'+opts.moneyCost.toLocaleString(), highlight:'#f87171' });
+  }
+  lines.push({ label: 'Energy used', value: '−'+opts.energyCost, highlight:'#818cf8' });
+
+  var rowsHtml = lines.map(function(l){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bord)">'
+      +'<span style="font-size:13px;color:var(--mut)">'+l.label+'</span>'
+      +'<span style="font-size:13px;font-weight:'+(l.bold?'800':'600')+';color:'+(l.highlight||'var(--txt)')+'">'+l.value+'</span>'
+      +'</div>';
+  }).join('');
+
+  // Gate unlock celebration
+  var gateCelebration = '';
+  if(opts.gateUnlocked === 40){
+    gateCelebration = '<div style="margin:16px 0;padding:14px;background:rgba(74,222,128,0.12);border:1px solid rgba(74,222,128,0.35);border-radius:12px;text-align:center">'
+      +'<div style="font-size:28px;margin-bottom:4px">🔓</div>'
+      +'<div style="font-size:15px;font-weight:800;color:#4ade80">Coaching Unlocked!</div>'
+      +'<div style="font-size:12px;color:var(--mut);margin-top:4px">You can now book coaching sessions for this skill.</div>'
+      +'</div>';
+  } else if(opts.gateUnlocked === 75){
+    gateCelebration = '<div style="margin:16px 0;padding:14px;background:rgba(255,212,121,0.12);border:1px solid rgba(255,212,121,0.35);border-radius:12px;text-align:center">'
+      +'<div style="font-size:28px;margin-bottom:4px">🔓</div>'
+      +'<div style="font-size:15px;font-weight:800;color:#ffd479">Masterclass Eligible!</div>'
+      +'<div style="font-size:12px;color:var(--mut);margin-top:4px">At skill 75 you qualify for elite masterclass sessions.</div>'
+      +'</div>';
+  } else if(opts.gateUnlocked === 100){
+    gateCelebration = '<div style="margin:16px 0;padding:14px;background:rgba(250,204,21,0.14);border:1px solid rgba(250,204,21,0.4);border-radius:12px;text-align:center">'
+      +'<div style="font-size:28px;margin-bottom:4px">🏆</div>'
+      +'<div style="font-size:15px;font-weight:800;color:#facc15">Maxed Out!</div>'
+      +'<div style="font-size:12px;color:var(--mut);margin-top:4px">This skill is at its peak. Legendary.</div>'
+      +'</div>';
+  }
+
+  // Mini before/after ring
+  var RING_R3 = 24, RING_C3 = 2 * Math.PI * RING_R3;
+  var offBefore = RING_C3 - ((opts.oldVal/100) * RING_C3);
+  var offAfter  = RING_C3 - ((opts.newVal/100) * RING_C3);
+
+  var html = '<div style="padding:0 0 100px">'
+    +'<div style="position:sticky;top:0;background:var(--bg);z-index:10;padding:14px 16px 12px;border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:12px">'
+    +'<div style="font-size:17px;font-weight:700;color:var(--txt)">'+opts.methodIcon+' '+opts.methodLabel+' · Result</div>'
+    +'</div>'
+
+    +'<div style="padding:20px 16px">'
+
+    // Before / After rings
+    +'<div style="display:flex;align-items:center;justify-content:center;gap:24px;margin-bottom:20px">'
+    +'<div style="text-align:center">'
+    +'<svg width="64" height="64" viewBox="0 0 64 64">'
+    +'<circle cx="32" cy="32" r="'+RING_R3+'" fill="none" stroke="var(--bord)" stroke-width="4"/>'
+    +'<circle cx="32" cy="32" r="'+RING_R3+'" fill="none" stroke="rgba(150,150,150,0.4)" stroke-width="4" '
+    +'stroke-dasharray="'+RING_C3.toFixed(1)+'" stroke-dashoffset="'+offBefore.toFixed(1)+'" stroke-linecap="round" transform="rotate(-90 32 32)"/>'
+    +'<text x="32" y="37" text-anchor="middle" font-size="13" font-weight="700" fill="var(--mut)" font-family="system-ui">'+opts.oldVal.toFixed(1)+'</text>'
+    +'</svg>'
+    +'<div style="font-size:11px;color:var(--mut);margin-top:4px">Before</div>'
+    +'</div>'
+    +'<div style="font-size:28px;color:var(--acc)">→</div>'
+    +'<div style="text-align:center">'
+    +'<svg width="64" height="64" viewBox="0 0 64 64">'
+    +'<circle cx="32" cy="32" r="'+RING_R3+'" fill="none" stroke="var(--bord)" stroke-width="4"/>'
+    +'<circle cx="32" cy="32" r="'+RING_R3+'" fill="none" stroke="'+color+'" stroke-width="4" '
+    +'stroke-dasharray="'+RING_C3.toFixed(1)+'" stroke-dashoffset="'+offAfter.toFixed(1)+'" stroke-linecap="round" transform="rotate(-90 32 32)"/>'
+    +'<text x="32" y="37" text-anchor="middle" font-size="13" font-weight="700" fill="'+color+'" font-family="system-ui">'+opts.newVal.toFixed(1)+'</text>'
+    +'</svg>'
+    +'<div style="font-size:11px;color:var(--mut);margin-top:4px">After</div>'
+    +'</div>'
+    +'</div>'
+
+    +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:14px;padding:4px 14px;margin-bottom:14px">'
+    +rowsHtml
+    +'</div>'
+
+    +gateCelebration
+
+    +'<button onclick="_closeOverlay(this)" style="width:100%;padding:14px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;touch-action:manipulation">Done</button>'
+    +'</div></div>';
+
+  _insertOverlay(html);
 }
 
 // CUSTOM ALBUM COVER UPLOAD
@@ -31434,27 +31768,58 @@ function showSkillDetail(skillKey){
       +badge+'</div>';
   }).join('');
 
-  var html = '<div style="padding:0 0 80px">'
+  // Gate tick marks for the large ring (ticks at 40% and 75%)
+  // Ring: center (50,50), radius 36, starts at top (-90° from positive x)
+  // Angle for pct: -90 + 360*pct degrees, converted to radians for cos/sin
+  function _gateTickSVG(pct, unlocked){
+    var angDeg = -90 + 360 * pct;
+    var angRad = angDeg * Math.PI / 180;
+    var r1 = 31, r2 = 41; // inner/outer radius for tick
+    var x1 = 50 + r1 * Math.cos(angRad), y1 = 50 + r1 * Math.sin(angRad);
+    var x2 = 50 + r2 * Math.cos(angRad), y2 = 50 + r2 * Math.sin(angRad);
+    var tickColor = unlocked ? '#4ade80' : 'rgba(150,150,150,0.55)';
+    return '<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="'+tickColor+'" stroke-width="3" stroke-linecap="round"/>';
+  }
+
+  // Streak info
+  var streak = (GAME.trainingStreak && GAME.trainingStreak[skillKey]) || { count:0, lastDay:0 };
+  var streakLine = streak.count >= 2
+    ? '<div style="font-size:12px;color:#fbbf24;font-weight:700;margin-bottom:4px">🔥 '+streak.count+'-day streak · +'+(Math.min(streak.count*5,25))+'% bonus</div>'
+    : '';
+
+  // Gate status pills
+  var gate40Ok = val >= 40, gate75Ok = val >= 75;
+  var gatePills = '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px">'
+    +'<span style="font-size:11px;padding:4px 10px;border-radius:20px;font-weight:700;background:'+(gate40Ok?'rgba(74,222,128,0.18)':'rgba(150,150,150,0.12)')+';color:'+(gate40Ok?'#4ade80':'var(--mut)')+';border:1px solid '+(gate40Ok?'rgba(74,222,128,0.4)':'var(--bord)')+'">Coaching '+(gate40Ok?'✅':'🔒 need 40')+'</span>'
+    +'<span style="font-size:11px;padding:4px 10px;border-radius:20px;font-weight:700;background:'+(gate75Ok?'rgba(74,222,128,0.18)':'rgba(150,150,150,0.12)')+';color:'+(gate75Ok?'#ffd479':'var(--mut)')+';border:1px solid '+(gate75Ok?'rgba(255,212,121,0.4)':'var(--bord)')+'">Masterclass '+(gate75Ok?'✅':'🔒 need 75')+'</span>'
+    +'</div>';
+
+  var html = '<div style="padding:0 0 100px">'
     +'<div style="position:sticky;top:0;background:var(--bg);z-index:10;padding:14px 16px 12px;border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:12px">'
     +'<button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--acc);font-size:26px;cursor:pointer;padding:0;line-height:1;touch-action:manipulation">←</button>'
     +'<div style="font-size:17px;font-weight:700;color:var(--txt)">'+cfg.icon+' '+cfg.label+'</div>'
     +'</div>'
 
     +'<div style="padding:24px 16px 0;display:flex;flex-direction:column;align-items:center">'
-    +'<svg width="100" height="100" viewBox="0 0 100 100" style="margin-bottom:16px">'
+    +'<svg width="100" height="100" viewBox="0 0 100 100" style="margin-bottom:10px">'
     +'<circle cx="50" cy="50" r="'+RING_R+'" fill="none" stroke="var(--bord)" stroke-width="6"/>'
     +'<circle cx="50" cy="50" r="'+RING_R+'" fill="none" stroke="'+color+'" stroke-width="6" '
     +'stroke-dasharray="'+RING_C.toFixed(1)+'" stroke-dashoffset="'+offset.toFixed(1)+'" '
     +'stroke-linecap="round" transform="rotate(-90 50 50)"/>'
+    +_gateTickSVG(0.40, gate40Ok)
+    +_gateTickSVG(0.75, gate75Ok)
     +'<text x="50" y="44" text-anchor="middle" font-size="22" font-weight="800" fill="var(--txt)" font-family="system-ui">'+parseFloat(val.toFixed(1))+'</text>'
     +'<text x="50" y="62" text-anchor="middle" font-size="12" fill="var(--mut)" font-family="system-ui">/ 100</text>'
     +'</svg>'
-    +'<div style="font-size:13px;color:var(--mut);text-align:center;max-width:280px;line-height:1.5;margin-bottom:20px">'+affects[skillKey]+'</div>'
+    +streakLine
+    +gatePills
+    +'<div style="font-size:13px;color:var(--mut);text-align:center;max-width:280px;line-height:1.5;margin-bottom:16px">'+affects[skillKey]+'</div>'
     +'</div>'
 
     +'<div style="padding:0 16px">'
     +decayInfo
-    +'<div style="font-size:12px;font-weight:700;color:var(--mut);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px">How to train</div>'
+    +'<button onclick="showSkillTrainMenu(\''+skillKey+'\')" style="width:100%;padding:14px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:16px;touch-action:manipulation">Train This Skill →</button>'
+    +'<div style="font-size:12px;font-weight:700;color:var(--mut);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px">Quick activities</div>'
     +trainingRows
     +'</div>'
     +'</div>';
