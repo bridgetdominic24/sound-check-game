@@ -125,3 +125,95 @@ LABEL TIER REQUIREMENTS (for tutorial):
 - Mid-Indie → Major Boutique: 5M total roster streams + min 5 artists
 - Major Boutique → Global Major: 50M total roster streams + min 10 artists
 - Tier perks per upgrade: bigger advance range, more staff slots, higher Velour submission quota (Indie=1/mo, Mid=2/mo, Boutique=3/mo, Global=5/mo + Label Showcase unlock)
+- 
+Five outlets (locked names — never change):
+Velour — prestige features, cover stories, long-form artist profiles. Elegant prose.
+Room Service — gossip, rumors, concern pieces. Cheeky tabloid voice.
+Chartwell — charts, business, data. Dry trade publication voice.
+Undertone — new music discovery, unsigned scene, collab culture. Warm indie voice.
+AirTime — mainstream radio flavor, heavy rotation coverage. Bright upbeat voice. No real radio system exists yet — AirTime covers big streaming weeks in radio-DJ voice (pure flavor until radio stations are built).
+Press rumor rules (HARD LIMITS — never violate):
+Rumors seeded ONLY by real in-game player events, never invented
+Always PG, never involve real money / partners / family / health / cruelty
+Stat effects capped at ±2% per rumor
+Rumors expire after 3 game weeks unless fed by player response
+Player response options: Deny (70% dies, 30% amplifies) / Ignore (80% quiet, 20% follow-up) / Lean in (+hype, +stress, runs full course)
+Room Service → label notification chain:
+When a rumor targets a signed artist, edge function inserts TWO notifications after article insert:
+Artist: type='press_mention', "Room Service wrote about you"
+Label owner: type='press_request', "Room Service is asking about [artist] — issue a statement?"
+Both reference the same article_id. No new tables needed.
+Press statement (label-owner feature):
+Label owner can publish official statements from Daily Inbox press requests
+Editor: tone chips (Professional/Warm/Firm/Dismissive), preset openers, editable headline + body
+AI pre-drafts via generate-article edge function with trigger='label_statement', outlet='label_official'
+Inserts into articles table as type='statement', outlet='[Label Name] Official', verified:true
+Effect: rep modifier ±1, rumor expiry chance boost
+Label Life systems (all per docs/label_life_blueprint.html)
+Artist Morale
+Score 0–100 per signed artist, recalculated each game day
+Factors: release approved (+12), rejected (−15), promo spent on them (+8), advance recouped (+10), advance high (−6), label contact (+6), no contact 3+ weeks (−8), roster collab this month (+5), no collab 4+ weeks (−4), studio time given (+7), auto-approve on (+3/day)
+Below 40: occasional moody social post
+Below 20: Room Service rumor fires + exit request notification to label owner
+At 0: artist formally requests release (owner can deny, artist goes silent)
+Owner actions: Send Gift (−$800 label funds, +8 morale), Give Studio Time (allocates session slot, next recording gets quality bonus), Check In (+6 morale, may surface contract concerns), Spotlight (featured on label page), Auto-Approve toggle
+Daily Inbox
+Surfaces pending decisions each game day, max 5 per day
+Types: release approvals, advance requests, scout applications, roster collab requests, press comment requests
+Each shows full context (song info, money amounts, artist stats) before decision
+All decisions logged in label activity feed with timestamp
+Label Studio
+Tiers: Home (free, minimal bonus) → Project ($20K) → Pro ($80K) → Elite ($250K)
+Equipment catalog (categories: Recording, Production, Mixing, Mastering, Vibe)
+Equipment purchases persist in label data, apply quality bonus to all roster recordings that week
+Session slots: Home=1, Project=2, Pro=3, Elite=4 per week
+Morale bonus: roster artists get +3 morale each when studio tier upgrades
+Equipment budget follows label finances (not player funds)
+Roster Collabs
+Artists on same label get +15% first-week streams bonus (roster_bonus:true flag)
++5 morale each on approval, −6 morale each if blocked
+Owner can Approve / Block / Suggest (suggest sends notification to two artists, they decide; morale +3 each from the ask alone)
+Collab compare screen shows: side-by-side fan counts/genres, compatibility score (6 factors), active collab warning, last 3 songs each with streams, proposed song info
+Velour Spotlight (label-exclusive)
+Unsigned artists CANNOT access — gate check: player must have signedLabel with isOwner OR be signed to a label
+Requirements: label tier Established+, artist 50K+ fans, chart entry in last 8 weeks, label rep 4.0+
+Submission quota by tier: Indie=1/month, Mid-Indie=2/month, Boutique Major=3/month, Global Major=5/month
+Global Major unlocks Label Showcase (full label profile article, not just one artist)
+AI-generated article on acceptance (Velour voice), triggers hype +8 + fans +3–5% + label rep +0.5
+Rejection includes feedback message ("not enough chart presence" / "label too new") so player knows what to fix
+One submission per label per month (not per artist)
+Year-End Label Rankings
+Runs automatically at game Week 52 each game year
+Scoring: chart entries (weighted by peak position) + combined roster streams + label rep + artist fan growth
+Triggers four things:
+Chartwell publishes AI-generated ranked article (visible all players in news feed)
+Velour does "Labels to Watch" for top 3 rising indie labels
+"Year in Review" tab in news feed for 4 game weeks
+#1 label gets permanent 🏆 badge on their public label page
+Ties broken by rep score
+Song Review screen (per docs/label_decisions_blueprint.html)
+Triggered when roster artist submits release for approval
+Shows: song cover + title/genre/format, quality score bar (0–100) with breakdown (writing/production/vocals/concept/studio bonus), featured artist card (their fans + roster bonus if applicable), projections (hype/fan growth/proposed week), week selector
+Approve: pendingReleases[i].status='approved', triggers processRelease, morale +12
+Schedule: status='scheduled', stores chosen week, morale +4
+Send Back: status='returned', stores note field, morale −10
+Shelve: status='shelved', stored in label.shelvedTracks[], morale −5, can be resubmitted later
+Collab Compare screen (per docs/label_decisions_blueprint.html)
+Compatibility score: genre overlap + fan audience overlap + chart form + workload + previous collab history + morale (each weighted)
+Active collab warning: if either artist has a concurrent active collab, show orange warning (quality split risk)
+Approve fires existing collab flow with roster_bonus:true
+Block: morale −6 each, logged in activity feed
+Suggest Different: owner nominates two other roster artists, both get notification
+Label tier requirements (for tutorial — LOCKED values from code)
+Indie → Mid-Indie: 500K total roster streams + minimum 3 artists on roster
+Mid-Indie → Major (Boutique): 5M total roster streams + minimum 5 artists
+Major (Boutique) → Global Major: 50M total roster streams + minimum 10 artists
+Upgrades are automatic — fires when thresholds hit, appears in Activity Feed
+Perks per tier: bigger advance range, more staff slots, higher Velour submission quota (see above)
+Planned builds (do not build unless asked)
+Radio stations: players create their own radio stations, choose song rotations, compete on listener rankings, sell NPC ad slots, other players pay for playlist placement; chart position affects ad pricing. AirTime outlet will cover real station rankings once built.
+Fandoms app: bot-generated fan community, separates sim-fans from real players, covers artists/groups/labels
+K-pop trainee/idol path: dice-roll character creation, birth names only at trainee stage, company-scheduled training grid, monthly evaluations, debut system, comeback cycles
+Festivals: lineup invites, hype payoffs, slot competition — needs design session before build
+Distributor system: signed artists get distribution via label; indie artists sign NPC distributor (budget/standard/premium tiers); no distributor = SoundPuff only
+Band/groups system: post-launch
