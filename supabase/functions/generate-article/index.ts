@@ -27,7 +27,7 @@ const SERVICE_ROLE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
 
 // Max AI-generated articles inserted server-wide per game week (rumors count)
-const WEEKLY_CAP = 10;
+const WEEKLY_CAP = 30;
 
 // Outlet voice instructions — the AI writes prose; it never decides game effects
 const OUTLET_VOICES: Record<string, string> = {
