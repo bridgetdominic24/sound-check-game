@@ -10285,161 +10285,275 @@ function goToSleepInternal(){
   }
 }
 
+function _finWkRows(h, inc, exp){
+  var net = inc - exp;
+  var fmt2 = function(v){ return '$'+Math.round(Math.abs(v)).toLocaleString(); };
+  var fmtSign2 = function(v){ return (v>=0?'+':'-')+'$'+Math.round(Math.abs(v)).toLocaleString(); };
+  return `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+      <div style="width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;background:#1a3a2a">📈</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--txt)">Total income</div><div style="font-size:10.5px;color:var(--mut)">Streams + gigs + collabs + work</div></div>
+      <div style="font-size:14px;font-weight:800;color:var(--green,#4cc98a)">+${fmt2(inc)}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+      <div style="width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;background:#2a1a1a">📉</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--txt)">Total expenses</div><div style="font-size:10.5px;color:var(--mut)">Rent + promo + manager</div></div>
+      <div style="font-size:14px;font-weight:800;color:var(--red,#e06666)">-${fmt2(exp)}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+      <div style="width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;background:#1a2a3e">💳</div>
+      <div style="flex:1;font-size:13px;font-weight:600;color:var(--txt)">Net this week</div>
+      <div style="font-size:14px;font-weight:800;color:${net>=0?'var(--green,#4cc98a)':'var(--red,#e06666)'}">${fmtSign2(net)}</div>
+    </div>
+  `;
+}
+
+function _finTab(i){
+  [0,1].forEach(function(j){
+    var body = document.getElementById('ftab-'+j);
+    var btn  = document.getElementById('ftab-btn-'+j);
+    if(body){ body.style.display = j===i ? '' : 'none'; }
+    if(btn){
+      if(j===i){
+        btn.style.background='var(--card)';btn.style.color='var(--txt)';btn.style.boxShadow='0 1px 4px rgba(0,0,0,.3)';
+      } else {
+        btn.style.background='transparent';btn.style.color='var(--mut)';btn.style.boxShadow='none';
+      }
+    }
+  });
+}
+
+function _finSelWk(wkNum){
+  var h = (window._finHistory||[]).find(function(x){ return x.week===wkNum; })||{};
+  var iK = window._finIncKeys||[];
+  var eK = window._finExpKeys||[];
+  var inc = iK.reduce(function(s,k){ return s+(h[k]||0); },0);
+  var exp = eK.reduce(function(s,k){ return s+(h[k]||0); },0);
+  var det = document.getElementById('fin-wk-detail');
+  var rows = document.getElementById('fin-wk-rows');
+  if(det) det.textContent = 'Week '+wkNum+' — Quick View';
+  if(rows) rows.innerHTML = _finWkRows(h, inc, exp);
+  document.querySelectorAll('.fin-wkpill').forEach(function(p){
+    var on = parseInt(p.dataset.fw)===wkNum;
+    p.style.background = on?'var(--acc)':'var(--card)';
+    p.style.color = on?'var(--acc-txt,#0d0f14)':'var(--mut)';
+    p.style.borderColor = on?'var(--acc)':'var(--bord)';
+  });
+}
+
 function showFinances(){
   if(!GAME) return;
-  const history = (GAME.financeHistory||[]).slice().sort((a,b)=>a.week-b.week);
-  const currentWeek = GAME.week||1;
-  const fmt = v => '$'+Math.round(Math.abs(v)).toLocaleString();
-  const fmtSign = v => (v>=0?'+':'-')+'$'+Math.round(Math.abs(v)).toLocaleString();
+  var history = (GAME.financeHistory||[]).slice().sort(function(a,b){ return a.week-b.week; });
+  var currentWeek = GAME.week||1;
+  var balance = Math.round(GAME.money||0);
+  var incKeys = ['streamingRevenue','jobPay','gigPay','tipsPay','minigamePay','tourEarnings','collabRoyalties','syncPay'];
+  var expKeys = ['rent','promo','managerFees','studioCost','collabFeesPaid'];
 
-  // Rows to show in Income and Expense sections (using latest week)
-  const latest = history.length ? history[history.length-1] : {};
-  const incRows = [
-    {cat:'Streaming',       key:'streamingRevenue'},
-    {cat:'Job / Work',      key:'jobPay'},
-    {cat:'Gigs & Shows',    key:'gigPay'},
-    {cat:'Tips & Busking',  key:'tipsPay'},
-    {cat:'Minigame Winnings',key:'minigamePay'},
-    {cat:'Tour Earnings',   key:'tourEarnings'},
-    {cat:'Collab Royalties',key:'collabRoyalties'},
-    {cat:'Sync Deals',      key:'syncPay'},
-  ].filter(r => history.some(h=>(h[r.key]||0)>0));
+  function wInc(h){ return incKeys.reduce(function(s,k){ return s+(h[k]||0); },0); }
+  function wExp(h){ return expKeys.reduce(function(s,k){ return s+(h[k]||0); },0); }
+  function wNet(h){ return wInc(h)-wExp(h); }
+  var fmt  = function(v){ return '$'+Math.round(Math.abs(v)).toLocaleString(); };
+  var fmtS = function(v){ return (v>=0?'+':'-')+'$'+Math.round(Math.abs(v)).toLocaleString(); };
 
-  const expRows = [
-    {cat:'Rent / Housing',  key:'rent'},
-    {cat:'Promo Campaigns', key:'promo'},
-    {cat:'Manager Fees',    key:'managerFees'},
-    {cat:'Studio Costs',    key:'studioCost'},
-    {cat:'Collab Fees Paid',key:'collabFeesPaid'},
-  ].filter(r => history.some(h=>(h[r.key]||0)>0));
+  var curH   = history.find(function(h){ return h.week===currentWeek; })||{};
+  var curInc = wInc(curH), curExp = wExp(curH), curNet = curInc-curExp;
 
-  // Spreadsheet: show last 8 weeks as columns
-  const cols = history.slice(-8);
+  var allInc = history.reduce(function(s,h){ return s+wInc(h); },0);
+  var allExp = history.reduce(function(s,h){ return s+wExp(h); },0);
+  var nets   = history.map(wNet);
+  var bestNet  = nets.length ? Math.max.apply(null,nets) : 0;
+  var worstNet = nets.length ? Math.min.apply(null,nets) : 0;
+  var bestWk   = history[nets.indexOf(bestNet)]||{};
+  var worstWk  = history[nets.indexOf(worstNet)]||{};
 
-  // Helper: th style
-  const TH = 'padding:8px 6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;text-align:right;white-space:nowrap;border-bottom:2px solid #c0c0c0;';
-  const TD = 'padding:7px 6px;font-size:11px;text-align:right;font-family:monospace;border-bottom:1px solid #e8e8e8;';
-  const TDCAT = 'padding:7px 6px 7px 12px;font-size:12px;text-align:left;border-bottom:1px solid #e8e8e8;';
-  const TDBOLD = 'padding:8px 6px;font-size:12px;font-weight:800;text-align:right;font-family:monospace;border-top:2px solid #c0c0c0;border-bottom:2px solid #c0c0c0;';
-  const TDBOLDCAT = 'padding:8px 6px 8px 12px;font-size:12px;font-weight:800;text-align:left;border-top:2px solid #c0c0c0;border-bottom:2px solid #c0c0c0;';
-
-  function cellVal(h, key) {
-    const v = h[key]||0;
-    return v > 0 ? fmt(v) : '—';
-  }
-  function netRow(h) {
-    const inc = (h.streamingRevenue||0)+(h.jobPay||0)+(h.gigPay||0)+(h.tipsPay||0)+(h.minigamePay||0)+(h.tourEarnings||0)+(h.collabRoyalties||0)+(h.syncPay||0);
-    const exp = (h.rent||0)+(h.promo||0)+(h.managerFees||0)+(h.studioCost||0)+(h.collabFeesPaid||0);
-    return inc - exp;
-  }
-
-  const colHeaders = cols.map(h =>
-    `<th style="${TH};color:${h.week===currentWeek?'#667eea':'#555'}">${h.week===currentWeek?`Wk ${h.week} ◀`:`Wk ${h.week}`}</th>`
-  ).join('');
-
-  function buildRows(rows, colorKey) {
-    return rows.map(r => {
-      const cells = cols.map(h => {
-        const v = h[r.key]||0;
-        return `<td style="${TD};color:${v>0?colorKey:'#bbb'}">${v>0?fmt(v):'—'}</td>`;
-      }).join('');
-      const total = history.reduce((s,h)=>s+(h[r.key]||0),0);
-      return `<tr>
-        <td style="${TDCAT};color:#222">${r.cat}</td>
-        ${cells}
-        <td style="${TD};font-weight:700;color:${total>0?colorKey:'#bbb'}">${total>0?fmt(total):'—'}</td>
-      </tr>`;
-    }).join('');
-  }
-
-  function buildTotalRow(label, keys, color) {
-    const cells = cols.map(h => {
-      const v = keys.reduce((s,k)=>s+(h[k]||0),0);
-      return `<td style="${TDBOLD};color:${color}">${v>0?fmt(v):'—'}</td>`;
-    }).join('');
-    const grand = history.reduce((s,h)=>s+keys.reduce((ss,k)=>ss+(h[k]||0),0),0);
-    return `<tr style="background:#f8f8ff">
-      <td style="${TDBOLDCAT};color:#222">${label}</td>
-      ${cells}
-      <td style="${TDBOLD};color:${color}">${grand>0?fmt(grand):'—'}</td>
-    </tr>`;
-  }
-
-  const netCells = cols.map(h => {
-    const n = netRow(h);
-    const isCurr = h.week===currentWeek;
-    return `<td style="${TDBOLD};background:${isCurr?'#eef0ff':'transparent'};color:${n>=0?'#1a7a4a':'#c0392b'}">${fmtSign(n)}</td>`;
+  // Sparkline (last 8 weeks)
+  var spark8   = history.slice(-8).map(wNet);
+  var sparkMax = Math.max.apply(null, spark8.map(Math.abs).concat([1]));
+  var sparkBars = spark8.map(function(v,i){
+    var h = Math.max(8,(Math.abs(v)/sparkMax)*100);
+    var col = v>=0 ? 'var(--green,#4cc98a)' : 'var(--red,#e06666)';
+    var cur = i===spark8.length-1 ? ';outline:2px solid var(--acc,#e8b44c);outline-offset:1px' : '';
+    return '<div style="flex:1;min-height:4px;height:'+h+'%;border-radius:3px;background:'+col+cur+'"></div>';
   }).join('');
-  const grandNet = history.reduce((s,h)=>s+netRow(h),0);
 
-  const incKeys = incRows.map(r=>r.key);
-  const expKeys = expRows.map(r=>r.key);
+  // Trend chart
+  var recentWks = history.slice(-8);
+  var trendMax  = Math.max.apply(null, recentWks.map(function(h){ return Math.abs(wNet(h)); }).concat([1]));
+  var trendBars = recentWks.map(function(h,i){
+    var n = wNet(h); var barH = Math.max(6,(Math.abs(n)/trendMax)*64);
+    var col = n>=0 ? 'var(--green,#4cc98a)' : 'var(--red,#e06666)';
+    var op  = (0.45+i*0.07).toFixed(2);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div style="border-radius:3px 3px 0 0;width:100%;background:${col};opacity:${op};height:${barH}px"></div>
+      <div style="font-size:8px;color:var(--mut);font-weight:700">W${h.week}</div>
+      <div style="font-size:7.5px;color:var(--mut)">${n>=0?'+':''}${(Math.round(n/100)/10).toFixed(1)}K</div>
+    </div>`;
+  }).join('');
 
-  const html = `
-  <div style="min-height:100%;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  // Week pills
+  var wkPills = recentWks.map(function(h){
+    var on = h.week===currentWeek;
+    return `<div onclick="_finSelWk(${h.week})" data-fw="${h.week}" class="fin-wkpill" style="flex:none;font-size:11px;font-weight:700;border:1px solid ${on?'var(--acc)':'var(--bord)'};border-radius:99px;padding:6px 13px;color:${on?'var(--acc-txt,#0d0f14)':'var(--mut)'};background:${on?'var(--acc)':'var(--card)'};cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent">Wk ${h.week}${on?' ◀':''}</div>`;
+  }).join('');
 
-    <!-- Header -->
-    <div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:16px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">
-      <button onclick="_closeOverlay(this)" style="background:rgba(255,255,255,0.25);color:white;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;flex-shrink:0">←</button>
-      <div style="flex:1">
-        <div style="font-size:18px;font-weight:800;color:white">💰 Finances</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.8)">Week ${currentWeek} · Balance: <strong>$${Math.round(GAME.money||0).toLocaleString()}</strong></div>
+  // Income rows
+  var incRowDefs = [
+    {cat:'Streaming',      emoji:'🎵',bg:'#1a3a2a',key:'streamingRevenue'},
+    {cat:'Gigs & Shows',   emoji:'🎤',bg:'#1a2a3e',key:'gigPay'},
+    {cat:'Collab Royalties',emoji:'🤝',bg:'#2a1e3a',key:'collabRoyalties'},
+    {cat:'Job / Work',     emoji:'💼',bg:'#2a2412',key:'jobPay'},
+    {cat:'Tips & Busking', emoji:'🎸',bg:'#1a2a1a',key:'tipsPay'},
+    {cat:'Tour Earnings',  emoji:'🚌',bg:'#1a2030',key:'tourEarnings'},
+    {cat:'Sync Deals',     emoji:'🎬',bg:'#2a1a20',key:'syncPay'},
+    {cat:'Minigame Wins',  emoji:'🎮',bg:'#1e1a2a',key:'minigamePay'},
+  ].filter(function(r){ return (curH[r.key]||0)>0; });
+
+  var expRowDefs = [
+    {cat:'Rent / Housing', emoji:'🏠',bg:'#2a1a1a',key:'rent'},
+    {cat:'Promo Campaigns',emoji:'📣',bg:'#1e2a3e',key:'promo'},
+    {cat:'Manager Fee',    emoji:'👔',bg:'#1a1a2a',key:'managerFees'},
+    {cat:'Studio Costs',   emoji:'🎙',bg:'#2a1e1a',key:'studioCost'},
+    {cat:'Collab Fees',    emoji:'🤜',bg:'#1a2a1e',key:'collabFeesPaid'},
+  ].filter(function(r){ return (curH[r.key]||0)>0; });
+
+  function mkRow(r, sign){
+    var v = curH[r.key]||0;
+    var col = sign==='+' ? 'var(--green,#4cc98a)' : 'var(--red,#e06666)';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+      <div style="width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;background:${r.bg}">${r.emoji}</div>
+      <div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--txt)">${r.cat}</div>
+      <div style="font-size:14px;font-weight:800;color:${col};white-space:nowrap">${sign}${fmt(v)}</div>
+    </div>`;
+  }
+
+  var incHtml = incRowDefs.length ? incRowDefs.map(function(r){ return mkRow(r,'+'); }).join('')
+    : '<div style="padding:14px 0;font-size:12px;color:var(--mut);text-align:center">No income this week</div>';
+  var expHtml = expRowDefs.length ? expRowDefs.map(function(r){ return mkRow(r,'-'); }).join('')
+    : '<div style="padding:14px 0;font-size:12px;color:var(--mut);text-align:center">No expenses this week</div>';
+
+  var netGradient = curNet>=0
+    ? 'linear-gradient(135deg,#1a3a2a,#0d1a12)'
+    : 'linear-gradient(135deg,#3a1a1a,#1a0d0d)';
+  var netBorder = curNet>=0 ? '#2a5a3a' : '#5a2a2a';
+
+  // Store for onclick helpers
+  window._finHistory = history;
+  window._finIncKeys = incKeys;
+  window._finExpKeys = expKeys;
+
+  _insertOverlay(`
+  <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
+
+    <!-- STICKY HEADER -->
+    <div style="background:linear-gradient(150deg,#1a1230,var(--bg));padding:16px 16px 14px;flex:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="_closeOverlay(this)" style="background:rgba(255,255,255,.1);color:var(--txt);border:none;border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">←</button>
+          <h2 style="font-family:var(--fd),'Georgia',serif;font-size:21px;color:var(--txt)">Finances</h2>
+        </div>
+        <div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;color:var(--mut)">📅 Week ${currentWeek}</div>
+      </div>
+
+      <!-- NET BALANCE CARD -->
+      <div style="background:linear-gradient(135deg,var(--surf),var(--card));border:1px solid var(--bord);border-radius:16px;padding:16px;margin-bottom:12px">
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:1.2px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Current Balance</div>
+        <div style="font-size:36px;font-weight:900;letter-spacing:-1px;color:${balance>=0?'var(--green,#4cc98a)':'var(--red,#e06666)'}">${fmt(balance)}</div>
+        <div style="font-size:11px;color:var(--mut);margin-top:4px">All-time earned · ${fmt(allInc)} · Spent · ${fmt(allExp)}</div>
+        <div style="font-size:12px;font-weight:700;margin-top:8px;color:${curNet>=0?'var(--green,#4cc98a)':'var(--red,#e06666)'}">${fmtS(curNet)} this week</div>
+        <div style="display:flex;gap:4px;margin-top:10px;align-items:flex-end;height:28px">${sparkBars}</div>
+      </div>
+
+      <!-- SEGMENT TABS -->
+      <div style="display:flex;background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:3px">
+        <span id="ftab-btn-0" onclick="_finTab(0)" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border-radius:7px;cursor:pointer;background:var(--card);color:var(--txt);box-shadow:0 1px 4px rgba(0,0,0,.3)">This Week</span>
+        <span id="ftab-btn-1" onclick="_finTab(1)" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border-radius:7px;cursor:pointer;color:var(--mut)">History</span>
       </div>
     </div>
 
-    <div style="padding:14px;overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <!-- TAB BODIES -->
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:68px">
 
-      <!-- SPREADSHEET TABLE -->
-      <div style="background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);min-width:340px">
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <!-- TAB 0: THIS WEEK -->
+      <div id="ftab-0" style="padding:0 16px 16px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">Income</div>
+        ${incHtml}
+        <div style="background:var(--surf);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <span style="font-size:14px;font-weight:700;color:var(--txt)">Total Income</span>
+          <span style="font-size:18px;font-weight:900;color:var(--green,#4cc98a)">+${fmt(curInc)}</span>
+        </div>
 
-          <!-- HEADER ROW -->
-          <thead>
-            <tr style="background:#f0f0f8">
-              <th style="${TH};text-align:left;padding-left:12px;min-width:120px;color:#444">Category</th>
-              ${colHeaders}
-              <th style="${TH};color:#444">Total</th>
-            </tr>
-          </thead>
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">Expenses</div>
+        ${expHtml}
+        <div style="background:var(--surf);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <span style="font-size:14px;font-weight:700;color:var(--txt)">Total Expenses</span>
+          <span style="font-size:18px;font-weight:900;color:var(--red,#e06666)">-${fmt(curExp)}</span>
+        </div>
 
-          <tbody>
-            <!-- INCOME section -->
-            <tr style="background:#e8f5e9">
-              <td colspan="${cols.length+2}" style="padding:6px 12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#2e7d32">Income</td>
-            </tr>
-            ${incRows.length ? buildRows(incRows,'#1a7a4a') : `<tr><td colspan="${cols.length+2}" style="${TDCAT};color:#bbb">No income recorded</td></tr>`}
-            ${buildTotalRow('Total Income', incKeys, '#1a7a4a')}
-
-            <!-- spacer -->
-            <tr><td colspan="${cols.length+2}" style="padding:4px;background:#f5f5f5"></td></tr>
-
-            <!-- EXPENSES section -->
-            <tr style="background:#fce4e4">
-              <td colspan="${cols.length+2}" style="padding:6px 12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#b71c1c">Expenses</td>
-            </tr>
-            ${expRows.length ? buildRows(expRows,'#c0392b') : `<tr><td colspan="${cols.length+2}" style="${TDCAT};color:#bbb">No expenses recorded</td></tr>`}
-            ${buildTotalRow('Total Expenses', expKeys, '#c0392b')}
-
-            <!-- spacer -->
-            <tr><td colspan="${cols.length+2}" style="padding:4px;background:#f5f5f5"></td></tr>
-
-            <!-- NET row -->
-            <tr style="background:#eef0ff">
-              <td style="${TDBOLDCAT};color:#333">Net Income</td>
-              ${netCells}
-              <td style="${TDBOLD};color:${grandNet>=0?'#1a7a4a':'#c0392b'}">${fmtSign(grandNet)}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">Week ${currentWeek} Net</div>
+        <div style="background:${netGradient};border:1px solid ${netBorder};border-radius:14px;padding:16px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut)">NET THIS WEEK</div>
+            <div style="font-size:28px;font-weight:900;color:${curNet>=0?'var(--green,#4cc98a)':'var(--red,#e06666)'};margin-top:3px">${fmtS(curNet)}</div>
+          </div>
+          <div style="text-align:right;font-size:11px;color:var(--mut);line-height:1.7">Income ${fmt(curInc)}<br>Expenses ${fmt(curExp)}<br>Balance ${fmt(balance)}</div>
+        </div>
       </div>
 
-      <div style="font-size:10px;color:#aaa;text-align:center;margin-top:10px;padding-bottom:20px">
-        Showing last ${cols.length} weeks · Week ${currentWeek} is current ◀
+      <!-- TAB 1: HISTORY -->
+      <div id="ftab-1" style="display:none;padding:0 16px 16px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">Week</div>
+        <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none;-webkit-overflow-scrolling:touch">${wkPills}</div>
+
+        <div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:14px;margin:4px 0 12px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+            <span style="font-size:13px;font-weight:700;color:var(--txt)">Net earnings — last ${recentWks.length} wks</span>
+            <span style="font-size:10px;color:var(--mut)">tap a pill</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:flex-end;height:70px">${trendBars}</div>
+        </div>
+
+        <div id="fin-wk-detail" style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">Week ${currentWeek} — Quick View</div>
+        <div id="fin-wk-rows">${_finWkRows(curH,curInc,curExp)}</div>
+
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">All-time Totals</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+          <div style="flex:1;font-size:13px;font-weight:600;color:var(--txt)">Total earned (all time)</div>
+          <div style="font-size:14px;font-weight:800;color:var(--green,#4cc98a)">${fmt(allInc)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+          <div style="flex:1;font-size:13px;font-weight:600;color:var(--txt)">Total spent (all time)</div>
+          <div style="font-size:14px;font-weight:800;color:var(--red,#e06666)">${fmt(allExp)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--txt)">Best single week</div><div style="font-size:10.5px;color:var(--mut)">Week ${bestWk.week||'—'}</div></div>
+          <div style="font-size:14px;font-weight:800;color:var(--green,#4cc98a)">${fmt(bestNet)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--txt)">Worst single week</div><div style="font-size:10.5px;color:var(--mut)">Week ${worstWk.week||'—'}</div></div>
+          <div style="font-size:14px;font-weight:800;color:${worstNet<0?'var(--red,#e06666)':'var(--mut)'}">${fmtS(worstNet)}</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- STICKY BOTTOM BAR -->
+    <div style="position:absolute;bottom:0;left:0;right:0;background:var(--surf);border-top:1px solid var(--bord);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;z-index:5">
+      <div style="text-align:center">
+        <span style="display:block;font-size:9px;font-weight:800;letter-spacing:.8px;color:var(--mut);text-transform:uppercase">Balance</span>
+        <span style="display:block;font-size:16px;font-weight:900;margin-top:1px;color:${balance>=0?'var(--green,#4cc98a)':'var(--red,#e06666)'}">${fmt(balance)}</span>
+      </div>
+      <div style="width:1px;height:28px;background:var(--bord)"></div>
+      <div style="text-align:center">
+        <span style="display:block;font-size:9px;font-weight:800;letter-spacing:.8px;color:var(--mut);text-transform:uppercase">This Wk In</span>
+        <span style="display:block;font-size:16px;font-weight:900;margin-top:1px;color:var(--green,#4cc98a)">+${fmt(curInc)}</span>
+      </div>
+      <div style="width:1px;height:28px;background:var(--bord)"></div>
+      <div style="text-align:center">
+        <span style="display:block;font-size:9px;font-weight:800;letter-spacing:.8px;color:var(--mut);text-transform:uppercase">This Wk Out</span>
+        <span style="display:block;font-size:16px;font-weight:900;margin-top:1px;color:var(--red,#e06666)">-${fmt(curExp)}</span>
       </div>
     </div>
-  </div>`;
-
-  _insertOverlay(html);
+  </div>`);
 }
 function showBusiness(){
   const html=`
