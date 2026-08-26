@@ -17083,68 +17083,71 @@ function doSkillTrain(skillKey, method){
   if(!spendEnergy(energyCost)) return;
   if(moneyCost > 0) GAME.money -= moneyCost;
 
-  // Streak calculation
-  if(!GAME.trainingStreak) GAME.trainingStreak = {};
-  var streak = GAME.trainingStreak[skillKey] || { count:0, lastDay:0 };
-  var today = GAME.day || 1;
-  if(today === streak.lastDay + 1){
-    streak.count = (streak.count || 0) + 1;
-  } else if(today === streak.lastDay){
-    // Same day — streak holds but no extra count
-  } else {
-    streak.count = 1;
-  }
-  streak.lastDay = today;
-  GAME.trainingStreak[skillKey] = streak;
-  var streakCount = streak.count;
-  var streakBonus = Math.min(streakCount * 0.05, 0.25); // 0–25%
+  // Show animated interstitial, then compute + display result
+  _runTrainingAnim(skillKey, method, function(){
+    // Streak calculation
+    if(!GAME.trainingStreak) GAME.trainingStreak = {};
+    var streak = GAME.trainingStreak[skillKey] || { count:0, lastDay:0 };
+    var today = GAME.day || 1;
+    if(today === streak.lastDay + 1){
+      streak.count = (streak.count || 0) + 1;
+    } else if(today === streak.lastDay){
+      // Same day — streak holds but no extra count
+    } else {
+      streak.count = 1;
+    }
+    streak.lastDay = today;
+    GAME.trainingStreak[skillKey] = streak;
+    var streakCount = streak.count;
+    var streakBonus = Math.min(streakCount * 0.05, 0.25); // 0–25%
 
-  // Base gain (integer in [minGain, maxGain])
-  var baseGain = minGain + Math.floor(Math.random() * (maxGain - minGain + 1));
+    // Base gain (integer in [minGain, maxGain])
+    var baseGain = minGain + Math.floor(Math.random() * (maxGain - minGain + 1));
 
-  // Diminishing returns when skill >= 80
-  var dimApplied = val >= 80;
-  var dimFactor = dimApplied ? 0.5 : 1.0;
+    // Diminishing returns when skill >= 80
+    var dimApplied = val >= 80;
+    var dimFactor = dimApplied ? 0.5 : 1.0;
 
-  // Final gain — round to nearest 0.5, minimum 0.5
-  var rawGain = baseGain * (1 + streakBonus) * dimFactor;
-  var finalGain = Math.max(0.5, Math.round(rawGain * 2) / 2);
+    // Final gain — round to nearest 0.5, minimum 0.5
+    var rawGain = baseGain * (1 + streakBonus) * dimFactor;
+    var finalGain = Math.max(0.5, Math.round(rawGain * 2) / 2);
 
-  var oldVal = val;
-  // Cap gain so skill doesn't exceed cap
-  var newVal = Math.min(cap, val + finalGain);
-  GAME.skills[skillKey] = newVal;
-  GAME.skill = Math.min(100, (GAME.skill||0) + (finalGain * 0.3));
-  GAME.inspiration = Math.min(100, (GAME.inspiration||0) + 5);
+    var oldVal = val;
+    // Cap gain so skill doesn't exceed cap
+    var newVal = Math.min(cap, val + finalGain);
+    GAME.skills[skillKey] = newVal;
+    GAME.skill = Math.min(100, (GAME.skill||0) + (finalGain * 0.3));
+    GAME.inspiration = Math.min(100, (GAME.inspiration||0) + 5);
 
-  // Update skillLastUsed
-  if(!GAME.skillLastUsed) GAME.skillLastUsed = {};
-  GAME.skillLastUsed[skillKey] = today;
-  if(skillKey === 'singing' || skillKey === 'dance' || skillKey === 'stagePresence'){
-    GAME.skillLastUsed.performance = today;
-  }
+    // Update skillLastUsed
+    if(!GAME.skillLastUsed) GAME.skillLastUsed = {};
+    GAME.skillLastUsed[skillKey] = today;
+    if(skillKey === 'singing' || skillKey === 'dance' || skillKey === 'stagePresence'){
+      GAME.skillLastUsed.performance = today;
+    }
 
-  // Masterclass cooldown
-  if(method === 'masterclass'){
-    if(!GAME.lastMasterclassWeek) GAME.lastMasterclassWeek = {};
-    GAME.lastMasterclassWeek[skillKey] = GAME.week || 1;
-  }
+    // Masterclass cooldown
+    if(method === 'masterclass'){
+      if(!GAME.lastMasterclassWeek) GAME.lastMasterclassWeek = {};
+      GAME.lastMasterclassWeek[skillKey] = GAME.week || 1;
+    }
 
-  // Gate unlock check (did we cross 40 or 75?)
-  var gateUnlocked = null;
-  if(oldVal < 40 && newVal >= 40) gateUnlocked = 40;
-  else if(oldVal < 75 && newVal >= 75) gateUnlocked = 75;
-  else if(oldVal < 100 && newVal >= 100) gateUnlocked = 100;
+    // Gate unlock check (did we cross 40 or 75?)
+    var gateUnlocked = null;
+    if(oldVal < 40 && newVal >= 40) gateUnlocked = 40;
+    else if(oldVal < 75 && newVal >= 75) gateUnlocked = 75;
+    else if(oldVal < 100 && newVal >= 100) gateUnlocked = 100;
 
-  updateStats(); markDirty();
-  if(GAME_MODE === 'multi') saveToCloud(true);
+    updateStats(); markDirty();
+    if(GAME_MODE === 'multi') saveToCloud(true);
 
-  _showTrainingResult({
-    skillKey, method, methodLabel, methodIcon,
-    oldVal, newVal: GAME.skills[skillKey],
-    gain: GAME.skills[skillKey] - oldVal,
-    baseGain, streakBonus, streakCount,
-    dimApplied, moneyCost, energyCost, gateUnlocked
+    _showTrainingResult({
+      skillKey: skillKey, method: method, methodLabel: methodLabel, methodIcon: methodIcon,
+      oldVal: oldVal, newVal: GAME.skills[skillKey],
+      gain: GAME.skills[skillKey] - oldVal,
+      baseGain: baseGain, streakBonus: streakBonus, streakCount: streakCount,
+      dimApplied: dimApplied, moneyCost: moneyCost, energyCost: energyCost, gateUnlocked: gateUnlocked
+    });
   });
 }
 
@@ -31897,8 +31900,315 @@ function _trainingResultMsg(skillKey, gained, stressDelta, energyDelta){
   return lines.join('\n');
 }
 
+// ── SVG CHARACTER ANIMATIONS ──────────────────────────────────────────────────
+// Inline SVG figures used in training overlays. Each returns a raw HTML string
+// (style + svg) to embed inside the activity overlay.
+
+function _svgDancer(){
+  return '<style>'
+    +'@keyframes sc-d-sway{0%,100%{transform:translate(0px,0px) rotate(-4deg)}50%{transform:translate(0px,-5px) rotate(4deg)}}'
+    +'@keyframes sc-d-arml{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(-60deg)}}'
+    +'@keyframes sc-d-armr{0%,100%{transform:rotate(10deg)}50%{transform:rotate(58deg)}}'
+    +'@keyframes sc-d-legl{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(18deg)}}'
+    +'@keyframes sc-d-legr{0%,100%{transform:rotate(8deg)}50%{transform:rotate(-18deg)}}'
+    +'@keyframes sc-d-note{0%{opacity:0;transform:translate(0,0)}55%{opacity:1}100%{opacity:0;transform:translate(10px,-30px)}}'
+    +'</style>'
+    +'<svg viewBox="0 0 200 230" width="170" height="170" style="display:block;overflow:visible">'
+    +'<ellipse cx="100" cy="220" rx="36" ry="6" style="fill:var(--bord);opacity:0.4"/>'
+    // Figure — sways as a whole around hip pivot
+    +'<g style="transform-origin:100px 165px;animation:sc-d-sway 0.65s ease-in-out infinite">'
+      // Head
+      +'<circle cx="100" cy="36" r="26" style="fill:var(--acc);opacity:0.9"/>'
+      // Hair
+      +'<ellipse cx="100" cy="13" rx="20" ry="9" style="fill:var(--txt);opacity:0.25"/>'
+      // Eyes
+      +'<circle cx="91" cy="33" r="4" style="fill:var(--bg)"/>'
+      +'<circle cx="109" cy="33" r="4" style="fill:var(--bg)"/>'
+      // Smile
+      +'<path d="M90 47 Q100 55 110 47" style="stroke:var(--bg);fill:none;stroke-width:2.5;stroke-linecap:round"/>'
+      // Torso
+      +'<rect x="83" y="63" width="34" height="48" rx="10" style="fill:var(--acc);opacity:0.85"/>'
+      // Left arm (rotates from shoulder)
+      +'<g style="transform-origin:85px 74px;animation:sc-d-arml 0.65s ease-in-out infinite">'
+        +'<rect x="59" y="68" width="26" height="12" rx="6" style="fill:var(--acc);opacity:0.8"/>'
+        +'<circle cx="57" cy="74" r="8" style="fill:var(--acc);opacity:0.75"/>'
+      +'</g>'
+      // Right arm
+      +'<g style="transform-origin:115px 74px;animation:sc-d-armr 0.65s ease-in-out infinite 0.325s">'
+        +'<rect x="115" y="68" width="26" height="12" rx="6" style="fill:var(--acc);opacity:0.8"/>'
+        +'<circle cx="143" cy="74" r="8" style="fill:var(--acc);opacity:0.75"/>'
+      +'</g>'
+      // Left leg (rotates from hip)
+      +'<g style="transform-origin:91px 111px;animation:sc-d-legl 0.65s ease-in-out infinite">'
+        +'<rect x="84" y="111" width="14" height="52" rx="7" style="fill:var(--acc);opacity:0.8"/>'
+        +'<rect x="75" y="157" width="24" height="14" rx="7" style="fill:var(--acc);opacity:0.75"/>'
+      +'</g>'
+      // Right leg
+      +'<g style="transform-origin:109px 111px;animation:sc-d-legr 0.65s ease-in-out infinite 0.325s">'
+        +'<rect x="102" y="111" width="14" height="52" rx="7" style="fill:var(--acc);opacity:0.8"/>'
+        +'<rect x="101" y="157" width="24" height="14" rx="7" style="fill:var(--acc);opacity:0.75"/>'
+      +'</g>'
+    +'</g>'
+    // Floating notes
+    +'<text x="156" y="82" font-size="22" style="fill:var(--acc);animation:sc-d-note 1.3s ease-out infinite">♪</text>'
+    +'<text x="22" y="72" font-size="18" style="fill:var(--acc);animation:sc-d-note 1.3s ease-out infinite 0.65s">♫</text>'
+    +'</svg>';
+}
+
+function _svgProducer(){
+  return '<style>'
+    +'@keyframes sc-p-nod{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}'
+    +'@keyframes sc-p-hand{0%,100%{transform:translateX(0)}50%{transform:translateX(14px)}}'
+    +'@keyframes sc-p-b1{0%,100%{transform:scaleY(0.3)}40%{transform:scaleY(1)}}'
+    +'@keyframes sc-p-b2{0%,100%{transform:scaleY(0.7)}50%{transform:scaleY(0.2)}}'
+    +'@keyframes sc-p-b3{0%,100%{transform:scaleY(0.5)}60%{transform:scaleY(1)}}'
+    +'@keyframes sc-p-b4{0%,100%{transform:scaleY(0.2)}70%{transform:scaleY(0.8)}}'
+    +'@keyframes sc-p-rec{0%,100%{opacity:1}50%{opacity:0.15}}'
+    +'</style>'
+    +'<svg viewBox="0 0 240 200" width="190" height="160" style="display:block;overflow:visible">'
+    // ── Mixing console (right side) ──
+    +'<rect x="105" y="130" width="125" height="55" rx="8" style="fill:var(--surf);stroke:var(--bord);stroke-width:2"/>'
+    +'<rect x="110" y="117" width="115" height="22" rx="5" style="fill:var(--card);stroke:var(--bord);stroke-width:1.5"/>'
+    // Knobs
+    +'<circle cx="124" cy="150" r="7" style="fill:var(--bord)"/>'
+    +'<circle cx="144" cy="150" r="7" style="fill:var(--acc);opacity:0.7"/>'
+    +'<circle cx="164" cy="150" r="7" style="fill:var(--bord)"/>'
+    +'<circle cx="184" cy="150" r="7" style="fill:var(--acc);opacity:0.5"/>'
+    +'<circle cx="204" cy="150" r="7" style="fill:var(--bord)"/>'
+    // Fader sliders
+    +'<rect x="120" y="165" width="4" height="14" rx="2" style="fill:var(--mut);opacity:0.5"/>'
+    +'<rect x="140" y="162" width="4" height="14" rx="2" style="fill:var(--mut);opacity:0.5"/>'
+    +'<rect x="160" y="168" width="4" height="14" rx="2" style="fill:var(--mut);opacity:0.5"/>'
+    +'<rect x="180" y="163" width="4" height="14" rx="2" style="fill:var(--mut);opacity:0.5"/>'
+    +'<rect x="200" y="167" width="4" height="14" rx="2" style="fill:var(--mut);opacity:0.5"/>'
+    // EQ bars (above console, pulsing) — scale from bottom
+    +'<g style="transform-origin:118px 117px;animation:sc-p-b1 0.4s ease-in-out infinite">'
+      +'<rect x="114" y="93" width="8" height="24" rx="3" style="fill:var(--acc);opacity:0.9"/>'
+    +'</g>'
+    +'<g style="transform-origin:130px 117px;animation:sc-p-b2 0.4s ease-in-out infinite 0.1s">'
+      +'<rect x="126" y="100" width="8" height="17" rx="3" style="fill:var(--acc);opacity:0.7"/>'
+    +'</g>'
+    +'<g style="transform-origin:142px 117px;animation:sc-p-b3 0.4s ease-in-out infinite 0.2s">'
+      +'<rect x="138" y="96" width="8" height="21" rx="3" style="fill:var(--acc);opacity:0.85"/>'
+    +'</g>'
+    +'<g style="transform-origin:154px 117px;animation:sc-p-b4 0.4s ease-in-out infinite 0.3s">'
+      +'<rect x="150" y="103" width="8" height="14" rx="3" style="fill:var(--acc);opacity:0.65"/>'
+    +'</g>'
+    // REC light
+    +'<circle cx="218" cy="96" r="7" style="fill:#ef4444;opacity:0.9;animation:sc-p-rec 1s ease-in-out infinite"/>'
+    +'<text x="209" y="113" font-size="8" style="fill:var(--mut);font-family:system-ui;font-weight:700">REC</text>'
+    // ── Person (left side) ──
+    // Chair back
+    +'<rect x="10" y="100" width="44" height="85" rx="6" style="fill:var(--bord);opacity:0.3"/>'
+    // Torso
+    +'<rect x="8" y="68" width="52" height="55" rx="12" style="fill:var(--acc);opacity:0.8"/>'
+    // Head — nods
+    +'<g style="transform-origin:34px 62px;animation:sc-p-nod 0.5s ease-in-out infinite">'
+      +'<circle cx="34" cy="38" r="28" style="fill:var(--acc-bg)"/>'
+      +'<circle cx="34" cy="38" r="28" style="fill:var(--acc);opacity:0.15"/>'
+      // Eyes closed / focused
+      +'<path d="M24 35 Q28 33 32 35" style="stroke:var(--txt);fill:none;stroke-width:2.5;stroke-linecap:round;opacity:0.7"/>'
+      +'<path d="M36 35 Q40 33 44 35" style="stroke:var(--txt);fill:none;stroke-width:2.5;stroke-linecap:round;opacity:0.7"/>'
+      // Headphones
+      +'<path d="M8 32 Q34 6 60 32" style="stroke:var(--txt);stroke-width:5;fill:none;stroke-linecap:round"/>'
+      +'<rect x="4" y="28" width="10" height="16" rx="5" style="fill:var(--txt);opacity:0.85"/>'
+      +'<rect x="54" y="28" width="10" height="16" rx="5" style="fill:var(--txt);opacity:0.85"/>'
+    +'</g>'
+    // Right arm — slides hand across console
+    +'<g style="transform-origin:60px 90px;animation:sc-p-hand 0.9s ease-in-out infinite">'
+      +'<line x1="60" y1="90" x2="105" y2="128" style="stroke:var(--acc);stroke-width:10;stroke-linecap:round;opacity:0.8"/>'
+      +'<circle cx="108" cy="130" r="7" style="fill:var(--acc);opacity:0.7"/>'
+    +'</g>'
+    +'</svg>';
+}
+
+function _svgWriter(){
+  return '<style>'
+    +'@keyframes sc-w-write{0%,100%{transform:translateX(0) rotate(-5deg)}50%{transform:translateX(18px) rotate(-5deg)}}'
+    +'@keyframes sc-w-bulb{0%,100%{opacity:1;transform:scale(1)}40%{opacity:0.3;transform:scale(0.9)}70%{opacity:1;transform:scale(1.08)}}'
+    +'@keyframes sc-w-line{0%{transform:scaleX(0.05)}100%{transform:scaleX(1)}}'
+    +'@keyframes sc-w-nod{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-6deg)}}'
+    +'</style>'
+    +'<svg viewBox="0 0 220 210" width="180" height="165" style="display:block;overflow:visible">'
+    // ── Desk ──
+    +'<rect x="50" y="148" width="150" height="16" rx="5" style="fill:var(--surf);stroke:var(--bord);stroke-width:2"/>'
+    +'<rect x="65" y="164" width="8" height="36" rx="4" style="fill:var(--bord);opacity:0.5"/>'
+    +'<rect x="173" y="164" width="8" height="36" rx="4" style="fill:var(--bord);opacity:0.5"/>'
+    // Paper on desk
+    +'<rect x="90" y="120" width="90" height="30" rx="4" style="fill:var(--bg);stroke:var(--bord);stroke-width:1.5"/>'
+    // Lines of text on paper (three lines, last one grows = writing in progress)
+    +'<line x1="98" y1="130" x2="170" y2="130" style="stroke:var(--mut);stroke-width:2;opacity:0.5"/>'
+    +'<line x1="98" y1="138" x2="165" y2="138" style="stroke:var(--mut);stroke-width:2;opacity:0.5"/>'
+    +'<line x1="98" y1="146" x2="120" y2="146" style="stroke:var(--acc);stroke-width:2;opacity:0.8;transform-origin:98px 146px;animation:sc-w-line 2s ease-out infinite"/>'
+    // ── Person ──
+    // Torso
+    +'<rect x="30" y="80" width="48" height="55" rx="12" style="fill:var(--acc);opacity:0.85"/>'
+    // Head — nods slightly
+    +'<g style="transform-origin:54px 75px;animation:sc-w-nod 1.8s ease-in-out infinite">'
+      +'<circle cx="54" cy="46" r="26" style="fill:var(--acc-bg)"/>'
+      +'<circle cx="54" cy="46" r="26" style="fill:var(--acc);opacity:0.15"/>'
+      // Face — focused look, slightly down
+      +'<circle cx="45" cy="44" r="3.5" style="fill:var(--txt);opacity:0.8"/>'
+      +'<circle cx="62" cy="44" r="3.5" style="fill:var(--txt);opacity:0.8"/>'
+      +'<path d="M46 56 Q54 60 62 56" style="stroke:var(--txt);fill:none;stroke-width:2;stroke-linecap:round;opacity:0.6"/>'
+      // Hair
+      +'<ellipse cx="54" cy="22" rx="22" ry="10" style="fill:var(--txt);opacity:0.2"/>'
+    +'</g>'
+    // Right arm — writing (moves left to right)
+    +'<g style="transform-origin:78px 100px;animation:sc-w-write 1.2s ease-in-out infinite">'
+      +'<line x1="78" y1="100" x2="108" y2="138" style="stroke:var(--acc);stroke-width:10;stroke-linecap:round;opacity:0.8"/>'
+      // Pen
+      +'<rect x="105" y="133" width="5" height="18" rx="2" transform="rotate(-30 108 140)" style="fill:var(--txt);opacity:0.8"/>'
+    +'</g>'
+    // Left arm resting on desk
+    +'<line x1="30" y1="105" x2="72" y2="140" style="stroke:var(--acc);stroke-width:10;stroke-linecap:round;opacity:0.8"/>'
+    // ── Light bulb above (inspiration) ──
+    +'<g style="transform-origin:165px 42px;animation:sc-w-bulb 2.4s ease-in-out infinite">'
+      +'<circle cx="165" cy="42" r="18" style="fill:var(--acc);opacity:0.25"/>'
+      +'<circle cx="165" cy="42" r="12" style="fill:var(--acc);opacity:0.7"/>'
+      +'<rect x="161" y="56" width="8" height="6" rx="2" style="fill:var(--acc);opacity:0.6"/>'
+      +'<line x1="165" y1="22" x2="165" y2="15" style="stroke:var(--acc);stroke-width:2.5;opacity:0.6"/>'
+      +'<line x1="148" y1="29" x2="142" y2="23" style="stroke:var(--acc);stroke-width:2.5;opacity:0.6"/>'
+      +'<line x1="182" y1="29" x2="188" y2="23" style="stroke:var(--acc);stroke-width:2.5;opacity:0.6"/>'
+    +'</g>'
+    +'</svg>';
+}
+
+function _svgSinger(){
+  return '<style>'
+    +'@keyframes sc-v-sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}'
+    +'@keyframes sc-v-wave{0%{opacity:0;transform:scale(0.6)}60%{opacity:0.8}100%{opacity:0;transform:scale(1.6)}}'
+    +'@keyframes sc-v-note{0%{opacity:0;transform:translate(0,0)}55%{opacity:1}100%{opacity:0;transform:translate(14px,-32px)}}'
+    +'@keyframes sc-v-mouth{0%,100%{transform:scaleY(0.4)}50%{transform:scaleY(1)}}'
+    +'</style>'
+    +'<svg viewBox="0 0 200 240" width="170" height="170" style="display:block;overflow:visible">'
+    +'<ellipse cx="90" cy="228" rx="32" ry="6" style="fill:var(--bord);opacity:0.4"/>'
+    // Figure — sways around base
+    +'<g style="transform-origin:90px 200px;animation:sc-v-sway 1.0s ease-in-out infinite">'
+      // Head
+      +'<circle cx="90" cy="38" r="28" style="fill:var(--acc-bg)"/>'
+      +'<circle cx="90" cy="38" r="28" style="fill:var(--acc);opacity:0.15"/>'
+      // Eyes (closed, singing)
+      +'<path d="M78 32 Q83 28 88 32" style="stroke:var(--txt);fill:none;stroke-width:2.5;stroke-linecap:round"/>'
+      +'<path d="M92 32 Q97 28 102 32" style="stroke:var(--txt);fill:none;stroke-width:2.5;stroke-linecap:round"/>'
+      // Mouth — opens and closes
+      +'<g style="transform-origin:90px 50px;animation:sc-v-mouth 0.5s ease-in-out infinite">'
+        +'<ellipse cx="90" cy="50" rx="10" ry="8" style="fill:var(--txt);opacity:0.9"/>'
+        +'<ellipse cx="90" cy="47" rx="9" ry="5" style="fill:var(--acc-bg)"/>'
+      +'</g>'
+      // Hair
+      +'<ellipse cx="90" cy="12" rx="24" ry="11" style="fill:var(--txt);opacity:0.25"/>'
+      // Torso
+      +'<rect x="72" y="68" width="36" height="55" rx="10" style="fill:var(--acc);opacity:0.85"/>'
+      // Left arm slightly out
+      +'<line x1="72" y1="82" x2="44" y2="108" style="stroke:var(--acc);stroke-width:10;stroke-linecap:round;opacity:0.8"/>'
+      +'<circle cx="40" cy="112" r="8" style="fill:var(--acc);opacity:0.75"/>'
+      // Right arm holding mic
+      +'<line x1="108" y1="82" x2="128" y2="115" style="stroke:var(--acc);stroke-width:10;stroke-linecap:round;opacity:0.8"/>'
+      // Mic handle
+      +'<rect x="124" y="112" width="8" height="22" rx="4" style="fill:var(--txt);opacity:0.7"/>'
+      +'<ellipse cx="128" cy="108" rx="10" ry="7" style="fill:var(--txt);opacity:0.9"/>'
+      // Legs
+      +'<rect x="76" y="123" width="14" height="55" rx="7" style="fill:var(--acc);opacity:0.8"/>'
+      +'<rect x="94" y="123" width="14" height="55" rx="7" style="fill:var(--acc);opacity:0.8"/>'
+      +'<rect x="68" y="172" width="24" height="14" rx="7" style="fill:var(--acc);opacity:0.75"/>'
+      +'<rect x="92" y="172" width="24" height="14" rx="7" style="fill:var(--acc);opacity:0.75"/>'
+    +'</g>'
+    // Sound waves from mouth
+    +'<ellipse cx="130" cy="60" rx="14" ry="10" style="fill:none;stroke:var(--acc);stroke-width:2;opacity:0.8;animation:sc-v-wave 1s ease-out infinite"/>'
+    +'<ellipse cx="150" cy="60" rx="26" ry="18" style="fill:none;stroke:var(--acc);stroke-width:2;opacity:0.8;animation:sc-v-wave 1s ease-out infinite 0.33s"/>'
+    +'<ellipse cx="170" cy="60" rx="38" ry="26" style="fill:none;stroke:var(--acc);stroke-width:1.5;opacity:0.8;animation:sc-v-wave 1s ease-out infinite 0.66s"/>'
+    // Floating notes
+    +'<text x="156" y="28" font-size="20" style="fill:var(--acc);animation:sc-v-note 1.5s ease-out infinite">♪</text>'
+    +'<text x="170" y="48" font-size="16" style="fill:var(--acc);animation:sc-v-note 1.5s ease-out infinite 0.75s">♫</text>'
+    +'</svg>';
+}
+
+// ── TRAINING SESSION ANIMATION ─────────────────────────────────────────────
+// Shows an animated interstitial for the three formal training methods
+// (Self-Practice / Coaching / Masterclass) then calls onComplete.
+
+function _runTrainingAnim(skillKey, method, onComplete){
+  var cfg = SKILL_CONFIG[skillKey] || {};
+  var svgFn = {
+    dance: _svgDancer, stagePresence: _svgDancer, performance: _svgDancer,
+    production: _svgProducer,
+    writing: _svgWriter, negotiation: _svgWriter,
+    singing: _svgSinger,
+  }[skillKey] || _svgDancer;
+
+  var phases = {
+    self: {
+      writing:    ['Finding the hook…','Scribbling verses…','The bridge clicks…','Final polish…'],
+      singing:    ['Breathing exercises…','Running scales…','Nailing the high notes…','Feeling it…'],
+      production: ['Loading the DAW…','Chopping samples…','Building the drop…','Listening back…'],
+      dance:      ['Clearing some space…','Warming up…','Running the routine…','Nailing it…'],
+      stagePresence:['Practising poses…','Working the energy…','Feeling the stage…','Locked in…'],
+      performance:['Reviewing footage…','Identifying weak spots…','Drilling the section…','Looking sharp…'],
+      negotiation:['Reading the terms…','Thinking through leverage…','Running the scenario…','Ready to deal…'],
+    },
+    coach: {
+      writing:    ['Coach sets the brief…','Working the concept…','Coach notes in…','Revision done…'],
+      singing:    ['Coach warms you up…','Technique drills…','Recording a take…','Playback + notes…'],
+      production: ['Coach pulls up your stems…','Breaking down the mix…','Rebuilding together…','Final ear check…'],
+      dance:      ['Coach demos the move…','Slow-motion breakdown…','Full speed run-through…','Coach signs off…'],
+      stagePresence:['Coach watches your walk…','Presence exercises…','Camera test…','Coach approves…'],
+      performance:['Coach reviews footage…','Identifying habits…','Drilling corrections…','Coach signs off…'],
+      negotiation:['Role-playing the deal…','Coach presses hard…','Finding your anchor…','Debrief done…'],
+    },
+    masterclass: {
+      writing:    ['Legend reviews your lyrics…','Breaking down the craft…','Co-writing the hook…','Signing off with notes…'],
+      singing:    ['Legend opens with a demo…','Technique deep-dive…','You sing for the legend…','Standing ovation…'],
+      production: ['Inside the legend\'s studio…','Secrets of the mix…','Your track on their desk…','Legend nods approval…'],
+      dance:      ['Legend shows the original…','One-on-one drilling…','You hit the choreo…','Legend says yes…'],
+      stagePresence:['Legend walks the stage…','Energy coaching…','Your full run-through…','Legend is impressed…'],
+      performance:['Legend watches your set…','Note by note feedback…','Full reprise…','Legend signs your mic…'],
+      negotiation:['Legend shares war stories…','Power-play exercises…','Mock negotiation…','Legend\'s final wisdom…'],
+    }
+  };
+
+  var methodPhrases = (phases[method] && phases[method][skillKey])
+    || ['Getting started…','Deep in the zone…','Almost there…','Finishing up…'];
+  var labels = methodPhrases.concat(['Done! ✅']);
+
+  var title = method === 'self' ? 'Self-Practice'
+    : method === 'coach' ? 'Coaching Session'
+    : 'Masterclass';
+
+  var totalMs = method === 'masterclass' ? 10000 : method === 'coach' ? 9000 : 8000;
+
+  var overlay = _insertOverlay(
+    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;text-align:center;padding:32px 24px">'
+    +svgFn()
+    +'<div style="font-size:20px;font-weight:800;color:var(--txt);margin-top:20px;margin-bottom:6px">'+cfg.icon+' '+title+'</div>'
+    +'<div style="font-size:13px;color:var(--mut);margin-bottom:18px">'+cfg.label+'</div>'
+    +'<div style="width:210px;height:6px;border-radius:3px;background:var(--bord);overflow:hidden;margin-bottom:12px">'
+    +'<div id="actBar" style="height:100%;width:0%;background:var(--acc);transition:width 0.2s linear;border-radius:3px"></div></div>'
+    +'<div style="font-size:13px;color:var(--mut)" id="actLabel">'+labels[0]+'</div>'
+    +'</div>'
+  );
+
+  var step = 0;
+  var totalSteps = labels.length;
+  var tick = setInterval(function(){
+    step++;
+    var bar = document.getElementById('actBar');
+    var lbl = document.getElementById('actLabel');
+    if(bar) bar.style.width = Math.round((step/totalSteps)*100)+'%';
+    if(lbl) lbl.textContent = labels[Math.min(step, totalSteps-1)];
+    if(step >= totalSteps){
+      clearInterval(tick);
+      setTimeout(function(){
+        if(overlay && overlay.parentNode) overlay.remove();
+        onComplete();
+      }, 400);
+    }
+  }, totalMs / totalSteps);
+}
+
 function _runQuickActivity(opts){
-  // opts: { title, emoji, labels, animStyle, animKeyframe, totalMs, energyCost, onComplete }
+  // opts: { title, emoji, svgContent?, labels, animStyle, animKeyframe, totalMs, energyCost, onComplete }
+  // If svgContent is provided it renders in place of the emoji div.
   var cost = opts.energyCost || 0;
   if(cost > 0 && (GAME.energy||0) < cost){
     showToast('Not enough energy (need '+cost+')', 'red');
@@ -31906,15 +32216,19 @@ function _runQuickActivity(opts){
   }
   if(cost > 0){ GAME.energy = Math.max(0, (GAME.energy||0) - cost); updateStats(); }
 
+  var visualBlock = opts.svgContent
+    ? ('<div style="display:flex;justify-content:center;margin-bottom:20px">'+opts.svgContent+'</div>')
+    : ('<div style="font-size:72px;margin-bottom:24px;animation:'+opts.animStyle+' 0.8s ease-in-out infinite alternate" id="actEmoji">'+opts.emoji+'</div>');
+
   var overlay = _insertOverlay(
-    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:40px">'
-    +'<div style="font-size:72px;margin-bottom:24px;animation:'+opts.animStyle+' 0.8s ease-in-out infinite alternate" id="actEmoji">'+opts.emoji+'</div>'
+    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;text-align:center;padding:32px 24px">'
+    +visualBlock
     +'<div style="font-size:22px;font-weight:700;color:var(--txt);margin-bottom:8px">'+opts.title+'</div>'
     +'<div style="width:200px;height:6px;border-radius:3px;background:var(--bord);overflow:hidden;margin-bottom:12px">'
     +'<div id="actBar" style="height:100%;width:0%;background:var(--acc);transition:width 0.2s linear;border-radius:3px"></div></div>'
     +'<div style="font-size:13px;color:var(--mut)" id="actLabel">'+opts.labels[0]+'</div>'
     +'</div>'
-    +'<style>@keyframes '+opts.animStyle+' {'+opts.animKeyframe+'}</style>'
+    +(opts.animStyle ? '<style>@keyframes '+opts.animStyle+' {'+opts.animKeyframe+'}</style>' : '')
   );
 
   var step = 0;
@@ -31943,7 +32257,7 @@ function doVocalWarmup(){
   if(!GAME) return;
   _ensureSkills();
   _runQuickActivity({
-    title:'Vocal Warmup', emoji:'🎤',
+    title:'Vocal Warmup', emoji:'🎤', svgContent:_svgSinger(),
     emojis:['🎤','🎵','🎶','🎼','✅'],
     labels:['La la la...','Do re mi...','Running scales...','Hitting the high notes...','Done!'],
     animStyle:'scaleAnim', animKeyframe:'from{transform:scale(1)}to{transform:scale(1.12)}',
@@ -31960,7 +32274,7 @@ function doWritingPractice(){
   if(!GAME) return;
   _ensureSkills();
   _runQuickActivity({
-    title:'Lyric Writing Session', emoji:'✍️',
+    title:'Lyric Writing Session', emoji:'✍️', svgContent:_svgWriter(),
     emojis:['✍️','📝','💡','📝','✅'],
     labels:['Finding the hook...','Building the verse...','Chorus coming together...','Polishing the bridge...','Done!'],
     animStyle:'flickerAnim', animKeyframe:'from{transform:rotate(-3deg)scale(1)}to{transform:rotate(3deg)scale(1.08)}',
@@ -31977,7 +32291,7 @@ function doBeatMakingSession(){
   if(!GAME) return;
   _ensureSkills();
   _runQuickActivity({
-    title:'Beat-Making Session', emoji:'🎛️',
+    title:'Beat-Making Session', emoji:'🎛️', svgContent:_svgProducer(),
     emojis:['🎛️','🎚️','🎶','🔊','✅'],
     labels:['Picking the samples...','Laying the drums...','Building the baseline...','Mixing it down...','Done!'],
     animStyle:'bounceAnim', animKeyframe:'from{transform:translateY(0)}to{transform:translateY(-8px)}',
@@ -32015,7 +32329,7 @@ function doPracticeAtHome(){
   if(!GAME) return;
   _ensureSkills();
   _runQuickActivity({
-    title:'Practice at Home', emoji:'🏠',
+    title:'Practice at Home', emoji:'🏠', svgContent:_svgDancer(),
     emojis:['🏠','💃','🎵','💦','✅'],
     labels:['Clearing some space...','Warming up...','Running the choreography...','Pushing through the hard part...','Done!'],
     animStyle:'moveAnim', animKeyframe:'from{transform:translateX(-6px)}to{transform:translateX(6px)}',
