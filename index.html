@@ -606,20 +606,21 @@ function emergencySkip() {
 @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-10px)}}
 /* screen base */
 .vn-screen{position:fixed;inset:0;background:#0a0a0f;overflow:hidden;display:flex;flex-direction:column;align-items:center;font-family:'Syne',sans-serif;color:#fff}
-/* spotlights */
-.vn-spot{position:absolute;top:0;width:220px;height:82%;pointer-events:none;background:linear-gradient(to bottom,rgba(255,255,255,.18) 0%,rgba(255,255,255,.01) 100%);clip-path:polygon(50% 0%,-20% 100%,120% 100%);transform-origin:50% 0%;will-change:transform}
-.vn-spot-l{left:18%;animation:vn-sweep-l 6s ease-in-out infinite}
-.vn-spot-r{right:18%;animation:vn-sweep-r 6s ease-in-out infinite 1.2s}
+/* spotlights — soft diffused cones, no hard clip-path edges */
+.vn-spot{position:absolute;top:-8%;width:46%;height:100%;pointer-events:none;background:radial-gradient(ellipse 55% 90% at 50% 0%,color-mix(in srgb,var(--vn-acc,#fff) 22%,transparent) 0%,color-mix(in srgb,var(--vn-acc,#fff) 9%,transparent) 38%,transparent 72%);filter:blur(26px);transform-origin:50% 4%;will-change:transform}
+.vn-spot-l{left:4%;animation:vn-sweep-l 6s ease-in-out infinite}
+.vn-spot-r{right:4%;animation:vn-sweep-r 6s ease-in-out infinite 1.2s}
 /* motes */
 .vn-motes{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .vn-mote{position:absolute;border-radius:50%;background:var(--vn-acc,#00f0ff);opacity:0;animation:vn-mote linear infinite}
 /* crowd */
 .vn-crowd{position:absolute;bottom:0;left:0;right:0;pointer-events:none}
 .vn-row{position:absolute;left:0;right:0;display:flex;justify-content:center;align-items:flex-end}
-.vn-fan{position:relative;flex-shrink:0;border-radius:35% 35% 15% 15%;background:#111;opacity:0;transform-origin:bottom center}
+.vn-fan{position:relative;flex-shrink:0;border-radius:42% 42% 10% 10%;background:#111;opacity:0;transform-origin:bottom center}
 .vn-fan.on{animation:vn-pop .4s ease forwards}
 .vn-fan.sway{animation:vn-pop .4s ease forwards}
 .vn-fan.on.sway{animation:vn-pop .4s ease forwards,vn-sway 1.8s ease-in-out infinite alternate}
+.vn-head{position:absolute;border-radius:50%;background:#111;left:50%;transform:translateX(-50%)}
 /* content */
 .vn-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;text-align:center;padding:10vh 20px 0;width:100%;max-width:420px}
 .vn-title{font-size:clamp(36px,10vw,60px);font-weight:900;letter-spacing:-1px;margin:0;animation:vn-neon 3s ease-in-out infinite;color:#fff}
@@ -40564,7 +40565,16 @@ async function openRegionChart(region) {
         if (cfg.sway && !rm) {
           fan.style.animationDelay = (Math.random() * 1.2).toFixed(2) + 's';
         }
-        fan._fanOp = cfg.op;  // store for use later if needed
+
+        // head circle — what makes a blob look like a person
+        var hw = Math.round(w * 0.68);
+        var hd = document.createElement('div');
+        hd.className = 'vn-head';
+        hd.style.width  = hw + 'px';
+        hd.style.height = hw + 'px';
+        hd.style.top    = '-' + Math.round(hw * 0.78) + 'px';
+        fan.appendChild(hd);
+
         rowEl.appendChild(fan);
         fans.push(fan);
       }
