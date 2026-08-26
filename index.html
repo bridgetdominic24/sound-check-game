@@ -607,9 +607,9 @@ function emergencySkip() {
 /* screen base */
 .vn-screen{position:fixed;inset:0;background:#0a0a0f;overflow:hidden;display:flex;flex-direction:column;align-items:center;font-family:'Syne',sans-serif;color:#fff}
 /* spotlights */
-.vn-spot{position:absolute;bottom:0;width:200px;height:78%;pointer-events:none;background:linear-gradient(to top,rgba(255,255,255,.13) 0%,rgba(255,255,255,.01) 100%);clip-path:polygon(50% 100%,-20% 0%,120% 0%);transform-origin:50% 100%;will-change:transform}
-.vn-spot-l{left:10%;animation:vn-sweep-l 6s ease-in-out infinite}
-.vn-spot-r{right:10%;animation:vn-sweep-r 6s ease-in-out infinite 1.2s}
+.vn-spot{position:absolute;top:0;width:220px;height:82%;pointer-events:none;background:linear-gradient(to bottom,rgba(255,255,255,.18) 0%,rgba(255,255,255,.01) 100%);clip-path:polygon(50% 0%,-20% 100%,120% 100%);transform-origin:50% 0%;will-change:transform}
+.vn-spot-l{left:18%;animation:vn-sweep-l 6s ease-in-out infinite}
+.vn-spot-r{right:18%;animation:vn-sweep-r 6s ease-in-out infinite 1.2s}
 /* motes */
 .vn-motes{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .vn-mote{position:absolute;border-radius:50%;background:var(--vn-acc,#00f0ff);opacity:0;animation:vn-mote linear infinite}
@@ -2347,11 +2347,15 @@ function togglePasswordVisibility(){
 
 // LOGIN SCREEN — two distinct views: sign-in and create-account
 function showLoginScreen(){
+  // Pick up venue accent colours set by the venue JS
+  const acc  = (window._vnAcc  || '#00f0ff');
+  const acc2 = (window._vnAcc2 || '#6200ea');
+
   const html = `
-    <div id="loginScreenOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;z-index:200000;padding:20px;">
+    <div id="loginScreenOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a0f;display:flex;align-items:center;justify-content:center;z-index:200000;padding:20px;overflow:hidden;">
 
       <!-- SIGN IN PANEL -->
-      <div id="loginPanel" style="background:white;border-radius:24px;padding:36px 32px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div id="loginPanel" style="position:relative;z-index:2;background:white;border-radius:24px;padding:36px 32px;max-width:400px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,0.5);">
         <div style="text-align:center;margin-bottom:24px">
           <div style="font-size:36px;margin-bottom:8px">🎵</div>
           <h2 style="margin:0 0 6px;font-size:26px;font-weight:900;color:#1a1d23">Welcome back</h2>
@@ -2369,7 +2373,7 @@ function showLoginScreen(){
         </div>
 
         <button onclick="signInWithEmail()"
-          style="width:100%;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:15px;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:12px;letter-spacing:0.3px;font-family:inherit">
+          style="width:100%;background:linear-gradient(135deg,${acc2},${acc});color:white;border:none;padding:15px;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:12px;letter-spacing:0.3px;font-family:inherit">
           Sign In
         </button>
 
@@ -2382,7 +2386,7 @@ function showLoginScreen(){
 
         <p style="text-align:center;font-size:13px;color:#888;margin:0 0 12px">Don't have an account?</p>
         <button onclick="showCreateAccountPanel()"
-          style="width:100%;background:transparent;color:#667eea;border:2px solid #667eea;padding:13px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
+          style="width:100%;background:transparent;color:${acc};border:2px solid ${acc};padding:13px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
           Create Account
         </button>
 
@@ -2393,7 +2397,7 @@ function showLoginScreen(){
       </div>
 
       <!-- CREATE ACCOUNT PANEL (hidden initially) -->
-      <div id="createPanel" style="display:none;background:white;border-radius:24px;padding:36px 32px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div id="createPanel" style="display:none;position:relative;z-index:2;background:white;border-radius:24px;padding:36px 32px;max-width:400px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,0.5);">
         <div style="text-align:center;margin-bottom:24px">
           <div style="font-size:36px;margin-bottom:8px">🚀</div>
           <h2 style="margin:0 0 6px;font-size:26px;font-weight:900;color:#1a1d23">Create Account</h2>
@@ -2413,18 +2417,18 @@ function showLoginScreen(){
         </div>
 
         <!-- CAPTCHA -->
-        <div id="captchaBox" style="background:#f4f3ff;border:2px solid #c5c0f0;border-radius:12px;padding:16px;margin-bottom:16px">
-          <div style="font-size:12px;font-weight:700;color:#764ba2;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Security Check</div>
+        <div id="captchaBox" style="background:#f8f8ff;border:2px solid ${acc};border-radius:12px;padding:16px;margin-bottom:16px;opacity:0.9">
+          <div style="font-size:12px;font-weight:700;color:${acc2};text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Security Check</div>
           <div id="captchaChallenge" style="margin-bottom:12px"></div>
           <div style="display:flex;gap:8px;align-items:center">
-            <input id="captchaAnswer" placeholder="Your answer" style="flex:1;padding:11px;border:2px solid #c5c0f0;border-radius:8px;font-size:15px;font-family:inherit;outline:none">
-            <button onclick="refreshCaptcha()" style="background:#f0eeff;border:1.5px solid #c5c0f0;border-radius:8px;padding:11px;font-size:16px;cursor:pointer;color:#764ba2" title="New challenge">🔄</button>
+            <input id="captchaAnswer" placeholder="Your answer" style="flex:1;padding:11px;border:2px solid #ddd;border-radius:8px;font-size:15px;font-family:inherit;outline:none">
+            <button onclick="refreshCaptcha()" style="background:#f5f5ff;border:1.5px solid ${acc};border-radius:8px;padding:11px;font-size:16px;cursor:pointer;color:${acc}" title="New challenge">🔄</button>
           </div>
           <div id="captchaFeedback" style="font-size:12px;color:#f44336;margin-top:8px;display:none"></div>
         </div>
 
         <button onclick="createAccountWithEmail()"
-          style="width:100%;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;padding:15px;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:12px;letter-spacing:0.3px;font-family:inherit">
+          style="width:100%;background:linear-gradient(135deg,${acc2},${acc});color:white;border:none;padding:15px;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:12px;letter-spacing:0.3px;font-family:inherit">
           Create Account
         </button>
 
@@ -2438,6 +2442,11 @@ function showLoginScreen(){
   `;
 
   document.body.insertAdjacentHTML('beforeend', html);
+
+  // Apply venue background (spotlights, motes, crowd) behind the login card
+  var overlay = document.getElementById('loginScreenOverlay');
+  if (overlay && window._vnApplyVenue) window._vnApplyVenue(overlay);
+
   // Generate first CAPTCHA challenge
   setTimeout(refreshCaptcha, 50);
 }
@@ -40503,7 +40512,9 @@ async function openRegionChart(region) {
     modern: {a:'#3d8ef0', b:'#0a2d6e'},
     pastel: {a:'#a8c9e8', b:'#4a70a0'},
   };
-  var tk = (localStorage.getItem('sc_theme_cache') || 'neon').replace(/^t-/, '');
+  var THEME_KEYS = ['ed','neon','lofi','sk','modern','pastel'];
+  var _cached = localStorage.getItem('sc_theme_cache');
+  var tk = _cached ? _cached.replace(/^t-/, '') : THEME_KEYS[Math.floor(Math.random() * THEME_KEYS.length)];
   var vt = VT[tk] || VT.neon;
 
   function setVars(el) {
@@ -40704,6 +40715,41 @@ async function openRegionChart(region) {
       }, 500);
     }, 4000);
   }
+
+  // ══════════════════════════════════════════════════════════════
+  // EXPOSE GLOBALS — used by showLoginScreen() and other dynamic screens
+  // ══════════════════════════════════════════════════════════════
+  window._vnAcc  = vt.a;
+  window._vnAcc2 = vt.b;
+
+  // _vnApplyVenue(el) — inject venue background (spots, motes, crowd) into
+  // any fixed/absolute container. Venue elements are prepended so they sit
+  // behind the container's existing children.
+  window._vnApplyVenue = function(el) {
+    if (!el) return;
+    setVars(el);
+
+    // crowd (prepend so it's behind the card)
+    var cr = document.createElement('div');
+    cr.className = 'vn-crowd';
+    el.insertBefore(cr, el.firstChild);
+    var fans = buildCrowd(cr);
+    setTimeout(function() {
+      for (var i = 0; i < fans.length; i++) fans[i].classList.add('on');
+    }, 80);
+
+    // motes
+    var mo = document.createElement('div');
+    mo.className = 'vn-motes';
+    el.insertBefore(mo, el.firstChild);
+    buildMotes(mo, rm ? 0 : 10);
+
+    // spotlights
+    var sr = document.createElement('div'); sr.className = 'vn-spot vn-spot-r';
+    el.insertBefore(sr, el.firstChild);
+    var sl = document.createElement('div'); sl.className = 'vn-spot vn-spot-l';
+    el.insertBefore(sl, el.firstChild);
+  };
 
 })();
 </script>
