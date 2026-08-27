@@ -8081,8 +8081,55 @@ async function getAllChartsData(){
     markDirty();
   }
 
+  // Generate press articles for other real players who just hit the top 10.
+  // Fires once per song (guarded by GAME._otherChartArticles).
+  if(GAME_MODE === 'multi' && typeof _pushArticle === 'function'){
+    if(!GAME._otherChartArticles) GAME._otherChartArticles = {};
+    allSongs.forEach(function(song){
+      if(song.isPlayer) return; // skip own songs — handled by milestone system
+      if(song.position > 10) return; // only top 10 debuts get an article
+      if(!song.playerId) return; // skip NPC/generated competitors
+      var key = (song.playerId||song.artist)+'_'+(song.songId||song.title);
+      if(GAME._otherChartArticles[key]) return; // already generated article for this song
+      GAME._otherChartArticles[key] = GAME.week || 1;
+      var aName = song.artist || 'An emerging artist';
+      var sTitle = song.title || 'their latest release';
+      var pos = song.position;
+      var outletChoices = {1:'velour',2:'velour',3:'airtime',4:'airtime',5:'airtime',6:'chartwell',7:'chartwell',8:'chartwell',9:'chartwell',10:'chartwell'};
+      var outlet = outletChoices[pos] || 'chartwell';
+      var outletDisplay = outlet === 'velour' ? 'Velour' : outlet === 'airtime' ? 'AirTime' : 'Chartwell';
+      var headlineTemplates = [
+        aName+' Storms the Charts at #'+pos,
+        '"'+sTitle+'" Debuts at #'+pos+' — '+aName+' Arrives',
+        aName+' Makes a Statement with #'+pos+' Chart Entry',
+        'Eyes on '+aName+': "'+sTitle+'" Debuts in the Top 10',
+        aName+'\'s "'+sTitle+'" Enters the Global Top 40 at #'+pos
+      ];
+      var headline = headlineTemplates[Math.floor(Math.random()*headlineTemplates.length)];
+      var previewTemplates = [
+        '"'+sTitle+'" is the biggest debut of the week.',
+        aName+' comes in strong with a #'+pos+' chart entry.',
+        'A new name joins the top 10 this week.',
+        'First week numbers put '+aName+' firmly on the map.'
+      ];
+      var preview = previewTemplates[Math.floor(Math.random()*previewTemplates.length)];
+      _pushArticle({
+        id: 'chart-debut-'+key.replace(/[^a-zA-Z0-9]/g,'_'),
+        type: 'chart_debut_other',
+        source: outlet,
+        outlet: outletDisplay,
+        week: GAME.week || 1,
+        timestamp: Date.now(),
+        artistName: aName,
+        headline: headline,
+        preview: preview,
+        content: '"'+sTitle+'" by '+aName+' debuted at #'+pos+' on the Global Top 40 this week, making it one of the strongest chart entries in recent memory.'
+      });
+    });
+  }
+
   console.log(`📊 Total charting songs: ${totalOnChart}`);
-  
+
   return allSongs;
 }
 
