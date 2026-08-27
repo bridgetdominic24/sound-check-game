@@ -4980,21 +4980,32 @@ function checkViralMoment(){
   // Only trigger if you have released songs and some hype
   const releasedSongs=GAME.songs.filter(s=>s.released);
   if(releasedSongs.length===0 || (GAME.buzz||GAME.hype||0)<10) return;
-  
-  // 3% chance per week of going viral
-  if(Math.random()>0.03)return;
-  
-  // Pick a random released song to go viral
-  const song=releasedSongs[Math.floor(Math.random()*releasedSongs.length)];
-  
-  // Different viral moment types
+
+  // Only once per week (dow===0 fires this; prevent double-firing same week)
+  const thisWeek = GAME.week || 1;
+  if(GAME._lastViralCheckWeek === thisWeek) return;
+  GAME._lastViralCheckWeek = thisWeek;
+
+  // 3% chance per week of going viral; skip if already in a viral window
+  if(Math.random() > 0.03) return;
+  const eligibleSongs = releasedSongs.filter(s => !s.viralWindow || s.viralWindow.weeksLeft <= 0);
+  if(eligibleSongs.length === 0) return;
+
+  // Pick a random released song (no active viral window) to go viral
+  const song=eligibleSongs[Math.floor(Math.random()*eligibleSongs.length)];
+
+  // Different viral moment types.
+  // streamWindowWeeks: how many weeks the stream boost lasts via calculateDailySongStreams
+  // streamWindowMult: the multiplier applied to daily stream calculation during that window
+  // immediateWeeks: immediate one-time boost = estimated weekly rate * this value
   const viralTypes=[
     {
       type:'tiktok_trend',
       name:'Rookie Trend',
       desc:`${song.title} became a Rookie trend!`,
       icon:'📱',
-      streamMultiplier:25,
+      streamWindowWeeks:3, streamWindowMult:8,
+      immediateWeeks:2,
       hypeBoost:30,
       followerBoost:5000
     },
@@ -5003,16 +5014,18 @@ function checkViralMoment(){
       name:'Celebrity Co-sign',
       desc:`A celebrity posted about ${song.title}!`,
       icon:'⭐',
-      streamMultiplier:15,
+      streamWindowWeeks:2, streamWindowMult:5,
+      immediateWeeks:1,
       hypeBoost:25,
       followerBoost:3000
     },
     {
       type:'playlist_feature',
       name:'Editorial Playlist',
-      desc:`${song.title} hit Spotify's Today's Top Hits!`,
+      desc:`${song.title} landed on a major editorial playlist!`,
       icon:'🎵',
-      streamMultiplier:50,
+      streamWindowWeeks:6, streamWindowMult:12,
+      immediateWeeks:3,
       hypeBoost:40,
       followerBoost:8000
     },
@@ -5021,7 +5034,8 @@ function checkViralMoment(){
       name:'Radio Breakthrough',
       desc:`${song.title} is getting major radio play!`,
       icon:'📻',
-      streamMultiplier:20,
+      streamWindowWeeks:4, streamWindowMult:6,
+      immediateWeeks:2,
       hypeBoost:35,
       followerBoost:4000
     },
@@ -5030,7 +5044,8 @@ function checkViralMoment(){
       name:'Went Viral as Meme',
       desc:`${song.title} became a viral meme!`,
       icon:'😂',
-      streamMultiplier:30,
+      streamWindowWeeks:2, streamWindowMult:10,
+      immediateWeeks:2,
       hypeBoost:20,
       followerBoost:6000
     },
@@ -5039,31 +5054,37 @@ function checkViralMoment(){
       name:'Chart Surprise',
       desc:`${song.title} unexpectedly surged on the charts!`,
       icon:'📈',
-      streamMultiplier:18,
+      streamWindowWeeks:3, streamWindowMult:7,
+      immediateWeeks:1,
       hypeBoost:28,
       followerBoost:3500
     }
   ];
-  
+
   // Pick random viral type
   const viral=viralTypes[Math.floor(Math.random()*viralTypes.length)];
-  
-  // Apply viral boost
-  const baseStreams=song.streams||0;
-  const viralStreams=Math.floor(Math.random()*10000)+baseStreams*viral.streamMultiplier;
-  song.streams+=viralStreams;
-  
+
+  // Set a viral window on the song — calculateDailySongStreams already respects this
+  song.viralWindow = { weeksLeft: viral.streamWindowWeeks, multiplier: viral.streamWindowMult };
+
+  // Immediate one-time stream bump: based on estimated daily rate × 7 (one week) × immediateWeeks
+  // This is sane even for a song with 500M total streams — it uses the *daily rate*, not total
+  const estimatedDaily = typeof calculateDailySongStreams==='function' ? calculateDailySongStreams(song) : 5000;
+  const immediateStreams = Math.max(5000, Math.floor(estimatedDaily * 7 * viral.immediateWeeks));
+  song.streams = (song.streams||0) + immediateStreams;
+  song.weeklyStreams = (song.weeklyStreams||0) + immediateStreams; // keep "this week" accurate
+
   // Boost hype
   addHype(viral.hypeBoost);
-  
+
   // Boost social followers
   const platform=['instagram','tiktok','twitter'][Math.floor(Math.random()*3)];
-  GAME.social[platform]+=viral.followerBoost;
-  
-  // Money from viral streams ($0.01 per stream)
-  const viralRevenue=viralStreams*0.01;
-  GAME.money+=viralRevenue;
-  
+  if(GAME.social) GAME.social[platform]=(GAME.social[platform]||0)+viral.followerBoost;
+
+  // Money from immediate viral streams ($0.004 per stream — same as daily rate)
+  const viralRevenue = immediateStreams * 0.004;
+  GAME.money = (GAME.money||0) + viralRevenue;
+
   // Track viral moment
   if(!GAME.viralMoments)GAME.viralMoments=[];
   GAME.viralMoments.push({
@@ -5071,25 +5092,65 @@ function checkViralMoment(){
     name:viral.name,
     week:GAME.week,
     song:song.title,
-    streams:viralStreams,
+    streams:immediateStreams,
     revenue:viralRevenue,
-    description:viral.desc
+    description:viral.desc,
+    windowWeeks:viral.streamWindowWeeks
   });
-  
+
+  // Push a press article about the viral moment
+  var artistName = GAME.sn || GAME.artistName || 'Artist';
+  var viralArticleId = 'viral_'+viral.type+'_'+(GAME.playerId||'local')+'_w'+thisWeek;
+  // Pick outlet: meme/tiktok → Undertone, playlist/radio → AirTime, chart_surge → Chartwell, celeb → Room Service
+  var outletMap = {tiktok_trend:'undertone',meme:'undertone',celebrity_cosign:'room_service',playlist_feature:'airtime',radio_play:'airtime',chart_surge:'chartwell'};
+  var articleOutlet = outletMap[viral.type] || 'undertone';
+  var outletDisplayMap = {undertone:'Undertone',room_service:'Room Service',airtime:'AirTime',chartwell:'Chartwell'};
+  var outletDisplay = outletDisplayMap[articleOutlet] || 'Undertone';
+  var viralArticleHeadlines = {
+    tiktok_trend: `"${song.title}" Is Everywhere on Rookie Right Now`,
+    meme: `How "${song.title}" Became the Meme Everyone Can\'t Escape`,
+    celebrity_cosign: `${artistName}\'s "${song.title}" Gets a Major Co-Sign`,
+    playlist_feature: `"${song.title}" Lands on an Editorial Playlist — Streams Are Surging`,
+    radio_play: `${artistName} Breaks Through to Radio With "${song.title}"`,
+    chart_surge: `Surprise: "${song.title}" Is Climbing the Charts Fast`
+  };
+  var viralPreviewMap = {
+    tiktok_trend: `The Rookie algorithm has its claws in "${song.title}" and it\'s not letting go.`,
+    meme: `Nobody planned this, but "${song.title}" is now the soundtrack to a thousand memes.`,
+    celebrity_cosign: `One post changed everything for ${artistName}.`,
+    playlist_feature: `Landing on a playlist this size can change a career. ${artistName}\'s streaming numbers say it already has.`,
+    radio_play: `Radio listeners are hearing "${song.title}" for the first time — and they\'re responding.`,
+    chart_surge: `"${song.title}" wasn\'t supposed to be charting like this, but here we are.`
+  };
+  _pushArticle({
+    id: viralArticleId,
+    type: 'viral_moment',
+    source: articleOutlet,
+    outlet: outletDisplay,
+    week: thisWeek,
+    timestamp: Date.now(),
+    artistName: artistName,
+    player_id: GAME.playerId || null,
+    headline: viralArticleHeadlines[viral.type] || `${artistName} Goes Viral`,
+    preview: viralPreviewMap[viral.type] || viral.desc,
+    content: viral.desc + ' The song gained ' + immediateStreams.toLocaleString() + ' additional streams this week, with a ' + viral.streamWindowWeeks + '-week boost window beginning now.'
+  });
+
   // Big celebration popup!
   const msg=`${viral.desc}
 
 🎵 ${song.title}
-📊 +${viralStreams.toLocaleString()} streams!
+📊 +${immediateStreams.toLocaleString()} streams this week!
+📈 ${viral.streamWindowWeeks}-week streaming boost active
 💰 +$${viralRevenue.toFixed(2)}
 🔥 +${viral.hypeBoost} hype
 📱 +${viral.followerBoost.toLocaleString()} ${platform} followers
 
 THIS IS YOUR MOMENT! 🚀`;
-  
+
   showEvent(viral.icon,'🌟 WENT VIRAL! 🌟',msg,['AMAZING!']);
   addNotification(`${viral.icon} Viral Moment!`,viral.desc,'viral');
-  
+
   // Auto-save after viral moment
   autoSave();
 }
