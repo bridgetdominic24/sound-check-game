@@ -13717,22 +13717,6 @@ function showLabelOwnerDashboard(startTab){
   // TAB BAR
   html += '<div id="odTabs" style="display:flex;background:var(--surf);border-bottom:1px solid var(--bord);overflow-x:auto;flex:none">'+tabHtml+'</div>';
 
-  // RECRUITING CONTROL (always visible between tabs and panes)
-  var recruitingOn=!ol.hasRosterFull;
-  var advSlots2=ol.advertisedSlots!==undefined?Math.min(ol.advertisedSlots,Math.max(0,tierDef.maxRoster-roster.length)):Math.max(0,tierDef.maxRoster-roster.length);
-  html+='<div style="background:var(--surf);border-bottom:1px solid var(--bord);padding:10px 16px;display:flex;align-items:center;gap:10px;flex:none">';
-  html+='<div style="flex:1;font-size:12.5px;font-weight:700">Recruiting</div>';
-  html+='<div style="display:flex;align-items:center;gap:8px">';
-  html+='<span style="font-size:11px;color:var(--mut)">Slots:</span>';
-  html+='<div style="display:flex;gap:4px">';
-  html+='<button onclick="odChangeSlots(-1)" style="width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--fb)">−</button>';
-  html+='<div id="od-slot-count" style="width:36px;height:30px;border-radius:8px;background:var(--acc-bg);border:1px solid var(--acc);color:var(--acc);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center">'+advSlots2+'</div>';
-  html+='<button onclick="odChangeSlots(1)" style="width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--fb)">+</button>';
-  html+='</div>';
-  html+='<div onclick="odToggleRecruiting(this)" data-is-on="'+(recruitingOn?'1':'')+'" style="width:36px;height:20px;border-radius:99px;background:'+(recruitingOn?'var(--green)':'var(--surf)')+';border:1px solid var(--bord);position:relative;cursor:pointer;transition:background .2s;flex:none">';
-  html+='<div style="position:absolute;top:2.5px;left:'+(recruitingOn?'19px':'2.5px')+';width:14px;height:14px;border-radius:50%;background:'+(recruitingOn?'#fff':'var(--mut)')+';transition:all .2s"></div></div>';
-  html+='</div></div>';
-
   // BODY
   html += '<div id="odBody" style="flex:1;overflow-y:auto;padding:14px 16px;padding-bottom:100px"></div>';
   html += '</div>';
@@ -13861,7 +13845,23 @@ function _odRoster(){
   var roster=ol.roster||[];
   var tierDef=LABEL_TIERS[ol.tier]||LABEL_TIERS.indie;
   var openSlots=Math.max(0,tierDef.maxRoster-roster.length);
+  var isRecruiting=!ol.hasRosterFull;
+  var advSlots=ol.advertisedSlots!==undefined?Math.min(ol.advertisedSlots,openSlots):openSlots;
   var out='';
+  // Recruiting control (Roster tab only)
+  out+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:11px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">';
+  out+='<div style="flex:1"><div style="font-size:12.5px;font-weight:700;color:var(--txt)">Recruiting</div>';
+  out+='<div style="font-size:10.5px;color:var(--mut);margin-top:2px">'+openSlots+' open slot'+(openSlots!==1?'s':'')+' · '+tierDef.name+' cap '+tierDef.maxRoster+'</div></div>';
+  out+='<div style="display:flex;align-items:center;gap:8px">';
+  out+='<span style="font-size:11px;color:var(--mut)">Slots:</span>';
+  out+='<div style="display:flex;gap:4px;align-items:center">';
+  out+='<button onclick="odChangeSlots(-1)" style="width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--fb)">−</button>';
+  out+='<div id="od-slot-count" style="width:36px;height:30px;border-radius:8px;background:var(--acc-bg);border:1px solid var(--acc);color:var(--acc);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center">'+advSlots+'</div>';
+  out+='<button onclick="odChangeSlots(1)" style="width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--fb)">+</button>';
+  out+='</div>';
+  out+='<div onclick="odToggleRecruiting(this)" data-is-on="'+(isRecruiting?'1':'')+'" style="width:36px;height:20px;border-radius:99px;background:'+(isRecruiting?'var(--green)':'var(--surf)')+';border:1px solid var(--bord);position:relative;cursor:pointer;transition:background .2s;flex:none">';
+  out+='<div style="position:absolute;top:2.5px;'+(isRecruiting?'left:19px':'left:2.5px')+';width:14px;height:14px;border-radius:50%;background:'+(isRecruiting?'#fff':'var(--mut)')+';transition:all .2s"></div></div>';
+  out+='</div></div>';
   // Roster header
   out+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
   out+='<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)">SIGNED ARTISTS ('+roster.length+'/'+tierDef.maxRoster+' slots)</div>';
