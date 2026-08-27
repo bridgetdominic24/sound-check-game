@@ -13624,8 +13624,8 @@ function showSignedArtistView(){
 }
 
 // ── LABEL OWNER DASHBOARD ──────────────────────────────────────────
-function showLabelOwnerDashboard(){
-  const ol = GAME.ownedLabel;
+function showLabelOwnerDashboard(startTab){
+  var ol = GAME.ownedLabel;
   if(!ol){showUnsignedView();return;}
   // Auto-sign owner if they somehow don't have signedLabel set (pre-fix saves)
   if(!GAME.signedLabel){
@@ -13638,196 +13638,398 @@ function showLabelOwnerDashboard(){
     };
     markDirty(); saveToCloud();
   }
-
-  // CRITICAL FIX: Ensure founder is always in the roster
+  // Ensure founder is always in roster
   if(!ol.roster) ol.roster = [];
-  const founderAlreadyInRoster = ol.roster.some(a => a.userId === currentUser?.id || a.id === GAME.playerId);
-  if(GAME.signedLabel && GAME.signedLabel.isOwner && !founderAlreadyInRoster){
-    console.log('🔧 Adding founder to roster (fix for missing founder)');
+  var founderInRoster = ol.roster.some(function(a){ return a.userId===currentUser?.id || a.id===GAME.playerId; });
+  if(GAME.signedLabel && GAME.signedLabel.isOwner && !founderInRoster){
+    console.log('🔧 Adding founder to roster');
     ol.roster.unshift({
-      id: GAME.playerId || null,
-      userId: currentUser?.id || null,
-      artistName: GAME.sn || GAME.artistName || 'You',
-      profilePic: (GAME.artistProfile && GAME.artistProfile.profilePic) || '🎤',
-      genre: GAME.genre || 'Pop',
-      cut: ol.defaultCut || 25,
-      dealType: 'standard',
-      weeklyAdvance: 0,
-      weeklyEarnings: 0,
-      totalStreams: getTotalStreams?.() || 0,
-      signedWeek: GAME.week || 1,
-      spotlight: false,
-      quotaWarning: false,
-      pendingReleases: []
+      id: GAME.playerId||null, userId: currentUser?.id||null,
+      artistName: GAME.sn||GAME.artistName||'You',
+      profilePic: (GAME.artistProfile&&GAME.artistProfile.profilePic)||'🎤',
+      genre: GAME.genre||'Pop', cut: ol.defaultCut||25, dealType:'standard',
+      weeklyAdvance:0, weeklyEarnings:0, totalStreams: getTotalStreams?.()||0,
+      signedWeek: GAME.week||1, spotlight:false, quotaWarning:false, pendingReleases:[]
     });
     markDirty(); saveToCloud();
   }
 
-  const tierDef = LABEL_TIERS[ol.tier] || LABEL_TIERS.indie;
-  const roster = ol.roster || [];
-  const staff = ol.staff || [];
-  const activity = (ol.activity||[]).slice(0,6);
-  const pendingOffers = ol.pendingOffers || [];
-  const approvalQueue = roster.flatMap(a=>a.pendingReleases||[]).filter(r=>r.status==='pending');
-  const weeklyRosterCut = roster.reduce((sum,a)=>{
-    const cut = (ol.pendingOffers||[]).find(o=>o.artistId===a.id)?.terms?.cut || 0.25;
-    return sum + (a.weeklyEarnings||0) * cut;
+  var t = (typeof startTab==='number') ? startTab : 0;
+  var tierDef = LABEL_TIERS[ol.tier]||LABEL_TIERS.indie;
+  var roster = ol.roster||[];
+  var approvalQueue = roster.flatMap(function(a){ return (a.pendingReleases||[]).filter(function(r){ return r.status==='pending'; }); });
+  var inboxCount = approvalQueue.length + (ol.pendingCollabRequests||[]).length + (ol.pendingPressRequests||[]).length;
+  var weeklyRosterCut = roster.reduce(function(s,a){
+    var cut=(a.cut||ol.defaultCut||25)/100;
+    return s+(a.weeklyEarnings||0)*cut;
   },0);
-  const totalDebt = ol.debt || 0;
-  const weeklyMaint = (roster.length * 5000) + (staff.length * 3000) + tierDef.maintenance;
 
-  let html = `<div style="padding:16px;padding-bottom:100px">`;
+  var tierBgColor = {indie:'rgba(58,47,34,0.9)',mid:'rgba(44,49,61,0.9)',major:'rgba(42,36,18,0.9)',global:'rgba(58,42,18,0.9)'}[ol.tier]||'rgba(58,47,34,0.9)';
+  var tierTxtColor = {indie:'#c9905a',mid:'#aab4c8',major:'var(--acc)',global:'#f59e0b'}[ol.tier]||'#c9905a';
 
-  // LABEL IDENTITY
-  html += `<div style="margin-bottom:12px;border-radius:10px;overflow:hidden;border:1px solid var(--bord);box-shadow:0 1px 3px rgba(0,0,0,0.06)">
-    <div style="padding:16px;display:flex;gap:14px;align-items:flex-start;border-bottom:1px solid var(--bord);background:var(--surf)">
-      <div style="width:56px;height:56px;border-radius:12px;overflow:hidden;border:1px solid var(--bord);flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--bg)">
-        ${ol.logoImage ? `<img src="${ol.logoImage}" style="width:100%;height:100%;object-fit:cover">` : `<span style="font-size:28px">${ol.logoEmoji||'🏢'}</span>`}
-      </div>
-      <div style="flex:1">
-        <div style="font-size:20px;font-weight:900;color:var(--txt);letter-spacing:-0.5px">${ol.name}</div>
-        <div style="font-size:12px;color:var(--mut);margin-top:3px">Player-run · Founded Week ${ol.createdWeek||1}</div>
-        <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
-          <span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">${tierDef.name}</span>
-          <span style="background:#ffedd5;color:#9a3412;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">${roster.length} Artists</span>
-          <span style="font-size:11px">${_renderStars(ol.rep||5)}</span>
-          <span style="font-size:10px;color:var(--mut)">${(ol.rep||5).toFixed(1)} rep</span>
-        </div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--surf);border-bottom:1px solid var(--bord)">
-      <div style="padding:12px;text-align:center;border-right:1px solid var(--bord)">
-        <div style="font-size:16px;font-weight:800;color:#22c55e">$${_fmt(Math.round(weeklyRosterCut))}</div>
-        <div style="font-size:9px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Wk Earnings</div>
-      </div>
-      <div style="padding:12px;text-align:center;border-right:1px solid var(--bord)">
-        <div style="font-size:16px;font-weight:800;color:var(--txt)">${ol.hype||0}</div>
-        <div style="font-size:9px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Label Hype</div>
-      </div>
-      <div style="padding:12px;text-align:center">
-        <div style="font-size:16px;font-weight:800;color:${totalDebt>0?'#ef4444':'#22c55e'}">$${_fmt(totalDebt)}</div>
-        <div style="font-size:9px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">Debt</div>
-      </div>
-    </div>
-    <div style="padding:10px 16px;border-bottom:1px solid var(--bord);display:flex;justify-content:space-between;align-items:center">
-      <div><div style="font-size:11px;font-weight:800;letter-spacing:0.5px;color:${tierDef.color}">${tierDef.name.toUpperCase()} LABEL</div>
-      <div style="font-size:10px;color:var(--mut);margin-top:1px">Weekly overhead: $${_fmt(weeklyMaint)}</div></div>
-      <button onclick="closeMenu();showLabelOwnerSettings()" style="background:var(--bg);border:1px solid var(--bord);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--txt);font-family:var(--fb)">Settings</button>
-    </div>
-    <div style="padding:10px 14px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:10px;color:var(--mut)">Progress to ${ol.tier==='indie'?'Mid-Tier':ol.tier==='mid'?'Major':ol.tier==='major'?'Global':'Max'}</span><span style="font-size:10px;font-weight:700;color:${tierDef.color}">${_labelTierProgress(ol)}%</span></div>
-      <div style="height:4px;background:var(--bord);border-radius:2px;overflow:hidden"><div style="height:100%;width:${_labelTierProgress(ol)}%;background:${tierDef.color};border-radius:2px"></div></div>
-    </div>
-  </div>`;
+  var logoHtml = ol.logoImage
+    ? '<img src="'+ol.logoImage+'" style="width:100%;height:100%;object-fit:cover">'
+    : '<span style="font-size:32px">'+(ol.logoEmoji||'🏢')+'</span>';
 
-  // URGENT ALERTS
-  if(approvalQueue.length > 0 || totalDebt > 0){
-    html += `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#dc2626;line-height:1.5">
-      ${approvalQueue.length > 0 ? `⏰ ${approvalQueue.length} release approval${approvalQueue.length>1?'s':''} pending — approve within 7 days or reputation drops.<br>` : ''}
-      ${totalDebt > 0 ? `💸 Label debt: $${_fmt(totalDebt)} — pay down before artists notice.` : ''}
-    </div>`;
-  }
+  var tabs = ['Activity','Roster','Inbox','Finances','Studio','Press'];
+  var tabHtml = tabs.map(function(name,i){
+    var badge = (i===2&&inboxCount>0)?'<span style="background:var(--red);color:#fff;border-radius:99px;font-size:9px;padding:1px 5px;margin-left:3px">'+inboxCount+'</span>':'';
+    return '<div onclick="window._odTab('+i+')" id="odt'+i+'" style="flex:none;padding:11px 12px;font-size:11.5px;font-weight:700;color:'+(i===t?'var(--acc)':'var(--mut)')+';border-bottom:2px solid '+(i===t?'var(--acc)':'transparent')+';cursor:pointer;white-space:nowrap;touch-action:manipulation">'+name+badge+'</div>';
+  }).join('');
 
-  // SENT OFFERS OUTBOX
-  const sentOffers = GAME.labelOffersSent || [];
-  if(sentOffers.length > 0){
-    html += `<div style="padding:14px 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">📤 Sent Offers</div>
-    <div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:12px;overflow:hidden">`;
-    sentOffers.slice().reverse().forEach(o => {
-      const age = _relTime(o.sentAt);
-      const isCounted = o.status === 'countered';
-      const statusColor = {accepted:'#166534',declined:'#dc2626',countered:'#d97706',pending:'var(--acc)'}[o.status||'pending'] || 'var(--acc)';
-      const statusBg    = {accepted:'#dcfce7',declined:'#fee2e2',countered:'#fef3c7',pending:'var(--acc-bg)'}[o.status||'pending'] || 'var(--acc-bg)';
-      html += `<div onclick="reviewSentOffer('${o.id}')" style="padding:11px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bord);cursor:pointer;active:opacity:.7">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;color:var(--txt)">${o.toArtistName||'Artist'}</div>
-          <div style="font-size:10px;color:var(--mut);margin-top:2px">${o.terms?.cut||25}% cut · ${o.terms?.length||'1 year'} · ${age}</div>
-          ${isCounted?'<div style="font-size:10px;color:#d97706;margin-top:2px;font-weight:700">⚡ Counter received — tap to review</div>':''}
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <span style="background:${statusBg};color:${statusColor};padding:3px 8px;border-radius:6px;font-size:9px;font-weight:700">${(o.status||'pending').toUpperCase()}</span>
-          <span style="color:var(--mut);font-size:14px">›</span>
-        </div>
-      </div>`;
-    });
-    html += `</div>`;
-  }
+  var html = '<div style="display:flex;flex-direction:column;min-height:100%;background:var(--bg)">';
+  // HERO
+  html += '<div style="position:relative;overflow:hidden;min-height:160px;background:#05050a;flex:none">';
+  html += '<div style="position:absolute;inset:0;font-size:160px;display:flex;align-items:center;justify-content:center;opacity:0.18;transform:scale(1.15);filter:blur(8px)">'+(ol.logoEmoji||'🏢')+'</div>';
+  html += '<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,5,10,.15) 0%,rgba(5,5,10,.65) 55%,var(--bg) 100%)"></div>';
+  html += '<div style="position:relative;z-index:2;padding:14px 16px">';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">';
+  html += '<button onclick="_closeOverlay(this)" style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--fb)">&#8249;</button>';
+  html += '<span style="font-size:12px;color:rgba(255,255,255,.5);font-weight:600;flex:1">My Label</span>';
+  html += '<button onclick="odOpenSettings()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">Settings</button>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:14px;align-items:flex-end">';
+  html += '<div style="width:62px;height:62px;border-radius:14px;background:var(--surf);border:2px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden">'+logoHtml+'</div>';
+  html += '<div style="flex:1"><h2 style="font-size:21px;font-weight:900;color:#fff;line-height:1.1;margin:0">'+ol.name+'</h2>';
+  html += '<div style="display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap">';
+  html += '<span style="font-size:9.5px;font-weight:800;letter-spacing:.8px;padding:3px 9px;border-radius:4px;background:'+tierBgColor+';color:'+tierTxtColor+'">'+tierDef.name.toUpperCase()+'</span>';
+  html += '<span style="font-size:10.5px;color:rgba(255,255,255,.45)">'+(ol.region||'Global')+'</span>';
+  html += '</div>';
+  html += '<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">Founded Week '+(ol.createdWeek||1)+'</div>';
+  html += '</div></div></div></div>';
 
-  // ACTIVITY FEED
-  if(activity.length > 0){
-    html += `<div style="padding:14px 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Label Activity</div>
-    <div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
-      ${activity.map(a=>`<div style="display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bord);align-items:flex-start">
-        <div style="width:8px;height:8px;border-radius:50%;background:${a.color||'#667eea'};flex-shrink:0;margin-top:5px"></div>
-        <div style="font-size:12px;color:var(--txt);line-height:1.5;flex:1">${a.text}</div>
-        <div style="font-size:10px;color:var(--mut);flex-shrink:0">${a.time||''}</div>
-      </div>`).join('')}
-    </div>`;
-  }
+  // STAT STRIP
+  var statItems = [
+    {v:'$'+_fmt(Math.round(ol.funds||ol.balance||0)),l:'Funds'},
+    {v:'<span style="color:var(--green)">+$'+_fmt(Math.round(weeklyRosterCut))+'</span>',l:'This Wk'},
+    {v:(ol.rep||5).toFixed(1)+'⭐',l:'Rep'},
+    {v:roster.length+'/'+tierDef.maxRoster,l:'Roster'}
+  ];
+  html += '<div style="display:flex;background:var(--surf);border-bottom:1px solid var(--bord);flex:none">';
+  statItems.forEach(function(s,i){
+    html += '<div style="flex:1;text-align:center;padding:10px 3px;'+(i<3?'border-right:1px solid var(--bord)':'')+'">';
+    html += '<div style="font-size:14px;font-weight:900">'+s.v+'</div>';
+    html += '<div style="font-size:8.5px;font-weight:700;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin-top:1px">'+s.l+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
 
-  // ROSTER
-  html += `<div style="padding:14px 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Signed Roster</div>
-  <div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--bord)">
-      <div style="font-size:13px;font-weight:800;color:var(--txt)">Artists (${roster.length})</div>
-      <button onclick="closeMenu();showSignArtistFlow()" style="background:var(--acc);color:white;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">+ Sign Artist</button>
-    </div>
-    ${roster.length===0
-      ? `<div style="padding:20px;text-align:center;font-size:12px;color:var(--mut)">No artists signed yet. Find and sign your first artist.</div>`
-      : roster.map(a=>`<div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--bord)">
-          <div style="width:38px;height:38px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${a.profilePic||'🎤'}</div>
-          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt)">${a.artistName}${a.spotlight?' ⭐':''}</div><div style="font-size:11px;color:var(--mut);margin-top:1px">${a.genre||'Pop'} · ${a.cut}% label cut${a.quotaWarning?' · ⚠️ Quota warning':''}</div></div>
-          <div style="text-align:right;flex-shrink:0"><div style="font-size:13px;font-weight:800;color:#22c55e">$${_fmt(Math.round((a.weeklyEarnings||0)*(a.cut/100)))}</div><div style="font-size:10px;color:var(--mut);margin-top:1px">this week</div></div>
-        </div>`).join('')
+  // TAB BAR
+  html += '<div id="odTabs" style="display:flex;background:var(--surf);border-bottom:1px solid var(--bord);overflow-x:auto;flex:none">'+tabHtml+'</div>';
+
+  // BODY
+  html += '<div id="odBody" style="padding:14px 16px;padding-bottom:100px"></div>';
+  html += '</div>';
+
+  _insertOverlay(html);
+
+  window._odTab = function(i){
+    var fns = [_odActivity,_odRoster,_odInbox,_odFinances,_odStudio,_odPress];
+    for(var j=0;j<6;j++){
+      var el=document.getElementById('odt'+j);
+      if(!el) continue;
+      el.style.color = j===i?'var(--acc)':'var(--mut)';
+      el.style.borderBottomColor = j===i?'var(--acc)':'transparent';
     }
-  </div>`;
+    var body=document.getElementById('odBody');
+    if(body) body.innerHTML = fns[i]();
+  };
+  window._odTab(t);
+}
 
-  // RELEASE APPROVAL QUEUE
-  if(approvalQueue.length > 0){
-    html += `<div style="padding:14px 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Release Approvals (${approvalQueue.length})</div>
-    <div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
-      ${approvalQueue.map(r=>`<div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--bord)">
-        <div style="width:38px;height:38px;border-radius:8px;background:#fef9c3;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🎵</div>
-        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt)">${r.artistName} — "${r.title}"</div><div style="font-size:11px;color:var(--mut);margin-top:1px">Quality ${r.quality}/100 · ${r.daysAgo}d ago${r.urgent?' ⚠️':''}</div></div>
-        <div style="display:flex;gap:5px">
-          <button onclick="approveLabelRelease('${r.id}',false)" style="background:#fef2f2;color:#dc2626;border:1.5px solid #fecaca;border-radius:6px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">✗</button>
-          <button onclick="approveLabelRelease('${r.id}',true)" style="background:var(--acc);color:white;border:none;border-radius:6px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">✓</button>
-        </div>
-      </div>`).join('')}
-    </div>`;
+function odOpenSettings(){
+  var ov=document.querySelector('[data-overlay]');
+  if(ov) _closeOverlay(ov);
+  setTimeout(function(){ showLabelOwnerSettings(); },150);
+}
+
+function odToggleRecruiting(el){
+  var ol=GAME.ownedLabel; if(!ol) return;
+  var wasOn = el.dataset.isOn==='1';
+  var isNowOn = !wasOn;
+  el.dataset.isOn = isNowOn?'1':'';
+  el.style.background = isNowOn?'var(--green)':'var(--surf)';
+  var dot=el.querySelector('div');
+  if(dot){ dot.style.left=isNowOn?'19px':'2.5px'; dot.style.background=isNowOn?'#fff':'var(--mut)'; }
+  ol.hasRosterFull = !isNowOn;
+  markDirty(); saveToCloud();
+  showToast(isNowOn?'🟢 Now recruiting':'🔴 Recruiting off', isNowOn?'green':'#888');
+}
+
+function odChangeSlots(delta){
+  var ol=GAME.ownedLabel; if(!ol) return;
+  var tierDef=LABEL_TIERS[ol.tier]||LABEL_TIERS.indie;
+  var maxSlots=Math.max(0,tierDef.maxRoster-(ol.roster||[]).length);
+  ol.advertisedSlots=Math.max(0,Math.min(maxSlots,(ol.advertisedSlots!==undefined?ol.advertisedSlots:maxSlots)+delta));
+  var el=document.getElementById('od-slot-count'); if(el) el.textContent=ol.advertisedSlots;
+  markDirty(); saveToCloud();
+}
+
+// ── OWNER DASHBOARD TAB: ACTIVITY ──
+function _odActivity(){
+  var ol=GAME.ownedLabel; if(!ol) return '';
+  var roster=ol.roster||[];
+  var tierDef=LABEL_TIERS[ol.tier]||LABEL_TIERS.indie;
+  var activity=(ol.activity||[]).slice(0,8);
+  var totalMorale=roster.length>0?Math.round(roster.reduce(function(s,a){return s+_computeMorale(a,ol);},0)/roster.length):60;
+  var balance=ol.funds||ol.balance||0;
+  var finScore=Math.min(100,Math.round((balance/50000)*100));
+  var repScore=Math.min(100,Math.round(((ol.rep||4)/5)*100));
+  var healthScore=Math.round(finScore*0.3+totalMorale*0.3+repScore*0.4);
+  var hCol=healthScore>=70?'var(--green)':healthScore>=40?'var(--yellow)':'var(--red)';
+  var tierProg=_labelTierProgress(ol);
+  var totalStreams=roster.reduce(function(a,r){return a+(r.totalStreams||0);},0);
+  var tierThreshold={indie:500000,mid:5000000,major:50000000,global:Infinity}[ol.tier]||500000;
+  var needed=Math.max(0,tierThreshold-totalStreams);
+  var nextTier={indie:'Mid-Indie',mid:'Major Boutique',major:'Global Major',global:'Max'}[ol.tier]||'Max';
+  var upcoming=roster.flatMap(function(a){
+    return (a.pendingReleases||[]).filter(function(r){return r.status==='scheduled';}).map(function(r){
+      return {title:r.title,artistName:a.artistName,pic:a.profilePic||'🎤',genre:r.genre||'Pop',scheduledWeek:r.scheduledWeek||'—'};
+    });
+  });
+
+  var out='';
+  // Health score
+  out+='<div style="background:linear-gradient(135deg,#1e2a3e,#131821);border:1px solid var(--bord);border-radius:14px;padding:14px;margin-bottom:12px">';
+  out+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><h4 style="font-size:13px;font-weight:700;margin:0">Label Health Score</h4><div style="font-size:22px;font-weight:900;color:'+hCol+'">'+healthScore+'</div></div>';
+  out+='<div style="height:6px;border-radius:3px;background:var(--surf);overflow:hidden"><div style="height:100%;width:'+healthScore+'%;background:linear-gradient(90deg,var(--green),var(--acc));border-radius:3px"></div></div>';
+  out+='<div style="display:flex;gap:8px;margin-top:10px">';
+  [{v:finScore,l:'FINANCES'},{v:totalMorale,l:'MORALE'},{v:repScore,l:'REP'},{v:tierProg,l:'GROWTH'}].forEach(function(f){
+    var fc=f.v>=70?'var(--green)':f.v>=40?'var(--yellow)':'var(--red)';
+    out+='<div style="flex:1;background:var(--surf);border-radius:9px;padding:7px 8px;text-align:center"><b style="font-size:14px;font-weight:900;display:block;color:'+fc+'">'+f.v+'</b><span style="font-size:8.5px;font-weight:700;color:var(--mut);letter-spacing:.5px">'+f.l+'</span></div>';
+  });
+  out+='</div></div>';
+  // Tier progress
+  out+='<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:12px 14px;margin-bottom:12px">';
+  out+='<div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;margin-bottom:8px"><span style="color:var(--mut)">Tier Upgrade Progress</span><span style="color:var(--txt)">'+tierDef.name+' → '+nextTier+'</span></div>';
+  out+='<div style="height:6px;border-radius:3px;background:var(--surf);overflow:hidden"><div style="height:100%;width:'+tierProg+'%;background:linear-gradient(90deg,'+tierDef.color+',var(--acc));border-radius:3px"></div></div>';
+  out+='<div style="font-size:10px;color:var(--mut);margin-top:5px">'+_fmt(totalStreams)+' streams · '+roster.length+' artists'+(needed>0?' · Need '+_fmt(needed)+' more streams':' · Ready!')+'</div>';
+  out+='</div>';
+  // Upcoming
+  if(upcoming.length>0){
+    out+='<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;overflow:hidden;margin-bottom:12px">';
+    out+='<div style="padding:9px 13px;background:var(--surf);border-bottom:1px solid var(--bord);font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase">UPCOMING RELEASES</div>';
+    upcoming.slice(0,4).forEach(function(r){
+      out+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bord)">';
+      out+='<div style="width:36px;height:36px;border-radius:8px;background:var(--surf);display:flex;align-items:center;justify-content:center;font-size:16px;flex:none">'+r.pic+'</div>';
+      out+='<div style="flex:1"><b style="font-size:12.5px;display:block">'+r.title+'</b><span style="font-size:10.5px;color:var(--mut)">'+r.artistName+' · '+r.genre+'</span></div>';
+      out+='<div style="font-size:11px;font-weight:700;color:var(--acc)">Wk '+r.scheduledWeek+'</div></div>';
+    });
+    out+='</div>';
   }
+  // Activity feed
+  out+='<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:14px 0 8px">Recent Activity</div>';
+  if(activity.length>0){
+    activity.forEach(function(a){
+      out+='<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--bord);align-items:flex-start">';
+      out+='<div style="width:8px;height:8px;border-radius:50%;background:'+(a.color||'#667eea')+';flex:none;margin-top:5px"></div>';
+      out+='<p style="font-size:12px;line-height:1.45;flex:1;margin:0">'+a.text+'</p>';
+      out+='<div style="font-size:9.5px;color:var(--mut);flex:none">'+(a.time||'')+'</div></div>';
+    });
+  } else {
+    out+='<div style="text-align:center;padding:40px 20px"><div style="font-size:32px;margin-bottom:12px">📊</div><div style="color:var(--mut);font-size:13px">No activity yet. Sign your first artist to get started.</div></div>';
+  }
+  // Quick actions
+  out+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px">';
+  out+='<button onclick="showLabelLoans()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">🏦 Bank Loans</button>';
+  out+='<button onclick="showHireStaffFlow()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">👥 Hire Staff</button>';
+  out+='<button onclick="showLabelShowcase()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">🎪 Showcase</button>';
+  out+='<button onclick="showSignArtistFlow()" style="background:var(--acc);color:var(--acc-txt);border:none;border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">➕ Sign Artist</button>';
+  out+='</div>';
+  return out;
+}
 
-  // CATALOGUE INCOME
-  html += `<div style="padding:14px 0 8px;font-size:10px;font-weight:800;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase">Catalogue & Revenue</div>
-  <div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
-    <div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--bord)">
-      <div style="width:38px;height:38px;border-radius:8px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💿</div>
-      <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--txt)">Masters owned (${ol.mastersOwned||0} songs)</div><div style="font-size:11px;color:var(--mut);margin-top:1px">Licensing income</div></div>
-      <div style="text-align:right"><div style="font-size:13px;font-weight:800;color:#22c55e">$${_fmt(ol.mastersIncome||0)}</div><div style="font-size:10px;color:var(--mut)">this month</div></div>
-    </div>
-    <div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--bord)">
-      <div style="width:38px;height:38px;border-radius:8px;background:#eff6ff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">📝</div>
-      <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--txt)">Publishing rights (${ol.publishingOwned||0} songs)</div><div style="font-size:11px;color:var(--mut);margin-top:1px">Composition royalties</div></div>
-      <div style="text-align:right"><div style="font-size:13px;font-weight:800;color:#22c55e">$${_fmt(ol.publishingIncome||0)}</div><div style="font-size:10px;color:var(--mut)">this month</div></div>
-    </div>
-    <div style="display:flex;align-items:center;gap:11px;padding:11px 14px">
-      <div style="width:38px;height:38px;border-radius:8px;background:#faf5ff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🎬</div>
-      <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--txt)">Sync licensing</div><div style="font-size:11px;color:var(--mut);margin-top:1px">TV/film placements</div></div>
-      <div style="text-align:right"><div style="font-size:13px;font-weight:800;color:#22c55e">$${_fmt(ol.syncIncome||0)}</div><div style="font-size:10px;color:var(--mut)">this month</div></div>
-    </div>
-  </div>`;
+// ── OWNER DASHBOARD TAB: ROSTER ──
+function _odRoster(){
+  var ol=GAME.ownedLabel; if(!ol) return '';
+  var roster=ol.roster||[];
+  var tierDef=LABEL_TIERS[ol.tier]||LABEL_TIERS.indie;
+  var openSlots=Math.max(0,tierDef.maxRoster-roster.length);
+  var isRecruiting=!ol.hasRosterFull;
+  var advSlots=ol.advertisedSlots!==undefined?Math.min(ol.advertisedSlots,openSlots):openSlots;
+  var out='';
+  // Recruiting control (moved into roster tab)
+  out+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:11px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">';
+  out+='<div style="flex:1"><div style="font-size:12.5px;font-weight:700;color:var(--txt)">Recruiting</div>';
+  out+='<div style="font-size:10.5px;color:var(--mut);margin-top:2px">'+openSlots+' open slot'+(openSlots!==1?'s':'')+' · '+tierDef.name+' cap '+tierDef.maxRoster+'</div></div>';
+  out+='<div style="display:flex;align-items:center;gap:8px">';
+  out+='<span style="font-size:11px;color:var(--mut)">Slots:</span>';
+  out+='<div style="display:flex;gap:4px;align-items:center">';
+  out+='<button onclick="odChangeSlots(-1)" style="width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--fb)">−</button>';
+  out+='<div id="od-slot-count" style="width:36px;height:30px;border-radius:8px;background:var(--acc-bg);border:1px solid var(--acc);color:var(--acc);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center">'+advSlots+'</div>';
+  out+='<button onclick="odChangeSlots(1)" style="width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--fb)">+</button>';
+  out+='</div>';
+  out+='<div onclick="odToggleRecruiting(this)" data-is-on="'+(isRecruiting?'1':'')+'" style="width:36px;height:20px;border-radius:99px;background:'+(isRecruiting?'var(--green)':'var(--surf)')+';border:1px solid var(--bord);position:relative;cursor:pointer;transition:background .2s;flex:none">';
+  out+='<div style="position:absolute;top:2.5px;'+(isRecruiting?'left:19px':'left:2.5px')+';width:14px;height:14px;border-radius:50%;background:'+(isRecruiting?'#fff':'var(--mut)')+';transition:all .2s"></div></div>';
+  out+='</div></div>';
+  // Roster header
+  out+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  out+='<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)">SIGNED ARTISTS ('+roster.length+'/'+tierDef.maxRoster+' slots)</div>';
+  out+='<button onclick="showSignArtistFlow()" style="background:var(--acc);color:var(--acc-txt);border:none;border-radius:8px;font-size:11px;font-weight:800;padding:6px 12px;cursor:pointer;font-family:var(--fb)">＋ Sign</button>';
+  out+='</div>';
+  if(!roster.length){
+    out+='<div style="text-align:center;padding:40px 20px"><div style="font-size:32px;margin-bottom:12px">🎤</div><div style="color:var(--mut);font-size:13px">No artists signed yet.</div></div>';
+    return out;
+  }
+  // Artist cards
+  roster.forEach(function(a){
+    var score=_computeMorale(a,ol);
+    var emoji=_moraleEmoji(score);
+    var barCol=_moraleBarColor(score);
+    var moraleLabel=_moraleLabel(score);
+    var isPlayerEntry=!!(window.currentUser&&(a.userId===currentUser.id||(a.id&&a.id===currentUser.id)));
+    var rawFans=isPlayerEntry?(GAME.fans||Object.values(GAME.fansByRegion||{}).reduce(function(s,v){return s+(v||0);},0)||0):(a.fans||a.fanCount||0);
+    var fanStr=rawFans>=1000000?(rawFans/1000000).toFixed(1)+'M':rawFans>=1000?Math.round(rawFans/1000)+'K':String(rawFans);
+    var autoOn=!!(ol.autoApprove||{})[a.id||a.userId];
+    var aid=a.id||a.userId||a.artistName;
+    var cutPct=a.cut||ol.defaultCut||25;
+    var warnHtml=score<20?'<div style="background:rgba(224,102,102,0.12);border:1px solid var(--red);border-radius:8px;padding:8px 10px;font-size:11px;color:#f08a8a;margin:6px 0;line-height:1.55">⚠ Room Service is circling. Below 20 → exit request. Check in or send a gift.</div>':'';
+    var pendingCount=(a.pendingReleases||[]).filter(function(r){return r.status==='pending';}).length;
+    out+='<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:12px;margin-bottom:10px">';
+    out+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">';
+    out+='<div style="width:40px;height:40px;border-radius:50%;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:19px;flex:none">'+(a.profilePic||'🎤')+'</div>';
+    out+='<div style="flex:1"><b style="font-size:14px;display:block">'+a.artistName+(a.spotlight?' ⭐':'')+'</b><span style="font-size:10px;color:var(--mut)">'+fanStr+' fans · '+(a.genre||'Pop')+'</span></div>';
+    out+='<div style="font-size:19px">'+emoji+'</div></div>';
+    out+='<div style="display:flex;justify-content:space-between;font-size:9.5px;font-weight:700;color:var(--mut);margin-bottom:4px"><span>MORALE</span><span style="color:'+barCol+'">'+score+' / 100 '+moraleLabel+'</span></div>';
+    out+='<div style="height:6px;border-radius:3px;background:var(--surf);overflow:hidden;margin-bottom:8px"><div style="height:100%;width:'+score+'%;background:'+barCol+';border-radius:3px"></div></div>';
+    out+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">';
+    out+='<span style="font-size:9px;font-weight:700;border-radius:4px;padding:2px 7px;background:var(--surf);color:var(--mut);border:1px solid var(--bord)">'+cutPct+'% cut</span>';
+    if(a.dealType) out+='<span style="font-size:9px;font-weight:700;border-radius:4px;padding:2px 7px;background:var(--surf);color:var(--mut);border:1px solid var(--bord)">'+a.dealType+'</span>';
+    if(autoOn) out+='<span style="font-size:9px;font-weight:700;border-radius:4px;padding:2px 7px;background:#1e3a2e;color:var(--green);border:1px solid var(--green)">✓ Auto-approved</span>';
+    else out+='<span style="font-size:9px;font-weight:700;border-radius:4px;padding:2px 7px;background:var(--surf);color:var(--mut);border:1px solid var(--bord)">✓ Release approval</span>';
+    if(pendingCount>0) out+='<span style="font-size:9px;font-weight:700;border-radius:4px;padding:2px 7px;background:#fef9c3;color:#854d0e;border:1px solid #fde68a">⏰ '+pendingCount+' pending</span>';
+    out+='</div>';
+    out+=warnHtml;
+    out+='<div style="display:flex;gap:5px;flex-wrap:wrap">';
+    out+='<button onclick="window._odTab(2)" style="font-size:9.5px;font-weight:700;border-radius:8px;padding:5px 10px;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">📋 Releases</button>';
+    out+='<button onclick="llSendGift(\''+aid+'\')" style="font-size:9.5px;font-weight:700;border-radius:8px;padding:5px 10px;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">🎁 Gift ($800)</button>';
+    out+='<button onclick="llCheckIn(\''+aid+'\')" style="font-size:9.5px;font-weight:700;border-radius:8px;padding:5px 10px;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">📞 Check In</button>';
+    out+='<button onclick="llSpotlight(\''+aid+'\')" style="font-size:9.5px;font-weight:700;border-radius:8px;padding:5px 10px;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">⭐ Spotlight</button>';
+    out+='</div>';
+    out+='</div>';
+  });
+  return out;
+}
 
-  // QUICK ACTIONS
-  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px">
-    <button onclick="closeMenu();showSignArtistFlow()" style="background:var(--acc);color:white;border:none;border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">➕ Sign Artist</button>
-    <button onclick="closeMenu();showHireStaffFlow()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">👥 Hire Staff</button>
-    <button onclick="closeMenu();showLabelLoans()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🏦 Bank Loan</button>
-    <button onclick="closeMenu();showLabelShowcase()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🎪 Showcase</button>
-    <button onclick="closeMenu();showLabelLife()" style="grid-column:span 2;background:linear-gradient(135deg,#1a1230,#2a1e3a);color:#c8a8f0;border:1px solid #5a3a8a;border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🌟 Label Life — Morale · Inbox · Studio · Collabs</button>
-  </div>`;
+// ── OWNER DASHBOARD TAB: INBOX ──
+function _odInbox(){ return _llInbox(); }
 
-  html += `</div>`;
-  openMenu('👑 ' + ol.name, html);
+// ── OWNER DASHBOARD TAB: FINANCES ──
+function _odFinances(){
+  var ol=GAME.ownedLabel; if(!ol) return '';
+  var roster=ol.roster||[];
+  var tierDef=LABEL_TIERS[ol.tier]||LABEL_TIERS.indie;
+  var balance=ol.funds||ol.balance||0;
+  var weeklyRosterCut=roster.reduce(function(s,a){
+    var cut=(a.cut||ol.defaultCut||25)/100;
+    return s+(a.weeklyEarnings||0)*cut;
+  },0);
+  var staff=ol.staff||[];
+  var weeklyMaint=Math.round((roster.length*5000)+(staff.length*3000)+tierDef.maintenance);
+  var weeklyNet=Math.round(weeklyRosterCut-weeklyMaint);
+  var out='';
+  // Hero balance
+  out+='<div style="background:linear-gradient(135deg,#1a3a2a,#0d1a12);border:1px solid #2a5a3a;border-radius:14px;padding:14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">';
+  out+='<div><div style="font-size:9.5px;font-weight:800;letter-spacing:1px;color:var(--mut)">LABEL FUNDS</div>';
+  out+='<div style="font-size:28px;font-weight:900;color:var(--green)">$'+_fmt(Math.round(balance))+'</div>';
+  out+='<div style="font-size:11px;color:var(--mut);margin-top:3px">Net <span style="color:'+(weeklyNet>=0?'var(--green)':'var(--red)')+'">'+( weeklyNet>=0?'+':'')+_fmt(weeklyNet)+'</span> this week</div></div>';
+  out+='<div style="text-align:right;font-size:11px;color:var(--mut);line-height:1.7">In $'+_fmt(Math.round(weeklyRosterCut))+'<br>Out −$'+_fmt(weeklyMaint)+'</div>';
+  out+='</div>';
+  // P&L
+  out+='<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:14px 0 8px">Weekly P&amp;L</div>';
+  out+='<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:4px 13px;margin-bottom:10px">';
+  if(weeklyRosterCut>0) out+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 0;border-bottom:1px solid var(--bord)"><span>Streams (roster cuts)</span><span style="color:var(--green);font-weight:700">+$'+_fmt(Math.round(weeklyRosterCut))+'</span></div>';
+  out+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 0;border-bottom:1px solid var(--bord)"><span>Weekly upkeep</span><span style="color:var(--red);font-weight:700">−$'+_fmt(Math.round(tierDef.maintenance))+'</span></div>';
+  if(staff.length>0) out+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 0;border-bottom:1px solid var(--bord)"><span>Staff wages</span><span style="color:var(--red);font-weight:700">−$'+_fmt(Math.round(staff.length*3000))+'</span></div>';
+  if((ol.debt||0)>0) out+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 0;border-bottom:1px solid var(--bord)"><span>Outstanding debt</span><span style="color:var(--red);font-weight:700">$'+_fmt(ol.debt)+'</span></div>';
+  out+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:7px 0;font-weight:700"><span>Net this week</span><span style="color:'+(weeklyNet>=0?'var(--green)':'var(--red)')+'">'+( weeklyNet>=0?'+':'')+_fmt(weeklyNet)+'</span></div>';
+  out+='</div>';
+  // Per-artist earnings
+  if(roster.length>0){
+    out+='<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:14px 0 8px">Per-Artist Earnings</div>';
+    out+='<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:11px 13px;margin-bottom:10px">';
+    var totalLabelEarn=0;
+    roster.forEach(function(a){
+      var cut=(a.cut||ol.defaultCut||25)/100;
+      var le=Math.round((a.weeklyEarnings||0)*cut);
+      totalLabelEarn+=le;
+      out+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bord)">';
+      out+='<div style="width:28px;height:28px;border-radius:50%;background:var(--surf);display:flex;align-items:center;justify-content:center;font-size:13px;flex:none">'+(a.profilePic||'🎤')+'</div>';
+      out+='<div style="flex:1;font-size:12.5px;font-weight:600">'+a.artistName+'</div>';
+      out+='<div style="font-size:12px;font-weight:700;color:var(--green)">+$'+_fmt(le)+'</div></div>';
+    });
+    out+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0"><div style="width:28px;height:28px;border-radius:50%;background:var(--surf);display:flex;align-items:center;justify-content:center;font-size:13px;flex:none">📊</div><div style="flex:1;font-size:12.5px;font-weight:700">Label Total</div><div style="font-size:12px;font-weight:700;color:var(--acc)">+$'+_fmt(totalLabelEarn)+'</div></div>';
+    out+='</div>';
+  }
+  // Recoupment
+  var hasAdv=roster.some(function(a){ return (a.advancePaid||0)>0||(a.weeklyAdvance||0)>0; });
+  if(hasAdv){
+    out+='<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:14px 0 8px">Recoupment Status</div>';
+    out+='<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:4px 13px;margin-bottom:10px">';
+    roster.forEach(function(a){
+      if(!((a.advancePaid||0)>0||(a.weeklyAdvance||0)>0)) return;
+      var paid=a.advanceRecouped||0;
+      var total=a.advancePaid||(a.weeklyAdvance||0)*52||0;
+      var pct=total>0?Math.min(100,Math.round(paid/total*100)):0;
+      out+='<div style="padding:8px 0;border-bottom:1px solid var(--bord)"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>'+a.artistName+' ($'+_fmt(total)+' advance)</span><b>$'+_fmt(paid)+' / $'+_fmt(total)+'</b></div>';
+      out+='<div style="height:4px;border-radius:2px;background:var(--surf);overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--green);border-radius:2px"></div></div></div>';
+    });
+    out+='</div>';
+  }
+  // Actions
+  out+='<div style="display:flex;gap:8px;margin-top:4px">';
+  out+='<button onclick="showLabelLoans()" style="flex:1;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;padding:12px;font-weight:800;font-size:12px;color:var(--txt);cursor:pointer;font-family:var(--fb)">🏦 Bank Loans</button>';
+  out+='<button onclick="showHireStaffFlow()" style="flex:1;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;padding:12px;font-weight:800;font-size:12px;color:var(--txt);cursor:pointer;font-family:var(--fb)">👥 Hire Staff</button>';
+  out+='</div>';
+  return out;
+}
+
+// ── OWNER DASHBOARD TAB: STUDIO ──
+function _odStudio(){ return _llStudio(); }
+
+// ── OWNER DASHBOARD TAB: PRESS ──
+function _odPress(){
+  var ol=GAME.ownedLabel; if(!ol) return '';
+  var roster=ol.roster||[];
+  var velourQuota={indie:1,mid:2,major:3,global:5}[ol.tier]||1;
+  var velourThisMonth=(ol.velourSubmissions||[]).filter(function(s){ return s.week>=(GAME.week||1)-4; }).length;
+  var canSubmitVelour=velourThisMonth<velourQuota&&(ol.rep||0)>=4.0;
+  var eligibleArtist=canSubmitVelour?roster.find(function(a){ var f=a.fans||a.fanCount||0; return f>=50000; }):null;
+  var pressArticles=(GAME.localArticles||[]).slice(0,6);
+  var out='';
+  // Velour status
+  out+='<div style="background:linear-gradient(135deg,#1a1a1a,#2a1e3a);border:1px solid #3a2a55;border-radius:12px;padding:12px 14px;margin-bottom:10px">';
+  out+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  out+='<h4 style="font-family:var(--fd);font-size:14px;color:#e8d9b0;margin:0">Velour Spotlight</h4>';
+  out+='<span style="font-size:9px;font-weight:800;letter-spacing:1px;padding:3px 8px;border-radius:4px;background:'+(eligibleArtist?'#1e3a2e':'#3a1e2a')+';color:'+(eligibleArtist?'var(--green)':'var(--red)')+'">'+( eligibleArtist?'ELIGIBLE':'NOT YET')+'</span>';
+  out+='</div>';
+  if(eligibleArtist){
+    out+='<div style="font-size:11.5px;color:var(--mut);line-height:1.6;margin-bottom:10px">Submit '+eligibleArtist.artistName+' for a feature this month. Quota: '+velourThisMonth+'/'+velourQuota+' used.</div>';
+    out+='<button onclick="showToast(\'Velour submission coming soon\',\'#a97de8\')" style="width:100%;background:linear-gradient(135deg,#1a1a1a,#2a1e3a);border:1px solid #e8d9b0;color:#e8d9b0;border-radius:10px;padding:10px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:var(--fb)">Submit for Velour Feature →</button>';
+  } else {
+    out+='<div style="font-size:11.5px;color:var(--mut);line-height:1.6">Requirements: artist 50K+ fans, label rep 4.0+, quota '+velourThisMonth+'/'+velourQuota+' used this month.</div>';
+  }
+  out+='</div>';
+  // Press coverage
+  out+='<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:14px 0 8px">Recent Label Coverage</div>';
+  if(pressArticles.length>0){
+    var outletColors={velour:'#2a1e3a',chartwell:'#1e2a3e',airtime:'#1e3a2e','room service':'#3a1e2a',undertone:'#3a2e1e'};
+    var outletTxts={velour:'var(--purple)',chartwell:'var(--blue)',airtime:'var(--green)','room service':'var(--pink)',undertone:'var(--acc)'};
+    pressArticles.forEach(function(a){
+      var olk=(a.outlet||'press').toLowerCase();
+      var obg=outletColors[olk]||'var(--card)';
+      var otc=outletTxts[olk]||'var(--mut)';
+      out+='<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:12px 14px;margin-bottom:8px">';
+      out+='<div style="font-size:9px;font-weight:800;letter-spacing:.8px;padding:2px 7px;border-radius:4px;display:inline-block;margin-bottom:6px;background:'+obg+';color:'+otc+'">'+( a.outlet||'PRESS').toUpperCase()+'</div>';
+      out+='<h4 style="font-size:13px;font-weight:700;line-height:1.35;margin:0 0 4px">'+( a.headline||'Press Coverage')+'</h4>';
+      out+='<p style="font-size:11px;color:var(--mut);margin:0 0 7px;line-height:1.45">'+((a.content||'').slice(0,120))+((a.content||'').length>120?'…':'')+'</p>';
+      out+='<div style="font-size:10px;color:var(--mut);font-weight:700">Wk '+(a.week||GAME.week||'—')+'</div>';
+      out+='</div>';
+    });
+  } else {
+    out+='<div style="text-align:center;padding:40px 20px"><div style="font-size:32px;margin-bottom:12px">📰</div><div style="color:var(--mut);font-size:13px">No press coverage yet.</div></div>';
+  }
+  return out;
 }
 
 // ── CREATE LABEL FLOW ──────────────────────────────────────────────
@@ -15473,38 +15675,12 @@ function _buildMoraleFactors(artist, ol){
 }
 
 function showLabelLife(startTab){
-  var ol = GAME.ownedLabel;
-  if(!ol){ showToast('You need to own a label first.','red'); return; }
-  var t = startTab||0;
-  var tabs = ['Morale','Daily Inbox','Studio','Roster Collab','Velour','Year-End'];
-  var tabHtml = tabs.map(function(name,i){
-    return '<button onclick="window._llTab('+i+')" id="llt'+i+'" style="flex:none;background:'+(i===t?'var(--acc)':'var(--card)')+';color:'+(i===t?'var(--acc-txt)':'var(--mut)')+';border:1px solid '+(i===t?'var(--acc)':'var(--bord)')+';font-size:10.5px;font-weight:700;padding:7px 11px;border-radius:99px;cursor:pointer;font-family:var(--fb)">'+name+'</button>';
-  }).join('');
-
-  var html = '<div>';
-  html += '<div style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--surf);border-bottom:1px solid var(--bord);position:sticky;top:0;z-index:10">';
-  html += '<button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer;padding:0;line-height:1;flex:none">‹</button>';
-  html += '<div style="overflow-x:auto;display:flex;gap:6px;flex:1;padding-bottom:2px">'+tabHtml+'</div>';
-  html += '</div>';
-  html += '<div id="llBody" style="padding:16px;padding-bottom:80px"></div>';
-  html += '</div>';
-
-  _insertOverlay(html);
-
-  window._llTab = function(i){
-    var tabs2 = ['Morale','Daily Inbox','Studio','Roster Collab','Velour','Year-End'];
-    tabs2.forEach(function(_,j){
-      var btn = document.getElementById('llt'+j);
-      if(!btn) return;
-      btn.style.background = j===i?'var(--acc)':'var(--card)';
-      btn.style.color = j===i?'var(--acc-txt)':'var(--mut)';
-      btn.style.borderColor = j===i?'var(--acc)':'var(--bord)';
-    });
-    var body = document.getElementById('llBody');
-    if(!body) return;
-    body.innerHTML = [_llMorale,_llInbox,_llStudio,_llCollab,_llVelour,_llYearEnd][i]();
-  };
-  window._llTab(t);
+  // Now integrated into owner dashboard — map old tab indices to new ones
+  // Old: 0=Morale, 1=DailyInbox, 2=Studio, 3=RosterCollab, 4=Velour, 5=YearEnd
+  // New: 0=Activity, 1=Roster, 2=Inbox, 3=Finances, 4=Studio, 5=Press
+  var tabMap = [1,2,4,2,5,0];
+  var t = (typeof startTab==='number') ? (tabMap[startTab]||0) : 0;
+  showLabelOwnerDashboard(t);
 }
 
 // ── LABEL LIFE TAB: ARTIST MORALE ──
