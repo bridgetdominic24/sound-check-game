@@ -20124,11 +20124,13 @@ async function showLabelPublicPage(labelId, labelName){
     // Fetch live roster from owner's player data (labels table doesn't store roster reliably)
     var roster = label.roster || [];
     var labelOwnedData = null;
+    var _ownerGd = null; // owner's full game_data, used to enrich roster
     if(label.owner_id){
       try {
         var ownerResult = await supabase.from('players').select('game_data').eq('user_id', label.owner_id).single();
         if(!ownerResult.error && ownerResult.data && ownerResult.data.game_data){
           var gd = typeof ownerResult.data.game_data === 'string' ? JSON.parse(ownerResult.data.game_data) : ownerResult.data.game_data;
+          _ownerGd = gd;
           if(gd.ownedLabel && gd.ownedLabel.id === labelId){
             labelOwnedData = gd.ownedLabel;
             roster = gd.ownedLabel.roster || [];
@@ -20137,6 +20139,28 @@ async function showLabelPublicPage(labelId, labelName){
         }
       } catch(e){ console.error('[showLabelPublicPage] Could not fetch owner player data:', e); }
     }
+
+    // Enrich each roster entry with real artist name + live fan count
+    roster = roster.map(function(a){
+      var enriched = Object.assign({}, a);
+      // Determine the live game_data for this roster member
+      var memberGd = null;
+      if(a.userId === label.owner_id && _ownerGd){
+        memberGd = _ownerGd;
+      } else {
+        var livePlayer = (window.allPlayers||[]).find(function(p){ return p.user_id === a.userId; });
+        if(livePlayer && livePlayer.game_data){
+          try{ memberGd = typeof livePlayer.game_data==='string'?JSON.parse(livePlayer.game_data):livePlayer.game_data; }catch(e){}
+        }
+      }
+      if(memberGd){
+        var realName = memberGd.sn || memberGd.artistName || null;
+        var realFans = Object.values(memberGd.fansByRegion||{}).reduce(function(s,v){return s+(v||0);},0);
+        if(realName) enriched.artistName = realName;
+        if(realFans > 0) enriched.fans = realFans;
+      }
+      return enriched;
+    });
     var isRecruiting = labelOwnedData ? !labelOwnedData.hasRosterFull : !label.has_roster_full;
     var tierDefForSlots = LABEL_TIERS[(labelOwnedData ? labelOwnedData.tier : label.tier)||'indie'] || LABEL_TIERS.indie;
     var openSlots = Math.max(0, tierDefForSlots.maxRoster - roster.length);
@@ -20145,20 +20169,9 @@ async function showLabelPublicPage(labelId, labelName){
       : (label.advertised_slots !== undefined ? label.advertised_slots : openSlots);
     var recruitText = isRecruiting ? '🟢 Recruiting · '+(advertisedSlots||'?')+' slot'+(advertisedSlots!==1?'s':'')+' open' : '🔴 Not recruiting';
 
-    // Compute stats — look up live fan counts from allPlayers if available
+    // Compute stats (roster entries already enriched with live fan counts above)
     var totalStreams = roster.reduce(function(s,a){ return s+(a.totalStreams||a.streams||0); }, 0);
-    var combinedFans = roster.reduce(function(s,a){
-      // Try to look up current fan count from allPlayers data
-      var livePlayer = (window.allPlayers||[]).find(function(p){ return p.user_id === a.userId; });
-      if(livePlayer && livePlayer.game_data){
-        try{
-          var lgd = typeof livePlayer.game_data==='string'?JSON.parse(livePlayer.game_data):livePlayer.game_data;
-          var lf = Object.values(lgd.fansByRegion||{}).reduce(function(x,v){return x+(v||0);},0);
-          if(lf>0) return s+lf;
-        }catch(e){}
-      }
-      return s+(a.fans||a.fanCount||0);
-    }, 0);
+    var combinedFans = roster.reduce(function(s,a){ return s+(a.fans||a.fanCount||0); }, 0);
     var chartHits = (label.chart_hits || (label.activity||[]).filter(function(a){ return a.text && a.text.indexOf('chart')!==-1; }).length || 0);
 
     // Tier badge colors
@@ -20268,7 +20281,9 @@ async function showLabelPublicPage(labelId, labelName){
       html += '<div style="height:110px;background:linear-gradient(135deg,#1a2a4e,#2a1a4e);display:flex;align-items:center;justify-content:center;font-size:54px;position:relative">';
       html += featuredArtist.profilePic||'🎤';
       html += '<div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(13,15,20,.85))"></div></div>';
-      html += '<div style="padding:12px 14px"><h4 style="font-size:16px;font-weight:800">'+featuredArtist.artistName+'</h4>';
+      var featIsMe = currentUser && featuredArtist.userId === currentUser.id;
+      var featDisplayName = featuredArtist.artistName + (featIsMe ? ' <span style="font-size:9px;font-weight:700;background:var(--acc-bg);color:var(--acc);border-radius:4px;padding:1px 5px;vertical-align:middle">YOU</span>' : '');
+      html += '<div style="padding:12px 14px"><h4 style="font-size:16px;font-weight:800">'+featDisplayName+'</h4>';
       html += '<div style="font-size:11px;color:var(--mut)">'+(featuredArtist.genre||'Pop')+'</div>';
       html += '<div style="display:flex;gap:12px;margin-top:7px;font-size:10.5px;font-weight:700;color:var(--mut);flex-wrap:wrap">';
       html += '<span>👥 <b style="color:var(--txt)">'+fmtFans(featFans)+'</b> fans</span>';
@@ -20295,9 +20310,11 @@ async function showLabelPublicPage(labelId, labelName){
     } else {
       roster.forEach(function(a){
         var af = a.fans||a.fanCount||0;
+        var isMe = currentUser && a.userId === currentUser.id;
+        var displayName = a.artistName + (isMe ? ' <span style="font-size:9px;font-weight:700;background:var(--acc-bg);color:var(--acc);border-radius:4px;padding:1px 5px;vertical-align:middle">YOU</span>' : '');
         html += '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--bord)">';
         html += '<div style="width:42px;height:42px;border-radius:50%;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none">'+(a.profilePic||'🎤')+'</div>';
-        html += '<div style="flex:1"><b style="font-size:14px;display:block">'+a.artistName+'</b><span style="font-size:10px;color:var(--mut);display:block;margin-top:1px">'+(a.genre||'Pop')+(a.spotlight?' · ⭐ Featured':'')+'</span></div>';
+        html += '<div style="flex:1"><b style="font-size:14px;display:block">'+displayName+'</b><span style="font-size:10px;color:var(--mut);display:block;margin-top:1px">'+(a.genre||'Pop')+(a.spotlight?' · ⭐ Featured':'')+'</span></div>';
         html += '<div style="text-align:right"><b style="display:block;font-size:13px">'+fmtFans(af)+'</b><span style="font-size:9.5px;color:var(--mut)">fans</span></div>';
         html += '</div>';
       });
