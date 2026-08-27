@@ -3384,6 +3384,7 @@ async function checkAndLoadSave(){
       if(typeof _redistributeFansToRegions === 'function') _redistributeFansToRegions();
       if(typeof _recalcPlatformSplits === 'function') _recalcPlatformSplits();
       if(typeof _ensureSkills === 'function') _ensureSkills();
+      if(typeof _recoverViralData === 'function') _recoverViralData(); // retroactive viral articles + finance reconciliation
 
       console.log('  Week:', GAME.week);
       console.log('  Money:', GAME.money);
@@ -5211,13 +5212,15 @@ function _recoverViralData(){
       var outlet = outletMap[v.type] || 'undertone';
       var outletDisplay = outletDisplayMap[outlet] || 'Undertone';
       var songTitle = v.song || 'your song';
+      // Use Date.now() so the article isn't filtered by the 3-real-day freshness check
+      // in showIndustryNews(). The week number on the card shows when it happened.
       _pushArticle({
         id: articleId,
         type: 'viral_moment',
         source: outlet,
         outlet: outletDisplay,
         week: v.week || 1,
-        timestamp: Date.now() - ((GAME.week - (v.week||1)) * 14 * 24 * 3600 * 1000),
+        timestamp: Date.now(),
         artistName: artistName,
         player_id: GAME.playerId || null,
         headline: headlineMap(v.type, songTitle),
