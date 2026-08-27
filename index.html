@@ -37504,12 +37504,7 @@ function loadDiscoverContent(){
             <div style="font-size:11px;color:var(--mut)">${o.terms?.cut||25}% cut · ${o.terms?.length||'1 year'}</div></div>
           </div>
           <button onclick="showLabelsSystem()" style="background:var(--acc);color:white;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">Review</button>
-        </div>`).join('') : `<div onclick="showLabelsSystem()" style="${ri};border-bottom:none;cursor:pointer">
-        <div style="${ric};background:var(--bord)">🏷️</div>
-        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt)">Manage your label career</div>
-        <div style="font-size:11px;color:var(--mut);margin-top:1px">Sign to a label, start your own, hire managers</div></div>
-        <div style="${ra}">Open →</div>
-      </div>`}
+        </div>`).join('') : ''}
     </div>` : ''}
 
     <!-- FIND PLAYERS & LABELS (multi) / QIKIPEDIA (single) -->
