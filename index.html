@@ -10460,94 +10460,81 @@ function showBusiness(){
 }
 
 function showHousing(){
-  const rent=GAME.housing?.rent||300;
-  const type=GAME.housing?.type||'Shared Room';
-  const missed=GAME.housing?.missedPayments||0;
-  
-  const options=[
-    {type:'Shared Room',rent:300,deposit:150,desc:'Cheapest option, shared living space',energyBonus:0},
-    {type:'Shared Apartment',rent:600,deposit:600,desc:'Split rent with roommates',energyBonus:5},
-    {type:'Studio Apartment',rent:1200,deposit:1200,desc:'Your own private space',energyBonus:10},
-    {type:'1BR Apartment',rent:2000,deposit:2000,desc:'Spacious one bedroom apartment',energyBonus:15},
-    {type:'Penthouse',rent:4000,deposit:4000,desc:'Luxury living, maximum comfort',energyBonus:20}
+  const rent = GAME.housing?.rent || 300;
+  const type = GAME.housing?.type || 'Shared Room';
+  const missed = GAME.housing?.missedPayments || 0;
+  const region = GAME.homeRegion || 'North America';
+  // City based on region
+  const regionCity = {
+    'North America':'Los Angeles','Europe':'London','Asia':'Seoul',
+    'Africa':'Lagos','South America':'São Paulo','Oceania':'Sydney'
+  };
+  const city = regionCity[region] || 'Los Angeles';
+
+  // Tier definitions — locked values per tutorial reference
+  const options = [
+    {tier:1, type:'Shared Room',    rent:300,  deposit:150,  energyRegen:0,  creativityPenalty:10, extras:[]},
+    {tier:2, type:'Shared Apartment',rent:600, deposit:600,  energyRegen:5,  creativityPenalty:0,  extras:[]},
+    {tier:3, type:'Studio Apartment',rent:1200,deposit:1200, energyRegen:10, creativityPenalty:0,  extras:['Home recording']},
+    {tier:4, type:'1BR Apartment',  rent:2000, deposit:2000, energyRegen:15, creativityPenalty:0,  extras:['Stress -3/day']},
+    {tier:5, type:'Penthouse',      rent:4000, deposit:4000, energyRegen:20, creativityPenalty:0,  extras:['Rep bonus']}
   ];
-  
-  let optionsHTML='';
-  options.forEach(opt=>{
-    const isCurrent=opt.type===type;
-    const canAfford=GAME.money>=opt.deposit;
-    
-    optionsHTML+=`
-      <div style="padding:16px;border:2px solid ${isCurrent?'#4CAF50':'#e0e0e0'};border-radius:12px;margin-bottom:12px;background:${isCurrent?'#f1f8f4':'white'}">
-        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
-          <div style="flex:1">
-            <div style="font-size:16px;font-weight:700;color:#000;margin-bottom:4px">${opt.type}</div>
-            <div style="font-size:13px;color:#666;line-height:1.4">${opt.desc}</div>
-            ${opt.energyBonus > 0 ? `<div style="font-size:12px;color:#4CAF50;margin-top:4px">⚡ +${opt.energyBonus} energy regen bonus</div>` : ''}
-          </div>
-          <div style="text-align:right;margin-left:16px">
-            <div style="font-size:18px;font-weight:700;color:#000">$${opt.rent}/wk</div>
-            <div style="font-size:12px;color:#666">$${opt.deposit} deposit</div>
-          </div>
-        </div>
-        ${isCurrent?
-          `<div style="text-align:center;padding:12px;background:#4CAF50;color:white;border-radius:8px;font-weight:700;margin-top:8px">✓ Current Home</div>`
-          :
-          `<div style="display:flex;gap:8px;margin-top:8px">
-            <button onclick="viewLeaseContract('${opt.type}',${opt.rent},${opt.deposit})" 
-                    style="flex:1;background:var(--surf);color:var(--txt);border:2px solid var(--bord);padding:10px 12px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">
-              📄 View Lease
-            </button>
-            <button onclick="moveToNewPlace('${opt.type}',${opt.rent},${opt.deposit})" 
-                    style="flex:1;background:${canAfford?'linear-gradient(135deg,#667eea,#764ba2)':'#ccc'};color:white;border:none;padding:10px 12px;border-radius:8px;font-weight:700;cursor:${canAfford?'pointer':'not-allowed'};font-size:13px"
-                    ${canAfford?'':'disabled'}>
-              ${canAfford?'Move In':'Need $'+(opt.deposit-GAME.money).toLocaleString()+' More'}
-            </button>
-          </div>`
-        }
-      </div>
-    `;
+
+  const tierEmoji = ['🛏️','🛋️','🏙️','🏠','🏰'];
+
+  let optionsHTML = '';
+  options.forEach(function(opt, idx){
+    const isCurrent = opt.type === type;
+    const canAfford = (GAME.money||0) >= opt.deposit;
+    const tierBadge = '<div style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.5);color:#fff;font-size:9px;font-weight:800;letter-spacing:.5px;padding:2px 7px;border-radius:3px">Tier '+opt.tier+'</div>';
+    // Stat pills
+    let pills = '';
+    if(opt.energyRegen > 0) pills += '<span style="background:rgba(34,197,94,0.15);color:#16a34a;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;margin-right:5px">+'+opt.energyRegen+' energy/day</span>';
+    if(opt.creativityPenalty > 0) pills += '<span style="background:rgba(239,68,68,0.1);color:#ef4444;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;margin-right:5px">-'+opt.creativityPenalty+' creativity/day</span>';
+    opt.extras.forEach(function(e){ pills += '<span style="background:rgba(168,85,247,0.12);color:#a855f7;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;margin-right:5px">'+e+'</span>'; });
+
+    optionsHTML += '<div style="background:var(--card);border:2px solid '+(isCurrent?'var(--green)':'var(--bord)')+';border-radius:14px;margin-bottom:12px;overflow:hidden">'
+      + '<div style="background:var(--surf);height:60px;position:relative;display:flex;align-items:center;justify-content:center;font-size:28px">'
+      + tierEmoji[idx] + tierBadge
+      + '</div>'
+      + '<div style="padding:14px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'
+          + '<div style="font-size:15px;font-weight:800;color:var(--txt)">'+opt.type+'</div>'
+          + '<div style="text-align:right"><div style="font-size:16px;font-weight:800;color:var(--txt)">$'+opt.rent.toLocaleString()+'</div><div style="font-size:10px;color:var(--mut)">/week · $'+opt.deposit.toLocaleString()+' dep.</div></div>'
+        + '</div>'
+        + (pills ? '<div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px">'+pills+'</div>' : '')
+        + (isCurrent
+          ? '<div style="background:var(--green);color:#0d1a12;text-align:center;border-radius:9px;padding:10px;font-size:13px;font-weight:800">✓ Current Home</div>'
+          : '<div style="display:flex;gap:7px">'
+            + '<button onclick="viewLeaseContract(\''+opt.type+'\','+opt.rent+','+opt.deposit+')" style="flex:1;background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:9px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">View Lease</button>'
+            + '<button onclick="moveToNewPlace(\''+opt.type+'\','+opt.rent+','+opt.deposit+')" '+(canAfford?'':'disabled')+' style="flex:1;background:'+(canAfford?'var(--acc)':'var(--bord)')+';color:'+(canAfford?'var(--acc-txt)':'var(--mut)')+';border:none;border-radius:9px;padding:10px;font-size:12px;font-weight:700;cursor:'+(canAfford?'pointer':'not-allowed')+';font-family:var(--fb)">'+(canAfford?'Move In':'Need $'+(opt.deposit-(GAME.money||0)).toLocaleString()+' more')+'</button>'
+            + '</div>'
+        )
+      + '</div>'
+    + '</div>';
   });
-  
-  const html=`
-    <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:#f8f9fa;z-index:200000;overflow-y:auto">
-      <div style="max-width:600px;margin:0 auto;min-height:100vh;background:#f8f9fa">
-        <div style="background:linear-gradient(135deg,#4CAF50,#2196F3);padding:20px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
-          <div style="display:flex;align-items:center;gap:12px">
-            <button onclick="this.parentElement.parentElement.parentElement.parentElement.remove()" style="background:rgba(255,255,255,0.3);color:white;border:none;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer">←</button>
-            <h2 style="margin:0;font-size:22px;font-weight:700;flex:1;color:white">🏠 Housing</h2>
-          </div>
-        </div>
-        
-        <div style="padding:20px;padding-bottom:80px">
-          <!-- Current Housing Card -->
-          <div style="background:white;padding:24px;border-radius:16px;margin-bottom:20px;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-            <div style="font-size:13px;color:#999;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;font-weight:600">You Currently Live In</div>
-            <div style="font-size:32px;font-weight:700;color:#000;margin-bottom:4px">${type}</div>
-            <div style="font-size:20px;color:#666;font-weight:600;margin-bottom:16px">$${rent}/week</div>
-            ${missed>0?`<div style="background:#ffebee;border-left:4px solid #f44336;padding:12px;border-radius:8px;margin-top:12px">
-              <div style="font-weight:700;color:#c62828;margin-bottom:4px">⚠️ Missed ${missed} Payment${missed>1?'s':''}</div>
-              <div style="font-size:13px;color:#c62828">${missed>=2?'You will be evicted this week!':'Miss one more and you\'ll be kicked out!'}</div>
-            </div>`:''}
-          </div>
-          
-          <!-- Available Housing -->
-          <div style="background:white;padding:20px;border-radius:12px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-            <div style="font-size:16px;font-weight:700;margin-bottom:16px;color:#000">📦 Move to a New Place</div>
-            ${optionsHTML}
-          </div>
-          
-          <!-- Warning -->
-          <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:16px;border-radius:8px">
-            <div style="font-weight:700;margin-bottom:8px;color:#856404;font-size:14px">⚠️ Important</div>
-            <div style="font-size:13px;line-height:1.6;color:#856404">Miss 2 rent payments and you'll be evicted to the streets! While homeless, you'll lose 5-15 inspiration randomly each week.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend',html);
+
+  var html = '<div>'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surf);border-bottom:1px solid var(--bord);position:sticky;top:0;z-index:10">'
+      + '<button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer;padding:0;line-height:1;flex:none">←</button>'
+      + '<div style="font-size:16px;font-weight:800;color:var(--txt);flex:1">Housing</div>'
+      + '<div style="font-size:11px;font-weight:700;color:var(--mut);background:var(--card);border:1px solid var(--bord);border-radius:20px;padding:5px 10px">🌍 '+region+'</div>'
+    + '</div>'
+    + '<div style="padding:16px;padding-bottom:80px">'
+      + '<div style="margin-bottom:4px">'
+        + '<div style="font-size:22px;font-weight:800;color:var(--txt)">Your Place in '+city+'</div>'
+        + '<div style="font-size:12px;color:var(--mut);margin-top:2px">📍 '+city+' · Week '+(GAME.week||1)+'</div>'
+      + '</div>'
+      + (missed>0 ? '<div style="background:rgba(239,68,68,0.1);border:1px solid var(--red);border-radius:10px;padding:10px 12px;margin:12px 0;font-size:12px;color:var(--red);font-weight:700">⚠️ Missed '+missed+' payment'+(missed>1?'s':'')+'. '+(missed>=2?'Eviction imminent!':'One more and you\'re out!')+'</div>' : '')
+      + '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:14px 0 8px">Available Places</div>'
+      + optionsHTML
+      + '<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.4);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--txt);line-height:1.6">'
+        + '⚠️ Miss 3 rent payments in a row → auto-eviction to Shared Room. Rent is deducted every game week.'
+      + '</div>'
+    + '</div>'
+  + '</div>';
+
+  _insertOverlay(html);
 }
 
 // old viewLeaseContract removed
@@ -15116,7 +15103,11 @@ function _llMorale(){
     var fRows = factors.map(function(f){
       return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:4px 0;border-bottom:1px solid var(--bord)"><span style="color:var(--txt)">'+f[0]+'</span><span style="font-weight:700;color:'+(f[2]==='pos'?'var(--green)':f[2]==='neg'?'var(--red)':'var(--mut)')+'">'+f[1]+'</span></div>';
     }).join('');
-    var fanStr = (a.fans||a.fanCount||0) >= 1000 ? (((a.fans||a.fanCount||0)/1000).toFixed(0)+'K') : (a.fans||a.fanCount||0);
+    var isPlayerEntry = !!(window.currentUser && (a.userId===currentUser.id || (a.id && a.id===currentUser.id)));
+    var rawFans = isPlayerEntry
+      ? (GAME.fans || Object.values(GAME.fansByRegion||{}).reduce(function(s,v){return s+(v||0);},0) || 0)
+      : (a.fans||a.fanCount||0);
+    var fanStr = rawFans>=1000000?(rawFans/1000000).toFixed(1)+'M':rawFans>=1000?Math.round(rawFans/1000)+'K':String(rawFans);
     var autoOn = !!(ol.autoApprove||{})[a.id];
     var warnHtml = score < 20 ? '<div style="background:#3a1212;border:1px solid var(--red);border-radius:9px;padding:9px 11px;font-size:11px;color:#f08a8a;margin-top:8px;line-height:1.55">⚠ Room Service is watching. If morale drops to 0, '+a.artistName+' may formally request release.</div>' : '';
     var aid = a.id||a.userId||a.artistName;
@@ -15383,6 +15374,11 @@ function llSendGift(artistId){
   artist._moraleGiftBonus = (artist._moraleGiftBonus||0) + 8;
   ol.activity = ol.activity||[];
   ol.activity.unshift({text:'Sent a gift to <strong>'+artist.artistName+'</strong>. Morale +8.',color:'#a855f7',time:'now'});
+  // Log to finance history
+  if(!GAME.financeHistory) GAME.financeHistory = [];
+  var fw = GAME.financeHistory.find(function(h){ return h.week===(GAME.week||1); });
+  if(!fw){ fw={week:GAME.week||1,streamingRevenue:0,jobPay:0,gigPay:0,tipsPay:0,minigamePay:0,managerFees:0,rent:0,promo:0,labelSpend:0}; GAME.financeHistory.push(fw); }
+  fw.labelSpend = (fw.labelSpend||0) + 800;
   markDirty(); saveToCloud();
   showToast('Gift sent! +8 morale · -$800','green');
   window._llTab && window._llTab(0);
@@ -36497,15 +36493,24 @@ function _onDayAdvanced(newDay){
 
 function applyDailyRefresh(){
   if(!GAME) return;
-  // Restore energy each in-game day — base 120, reduced by stress, boosted by housing
+  // Restore energy each in-game day — base 120, reduced by stress, boosted by housing tier
   const stressPenalty = Math.floor((GAME.stress||0) * 0.3);
-  const housingBonus = (GAME.housingType === 'apartment' || GAME.housing?.type === 'apartment') ? 10 : (GAME.housingType === 'house' || GAME.housing?.type === 'house') ? 20 : 0;
-  const newEnergy = Math.max(0, Math.min(120, 120 - stressPenalty + housingBonus));
+  const _housingEnergyBonus = {
+    'Shared Room':0,'Shared Apartment':5,'Studio Apartment':10,
+    '1BR Apartment':15,'Penthouse':20
+  };
+  const _housingType = (GAME.housing && GAME.housing.type) || '';
+  const housingBonus = _housingEnergyBonus[_housingType] || 0;
+  const newEnergy = Math.max(0, Math.min(140, 120 - stressPenalty + housingBonus));
   GAME.energy = newEnergy;
 
-  // Restore creativity to 100 every in-game day, track which day it refreshed
+  // Restore creativity each in-game day
   GAME.creativity = 100;
   GAME._creativityRefreshedDay = GAME.day || 1;
+  // Shared Room: -10 creativity/day penalty (cramped living drains creativity)
+  if(_housingType === 'Shared Room'){
+    GAME.creativity = Math.max(0, GAME.creativity - 10);
+  }
 
   updateStats();
   markDirty();
@@ -37684,7 +37689,7 @@ function showToast(msg, color){
   if(old) old.remove();
   var toast = document.createElement('div');
   toast.id = 'gameToast';
-  toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:'+bg+';color:#fff;padding:12px 20px;border-radius:24px;font-size:14px;font-weight:700;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3);pointer-events:none;max-width:80%;text-align:center';
+  toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:'+bg+';color:#fff;padding:12px 20px;border-radius:24px;font-size:14px;font-weight:700;z-index:300000;box-shadow:0 4px 20px rgba(0,0,0,0.3);pointer-events:none;max-width:80%;text-align:center';
   toast.innerHTML = msg;
   document.body.appendChild(toast);
   setTimeout(function(){ if(toast.parentNode) toast.remove(); }, 3000);
