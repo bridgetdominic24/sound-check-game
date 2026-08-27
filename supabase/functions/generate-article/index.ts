@@ -260,6 +260,84 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log('[generate-article] Inserted article for', trigger_key, is_rumor ? '(rumor)' : '');
+
+    // ── 6. Notifications (rumors only) ───────────────────────────────────────
+    // After a successful rumor insert, notify the target artist and their label owner.
+    if (is_rumor && target_player_id) {
+      try {
+        // Fetch target player's user_id and signed_label info
+        const playerRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/players?id=eq.${encodeURIComponent(target_player_id)}&select=user_id,signed_label&limit=1`,
+          { headers: hdrs }
+        );
+        const playerRows = playerRes.ok ? await playerRes.json() : [];
+        const targetPlayer = Array.isArray(playerRows) ? playerRows[0] : null;
+
+        const artistUserId: string | null = targetPlayer?.user_id ?? null;
+        const labelId: string | null = targetPlayer?.signed_label?.label_id ?? null;
+
+        const notifTimestamp = Date.now();
+        const artistName = String(facts?.artist || 'You');
+
+        // Notify the artist
+        if (artistUserId) {
+          await fetch(
+            `${SUPABASE_URL}/rest/v1/notifications`,
+            {
+              method: 'POST',
+              headers: hdrs,
+              body: JSON.stringify({
+                user_id:     artistUserId,
+                type:        'press_mention',
+                platform:    'system',
+                fromuserid:  null,
+                fromusername: 'Room Service',
+                message:     `Room Service wrote about you: "${headline}"`,
+                article_id:  null, // populated below if available
+                timestamp:   notifTimestamp,
+                read:        false,
+              }),
+            }
+          ).catch(e => console.warn('[generate-article] Artist notif error:', e));
+        }
+
+        // Notify the label owner if the artist is signed
+        if (labelId) {
+          const labelRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/labels?id=eq.${encodeURIComponent(labelId)}&select=owner_id&limit=1`,
+            { headers: hdrs }
+          );
+          const labelRows = labelRes.ok ? await labelRes.json() : [];
+          const labelOwnerUserId: string | null =
+            Array.isArray(labelRows) && labelRows[0]?.owner_id ? labelRows[0].owner_id : null;
+
+          if (labelOwnerUserId) {
+            await fetch(
+              `${SUPABASE_URL}/rest/v1/notifications`,
+              {
+                method: 'POST',
+                headers: hdrs,
+                body: JSON.stringify({
+                  user_id:     labelOwnerUserId,
+                  type:        'press_request',
+                  platform:    'system',
+                  fromuserid:  null,
+                  fromusername: 'Room Service',
+                  message:     `Room Service is asking about ${artistName} — issue a statement?`,
+                  article_id:  null,
+                  timestamp:   notifTimestamp,
+                  read:        false,
+                }),
+              }
+            ).catch(e => console.warn('[generate-article] Label notif error:', e));
+          }
+        }
+      } catch (notifErr) {
+        // Notifications are best-effort — never fail the whole request over them
+        console.warn('[generate-article] Notification step error:', notifErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({ headline, content }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
