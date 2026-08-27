@@ -13807,6 +13807,7 @@ function showLabelOwnerDashboard(){
     <button onclick="closeMenu();showHireStaffFlow()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">👥 Hire Staff</button>
     <button onclick="closeMenu();showLabelLoans()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🏦 Bank Loan</button>
     <button onclick="closeMenu();showLabelShowcase()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🎪 Showcase</button>
+    <button onclick="closeMenu();showLabelLife()" style="grid-column:span 2;background:linear-gradient(135deg,#1a1230,#2a1e3a);color:#c8a8f0;border:1px solid #5a3a8a;border-radius:8px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🌟 Label Life — Morale · Inbox · Studio · Collabs</button>
   </div>`;
 
   html += `</div>`;
@@ -14833,6 +14834,43 @@ function processLabelWeekly(){
 
     // Tier upgrade check
     _checkLabelTierUpgrade(ol);
+
+    // ── Morale processing ────────────────────────────────────────────
+    roster.forEach(function(a){
+      var score = _computeMorale(a, ol);
+      // Decay gift bonus slowly each week
+      if(a._moraleGiftBonus){ a._moraleGiftBonus = Math.round((a._moraleGiftBonus||0)*0.7); }
+      // Below 40: moody post (one-time per low cycle)
+      if(score < 40 && !a._moodyPostFired){
+        a._moodyPostFired = true;
+        ol.activity = ol.activity||[];
+        ol.activity.unshift({text:'<strong>'+a.artistName+'</strong> posted something moody on socials (morale below 40).',color:'#ef4444',time:'now'});
+      } else if(score >= 40){ a._moodyPostFired = false; }
+      // Below 20: Room Service + exit request notification
+      if(score < 20 && !a._rumourFiredWeek){
+        a._rumourFiredWeek = GAME.week||1;
+        ol.pendingPressRequests = ol.pendingPressRequests||[];
+        ol.pendingPressRequests.push({id:'pr_'+Date.now()+'_'+(a.id||a.artistName),artistName:a.artistName,artistId:a.id||a.artistName,headline:'Sources say an artist is unhappy at '+ol.name+'. Label unavailable for comment.',type:'rumor'});
+        ol.activity.unshift({text:'⚠ Room Service is asking about <strong>'+a.artistName+'</strong>. Morale critically low.',color:'#ef4444',time:'now'});
+        addNotification('📰 Room Service Alert','Room Service is asking about '+a.artistName+' — issue a statement from your Daily Inbox.','label');
+      } else if(score >= 20){ a._rumourFiredWeek = null; }
+    });
+
+    // ── Year-End Rankings at Week 52 of each game year ───────────────
+    var gameWeekInYear = ((GAME.week||1)-1)%52+1;
+    if(gameWeekInYear===52 && ol.lastYearEndWeek !== (GAME.week||1)){
+      ol.lastYearEndWeek = GAME.week||1;
+      var yearEndScore = _labelYearEndScore(ol);
+      var gameYear = Math.floor(((GAME.week||1)-1)/52)+1;
+      ol.yearEndScores = ol.yearEndScores||[];
+      ol.yearEndScores.push({year:gameYear,score:yearEndScore,week:GAME.week||1});
+      ol.activity=ol.activity||[];
+      ol.activity.unshift({text:'🏆 Year '+gameYear+' ended. Your label scored <strong>'+yearEndScore+'</strong> points. Chartwell annual report published.',color:'#f59e0b',time:'now'});
+      addNotification('🏆 Year-End Rankings','Year '+gameYear+' ended. Your label scored '+yearEndScore+' pts. Check the Label Life → Year-End tab.','label');
+      if(typeof _pushArticle==='function'){
+        _pushArticle({type:'label_year_end',source:'chartwell',week:GAME.week||1,timestamp:Date.now(),headline:'Year '+gameYear+' Label Rankings: Who Came Out on Top?',preview:'Chartwell reviews the labels that defined the year.',content:ol.name+' finished Year '+gameYear+' with '+yearEndScore+' points, a roster of '+(ol.roster||[]).length+' artists, and a rep of '+(ol.rep||0).toFixed(1)+' stars.',artistName:'',player_id:GAME.playerId||null});
+      }
+    }
   }
 
   // Process signed label advance
@@ -15364,6 +15402,876 @@ async function dissolveLabel(){
   closeMenu();
   showEvent('🏢','Label Dissolved','Your label has been dissolved. You\'re back to being an independent artist.',['OK']);
 }
+
+// ── LABEL LIFE ──────────────────────────────────────────────────────
+// Helper: compute morale score for a roster artist
+function _computeMorale(artist, ol){
+  if(!ol) return 60;
+  var score = 60; // base
+  var now = GAME.week || 1;
+  // Release events (stored on artist)
+  score += (artist._moraleReleaseApproved||0) * 12;
+  score += (artist._moraleReleaseRejected||0) * -15;
+  // Promo
+  if(artist._moralePromoPaid) score += 8;
+  // Advance recoupment
+  if(artist._moraleAdvanceRecouped) score += 10;
+  if((artist._moraleAdvanceOwed||0) > 5000) score -= 6;
+  // Contact
+  var lastContact = artist._moraleLastContact || 0;
+  if(lastContact > 0 && (now - lastContact) >= 3) score -= 8;
+  else if(lastContact > 0) score += 6;
+  // Roster collab
+  var lastCollab = artist._moraleLastCollab || 0;
+  if(lastCollab > 0 && (now - lastCollab) < 4) score += 5;
+  else if(lastCollab === 0 || (now - lastCollab) >= 4) score -= 4;
+  // Studio time
+  if(artist._moraleStudioTime) score += 7;
+  // Auto-approve on
+  if((ol.autoApprove||{})[artist.id]) score += 3;
+  // gift bonus (temp)
+  score += (artist._moraleGiftBonus||0);
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+function _moraleEmoji(s){ return s>=70?'😊':s>=40?'😐':s>=20?'😟':'😰'; }
+function _moraleBarColor(s){ return s>=70?'var(--green)':s>=40?'var(--yellow)':'var(--red)'; }
+function _moraleLabel(s){ return s>=70?'Good':s>=40?'Okay':s>=20?'LOW ⚠':'CRITICAL 🚨'; }
+function _buildMoraleFactors(artist, ol){
+  var rows = [];
+  var now = GAME.week||1;
+  if((artist._moraleReleaseApproved||0)>0) rows.push(['Release approved this cycle','+'+((artist._moraleReleaseApproved||0)*12),'pos']);
+  if((artist._moraleReleaseRejected||0)>0) rows.push(['Release rejected',''+(artist._moraleReleaseRejected*-15),'neg']);
+  if(artist._moralePromoPaid) rows.push(['Label promo spent on them','+8','pos']);
+  if(artist._moraleAdvanceRecouped) rows.push(['Advance recouped','+10','pos']);
+  if((artist._moraleAdvanceOwed||0)>5000) rows.push(['Advance still owed (high)','-6','neg']);
+  var lastContact=artist._moraleLastContact||0;
+  if(lastContact>0&&(now-lastContact)<3) rows.push(['Recent label contact','+6','pos']);
+  else rows.push(['No contact '+((lastContact>0?(now-lastContact):3)+'+ wks'),'-8','neg']);
+  var lastCollab=artist._moraleLastCollab||0;
+  if(lastCollab>0&&(now-lastCollab)<4) rows.push(['Roster collab this month','+5','pos']);
+  else rows.push(['No roster collab 4+ wks','-4','neg']);
+  if(artist._moraleStudioTime) rows.push(['Studio time given','+7','pos']);
+  if((ol.autoApprove||{})[artist.id]) rows.push(['Auto-approve on','+3/day','pos']);
+  if(!rows.length) rows.push(['No significant events','0','neu']);
+  return rows;
+}
+
+function showLabelLife(startTab){
+  var ol = GAME.ownedLabel;
+  if(!ol){ showToast('You need to own a label first.','red'); return; }
+  var t = startTab||0;
+  var tabs = ['Morale','Daily Inbox','Studio','Roster Collab','Velour','Year-End'];
+  var tabHtml = tabs.map(function(name,i){
+    return '<button onclick="window._llTab('+i+')" id="llt'+i+'" style="flex:none;background:'+(i===t?'var(--acc)':'var(--card)')+';color:'+(i===t?'var(--acc-txt)':'var(--mut)')+';border:1px solid '+(i===t?'var(--acc)':'var(--bord)')+';font-size:10.5px;font-weight:700;padding:7px 11px;border-radius:99px;cursor:pointer;font-family:var(--fb)">'+name+'</button>';
+  }).join('');
+
+  var html = '<div>';
+  html += '<div style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--surf);border-bottom:1px solid var(--bord);position:sticky;top:0;z-index:10">';
+  html += '<button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer;padding:0;line-height:1;flex:none">‹</button>';
+  html += '<div style="overflow-x:auto;display:flex;gap:6px;flex:1;padding-bottom:2px">'+tabHtml+'</div>';
+  html += '</div>';
+  html += '<div id="llBody" style="padding:16px;padding-bottom:80px"></div>';
+  html += '</div>';
+
+  _insertOverlay(html);
+
+  window._llTab = function(i){
+    var tabs2 = ['Morale','Daily Inbox','Studio','Roster Collab','Velour','Year-End'];
+    tabs2.forEach(function(_,j){
+      var btn = document.getElementById('llt'+j);
+      if(!btn) return;
+      btn.style.background = j===i?'var(--acc)':'var(--card)';
+      btn.style.color = j===i?'var(--acc-txt)':'var(--mut)';
+      btn.style.borderColor = j===i?'var(--acc)':'var(--bord)';
+    });
+    var body = document.getElementById('llBody');
+    if(!body) return;
+    body.innerHTML = [_llMorale,_llInbox,_llStudio,_llCollab,_llVelour,_llYearEnd][i]();
+  };
+  window._llTab(t);
+}
+
+// ── LABEL LIFE TAB: ARTIST MORALE ──
+function _llMorale(){
+  var ol = GAME.ownedLabel;
+  if(!ol) return '<p style="color:var(--mut);padding:20px">No label data.</p>';
+  var roster = ol.roster||[];
+  if(!roster.length) return '<div style="text-align:center;padding:30px;color:var(--mut);font-size:13px">Sign your first artist to see their morale.</div>';
+
+  var sh = '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">How morale is calculated</div>';
+  var info = '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:13px;margin-bottom:10px;font-size:11.5px;color:var(--mut);line-height:1.7"><b style="color:var(--txt);display:block;margin-bottom:4px">Morale factors (runs each game day):</b>Release approved +12 · Rejected -15 · Promo on them +8<br>Advance recouped +10 · Advance still owed (high) -6<br>Label contact +6 · No contact 3+ weeks -8<br>Roster collab this month +5 · No collab 4+ weeks -4<br>Studio time +7 · Auto-approve on +3/day<br><b style="color:var(--red);display:block;margin-top:6px">Consequences:</b>Below 40 → moody social post · Below 20 → Room Service rumor + exit request · 0 → artist formally requests release</div>';
+
+  var cards = roster.map(function(a){
+    var score = _computeMorale(a, ol);
+    var emoji = _moraleEmoji(score);
+    var barCol = _moraleBarColor(score);
+    var lbl = _moraleLabel(score);
+    var factors = _buildMoraleFactors(a, ol);
+    var fRows = factors.map(function(f){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:4px 0;border-bottom:1px solid var(--bord)"><span style="color:var(--txt)">'+f[0]+'</span><span style="font-weight:700;color:'+(f[2]==='pos'?'var(--green)':f[2]==='neg'?'var(--red)':'var(--mut)')+'">'+f[1]+'</span></div>';
+    }).join('');
+    var fanStr = (a.fans||a.fanCount||0) >= 1000 ? (((a.fans||a.fanCount||0)/1000).toFixed(0)+'K') : (a.fans||a.fanCount||0);
+    var autoOn = !!(ol.autoApprove||{})[a.id];
+    var warnHtml = score < 20 ? '<div style="background:#3a1212;border:1px solid var(--red);border-radius:9px;padding:9px 11px;font-size:11px;color:#f08a8a;margin-top:8px;line-height:1.55">⚠ Room Service is watching. If morale drops to 0, '+a.artistName+' may formally request release.</div>' : '';
+    var aid = a.id||a.userId||a.artistName;
+    return '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:10px;align-items:center"><div style="width:40px;height:40px;border-radius:50%;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:19px;flex:none">'+(a.profilePic||'🎤')+'</div><div style="flex:1"><b style="font-size:14px;display:block">'+a.artistName+'</b><span style="font-size:10.5px;color:var(--mut)">'+fanStr+' fans · '+(a.genre||'Pop')+'</span></div><div style="font-size:18px">'+emoji+'</div></div><div style="height:7px;border-radius:4px;background:var(--surf);overflow:hidden;margin-top:9px"><div style="height:100%;width:'+score+'%;background:'+barCol+';border-radius:4px"></div></div><div style="display:flex;justify-content:space-between;font-size:9px;color:var(--mut);margin-top:3px;font-weight:700"><span>MORALE</span><span>'+score+' / 100 '+lbl+'</span></div><div style="margin-top:10px;background:var(--surf);border-radius:9px;padding:9px 11px">'+fRows+'</div>'+warnHtml+'<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><button onclick="llSendGift(\''+aid+'\')" style="flex:1;min-width:80px;font-size:10.5px;font-weight:700;border-radius:9px;padding:8px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">🎁 Gift ($800)</button><button onclick="llCheckIn(\''+aid+'\')" style="flex:1;min-width:80px;font-size:10.5px;font-weight:700;border-radius:9px;padding:8px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">📞 Check In</button><button onclick="llSpotlight(\''+aid+'\')" style="flex:1;min-width:80px;font-size:10.5px;font-weight:700;border-radius:9px;padding:8px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">⭐ Spotlight</button></div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:8px 10px;background:var(--surf);border-radius:8px;font-size:11px"><span style="color:var(--mut)">Auto-Approve</span><div onclick="llToggleAutoApprove(\''+aid+'\')" style="width:34px;height:19px;border-radius:99px;background:'+(autoOn?'var(--green)':'var(--surf)')+';border:1px solid var(--bord);position:relative;cursor:pointer;transition:background .2s"><div style="position:absolute;top:2.5px;'+(autoOn?'left:17px':'left:2.5px')+';width:13px;height:13px;border-radius:50%;background:'+(autoOn?'#fff':'var(--mut)')+';transition:all .2s"></div></div></div></div>';
+  }).join('');
+
+  return cards + sh + info;
+}
+
+// ── LABEL LIFE TAB: DAILY INBOX ──
+function _llInbox(){
+  var ol = GAME.ownedLabel;
+  if(!ol) return '';
+  var roster = ol.roster||[];
+  var items = [];
+
+  // Pending release approvals
+  roster.forEach(function(a){
+    (a.pendingReleases||[]).filter(function(r){ return r.status==='pending'; }).forEach(function(r){
+      var urgent = (GAME.day - (r.submittedDay||0)) > 5;
+      items.push({type:'RELEASE',color:'#1e3a2e',tc:r.id,urgent:urgent,title:a.artistName+' wants to release "'+r.title+'"',desc:'Quality '+r.quality+'/100 · '+(r.genre||'Pop')+'.',aid:a.id,rid:r.id,artistName:a.artistName});
+    });
+  });
+  // Pending collab requests
+  (ol.pendingCollabRequests||[]).forEach(function(cr){
+    items.push({type:'COLLAB',color:'#2a1e3a',tc:cr.id,urgent:false,title:cr.artist1Name+' + '+cr.artist2Name+' want to collab',desc:'"'+cr.songTitle+'" · '+(cr.genre||'Pop')+' · Roster bonus applies.',crid:cr.id});
+  });
+  // Room Service press requests
+  (ol.pendingPressRequests||[]).forEach(function(pr){
+    items.push({type:'PRESS',color:'#3a1e2a',tc:pr.id,urgent:true,title:'Room Service is asking about '+pr.artistName,desc:'"'+pr.headline+'"',prid:pr.id,artistName:pr.artistName});
+  });
+
+  if(!items.length){
+    return '<div style="text-align:center;padding:40px 20px"><div style="font-size:32px;margin-bottom:12px">📬</div><div style="color:var(--mut);font-size:13px">No pending decisions today.</div></div>';
+  }
+
+  var sh = function(label){ return '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">'+label+'</div>'; };
+  var out = sh('Inbox — '+items.length+' pending');
+
+  items.forEach(function(item){
+    var urgBadge = item.urgent ? '<div style="position:absolute;top:-7px;right:12px;background:var(--red);color:#fff;font-size:9px;font-weight:900;border-radius:3px;padding:2px 8px;letter-spacing:.5px">URGENT</div>' : '';
+    var tagColors = {RELEASE:'#1e3a2e',COLLAB:'#2a1e3a',PRESS:'#3a1e2a',MONEY:'var(--acc-bg)'};
+    var tagTxtColors = {RELEASE:'var(--green)',COLLAB:'var(--purple)',PRESS:'var(--pink)',MONEY:'var(--acc)'};
+    var tc = tagColors[item.type]||'var(--card)';
+    var ttc = tagTxtColors[item.type]||'var(--mut)';
+
+    var btns = '';
+    if(item.type==='RELEASE'){
+      btns = '<div style="display:flex;gap:7px;margin-top:10px"><button onclick="llInboxApproveRelease(\''+item.aid+'\',\''+item.rid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:none;background:var(--green);color:#0d1a12;cursor:pointer;font-family:var(--fb)">Approve</button><button onclick="showSongReview(\''+item.aid+'\',\''+item.rid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">Review</button><button onclick="llInboxRejectRelease(\''+item.aid+'\',\''+item.rid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--red);color:var(--red);background:none;cursor:pointer;font-family:var(--fb)">Reject</button></div>';
+    } else if(item.type==='COLLAB'){
+      btns = '<div style="display:flex;gap:7px;margin-top:10px"><button onclick="llInboxApproveCollab(\''+item.crid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:none;background:var(--purple);color:#fff;cursor:pointer;font-family:var(--fb)">Approve</button><button onclick="showCollabCompare(\''+item.crid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">Compare</button><button onclick="llInboxBlockCollab(\''+item.crid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:none;color:var(--red);cursor:pointer;font-family:var(--fb)">Block</button></div>';
+    } else if(item.type==='PRESS'){
+      btns = '<div style="display:flex;gap:7px;margin-top:10px"><button onclick="showPressStatement(\''+item.prid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">Issue Statement</button><button onclick="llPressDismiss(\''+item.prid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:none;color:var(--mut);cursor:pointer;font-family:var(--fb)">No Comment</button></div>';
+    }
+
+    out += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:13px;margin-bottom:10px;position:relative">'+urgBadge+'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><h4 style="font-size:13.5px;font-weight:700;line-height:1.35;margin:0">'+item.title+'</h4><span style="font-size:9px;font-weight:800;letter-spacing:.8px;padding:2px 8px;border-radius:4px;flex:none;background:'+tc+';color:'+ttc+'">'+item.type+'</span></div><p style="font-size:11.5px;color:var(--mut);line-height:1.5;margin:5px 0 0">'+item.desc+'</p>'+btns+'</div>';
+  });
+
+  return out;
+}
+
+// ── LABEL LIFE TAB: STUDIO ──
+function _llStudio(){
+  var ol = GAME.ownedLabel;
+  if(!ol) return '';
+  var studioTiers = [
+    {icon:'🏠',name:'Home',cost:0,desc:'A bedroom setup. Minimal quality bonus.',quality:5,bonus:5,sessions:1},
+    {icon:'🎙',name:'Project',cost:20000,desc:'A proper project studio. Solid quality boost.',quality:30,bonus:14,sessions:2},
+    {icon:'🏢',name:'Pro',cost:80000,desc:'Professional-grade rooms. Premium quality.',quality:60,bonus:22,sessions:3},
+    {icon:'⭐',name:'Elite',cost:250000,desc:'World-class facility. Chart-boost potential unlocked.',quality:90,bonus:32,sessions:4}
+  ];
+  var equipment = [
+    {key:'mixing_console',icon:'🎛',name:'Mixing Console',price:8000,perk:'+5 Production quality per session',desc:'A solid digital mixing board. Roster artists get a production bonus during mixdown.'},
+    {key:'vocal_booth',icon:'🎤',name:'Vocal Booth',price:12000,perk:'+7 Vocal quality · Decay slowed while using',desc:'Soundproofed isolation booth. Vocals recorded here get warmth and clarity bonus.'},
+    {key:'grand_piano',icon:'🎹',name:'Grand Piano (Yamaha C7)',price:28000,perk:'+9 Writing quality · Hype +3 on releases recorded here',desc:'A concert grand. Fans notice the difference.'},
+    {key:'neve_1073',icon:'🎚',name:'Outboard Gear (Neve 1073)',price:55000,perk:'+12 overall song quality · Unlocks Elite tier recordings',desc:'Vintage preamp. The difference between good and great.'},
+    {key:'ssl_9000',icon:'🏆',name:'SSL 9000 Console',price:120000,perk:'+20 quality · Chart algorithm boost on release week',desc:'The console behind decades of #1 records.',requiresTier:3}
+  ];
+
+  var cur = ol.studioTier||0;
+  var owned = ol.equipment||[];
+  var qualityBonus = studioTiers[cur].bonus + owned.length * 3;
+  var sessions = studioTiers[cur].sessions;
+  var rosterUsing = Math.min(sessions, (ol.roster||[]).length);
+
+  var statsHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px"><div style="background:var(--card);border:1px solid var(--bord);border-radius:11px;padding:10px"><div style="font-size:8.5px;font-weight:800;letter-spacing:.8px;color:var(--mut)">STUDIO QUALITY</div><div style="font-size:16px;font-weight:900;color:var(--blue);margin-top:3px">'+studioTiers[cur].quality+'<small style="font-size:11px;color:var(--mut)">/100</small></div><div style="font-size:9px;color:var(--green);font-weight:700">'+studioTiers[cur].name+' tier</div></div><div style="background:var(--card);border:1px solid var(--bord);border-radius:11px;padding:10px"><div style="font-size:8.5px;font-weight:800;letter-spacing:.8px;color:var(--mut)">RECORDING BONUS</div><div style="font-size:16px;font-weight:900;color:var(--green);margin-top:3px">+'+qualityBonus+'%</div><div style="font-size:9px;color:var(--green);font-weight:700">quality boost</div></div><div style="background:var(--card);border:1px solid var(--bord);border-radius:11px;padding:10px"><div style="font-size:8.5px;font-weight:800;letter-spacing:.8px;color:var(--mut)">SESSIONS / WEEK</div><div style="font-size:16px;font-weight:900;margin-top:3px">'+sessions+'<small style="font-size:11px;color:var(--mut)"> slots</small></div><div style="font-size:9px;color:var(--green);font-weight:700">available</div></div><div style="background:var(--card);border:1px solid var(--bord);border-radius:11px;padding:10px"><div style="font-size:8.5px;font-weight:800;letter-spacing:.8px;color:var(--mut)">ROSTER USING IT</div><div style="font-size:16px;font-weight:900;color:var(--acc);margin-top:3px">'+rosterUsing+'</div><div style="font-size:9px;color:var(--green);font-weight:700">artists this week</div></div></div>';
+
+  var sh = '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">';
+
+  var tierHtml = sh+'Studio Tier</div><div style="display:flex;gap:10px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px">';
+  studioTiers.forEach(function(tier,i){
+    var isCur = i===cur;
+    tierHtml += '<div onclick="llSetStudioTier('+i+')" style="flex:none;width:95px;background:var(--card);border:2px solid '+(isCur?'var(--acc)':'var(--bord)')+';border-radius:12px;padding:10px;text-align:center;cursor:pointer"><div style="font-size:24px;margin-bottom:5px">'+tier.icon+'</div><b style="font-size:11px;display:block">'+tier.name+'</b><span style="font-size:9.5px;color:var(--mut)">'+(i===0?'Free':'$'+_fmt(tier.cost))+'</span></div>';
+  });
+  tierHtml += '</div>';
+
+  var eqHtml = sh+'Equipment</div>';
+  equipment.forEach(function(eq){
+    var isOwned = owned.includes(eq.key);
+    var lockedByTier = eq.requiresTier && cur < eq.requiresTier;
+    var dimmed = lockedByTier ? 'opacity:0.5;' : '';
+    eqHtml += '<div style="'+dimmed+'background:var(--card);border:1px solid var(--bord);border-radius:14px;overflow:hidden;margin-bottom:10px">';
+    eqHtml += '<div style="padding:11px 13px;background:var(--surf);border-bottom:1px solid var(--bord);display:flex;justify-content:space-between;align-items:center"><b style="font-size:13px">'+eq.icon+' '+eq.name+'</b>';
+    if(isOwned) eqHtml += '<span style="font-size:11px;color:var(--green);font-weight:700">Owned ✓</span>';
+    else if(lockedByTier) eqHtml += '<span style="font-size:11px;color:var(--mut);font-weight:700">Requires '+studioTiers[eq.requiresTier].name+' tier</span>';
+    else eqHtml += '<span style="font-size:11px;color:var(--acc);font-weight:700">$'+_fmt(eq.price)+'</span>';
+    eqHtml += '</div><div style="padding:10px 13px"><p style="font-size:11.5px;color:var(--mut);line-height:1.5">'+eq.desc+'</p><div style="color:var(--blue);font-size:10.5px;font-weight:700;margin-top:8px">🎵 '+eq.perk+'</div><div style="display:flex;gap:7px;margin-top:10px">';
+    if(isOwned){
+      eqHtml += '<button disabled style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px;border:1px solid var(--green);background:#1e3a2e;color:var(--green);cursor:default;font-family:var(--fb)">Installed</button>';
+    } else if(lockedByTier){
+      eqHtml += '<button disabled style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px;border:1px solid var(--bord);background:var(--surf);color:var(--mut);cursor:default;font-family:var(--fb)">Locked</button>';
+    } else {
+      eqHtml += '<button onclick="llBuyEquipment(\''+eq.key+'\','+eq.price+')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px;border:none;background:var(--acc);color:var(--acc-txt);cursor:pointer;font-family:var(--fb)">Buy</button>';
+    }
+    eqHtml += '</div></div></div>';
+  });
+
+  return statsHtml + tierHtml + eqHtml;
+}
+
+// ── LABEL LIFE TAB: ROSTER COLLAB ──
+function _llCollab(){
+  var ol = GAME.ownedLabel;
+  if(!ol) return '';
+  var pending = ol.pendingCollabRequests||[];
+  var completed = (ol.completedCollabs||[]).slice(-3).reverse();
+  var roster = ol.roster||[];
+
+  var bonusInfo = '<div style="background:var(--acc-bg);border:1px solid var(--acc);border-radius:14px;padding:13px;margin-bottom:10px"><div style="font-size:10.5px;font-weight:800;color:var(--acc);margin-bottom:5px">LABEL ROSTER BONUS</div><div style="font-size:12px;color:var(--txt);line-height:1.55">Collabs between rostered artists get a <b>+15% first-week streams</b> bonus and a <b>+5 morale</b> boost for both. Blocking a collab costs each artist <b>-6 morale</b>.</div></div>';
+
+  var sh = function(t){ return '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">'+t+'</div>'; };
+
+  var pendingHtml = sh('Pending Collab Requests ('+pending.length+')');
+  if(!pending.length){
+    pendingHtml += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:16px;text-align:center;color:var(--mut);font-size:12px">No pending collab requests.</div>';
+  } else {
+    pending.forEach(function(cr){
+      pendingHtml += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:13px;margin-bottom:10px"><div style="display:flex;gap:10px;align-items:center;margin-bottom:10px"><div style="display:flex"><div style="width:38px;height:38px;border-radius:50%;background:var(--surf);border:2px solid var(--card);display:flex;align-items:center;justify-content:center;font-size:17px">'+( cr.emoji1||'🎤')+'</div><div style="width:38px;height:38px;border-radius:50%;background:var(--surf);border:2px solid var(--card);display:flex;align-items:center;justify-content:center;font-size:17px;margin-left:-12px">'+(cr.emoji2||'🎹')+'</div></div><div><h4 style="font-size:13.5px;font-weight:700;line-height:1.35;margin:0">'+cr.artist1Name+' + '+cr.artist2Name+'</h4><div style="font-size:10.5px;color:var(--mut);margin-top:2px">"'+(cr.songTitle||'Untitled')+'" · '+(cr.genre||'Pop')+'</div></div></div><div style="background:var(--acc-bg);border:1px solid var(--acc);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--acc);font-weight:700">🎶 Roster bonus: +15% streams week 1 · +5 morale each</div><div style="display:flex;gap:7px;margin-top:10px"><button onclick="llInboxApproveCollab(\''+cr.id+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:none;background:var(--purple);color:#fff;cursor:pointer;font-family:var(--fb)">Approve</button><button onclick="showCollabCompare(\''+cr.id+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">Compare</button><button onclick="llInboxBlockCollab(\''+cr.id+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:none;color:var(--red);cursor:pointer;font-family:var(--fb)">Block</button></div></div>';
+    });
+  }
+
+  var suggestHtml = sh('Suggest a Collab');
+  if(roster.length < 2){
+    suggestHtml += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:16px;text-align:center;color:var(--mut);font-size:12px">Sign at least 2 artists to suggest collabs.</div>';
+  } else {
+    var selOpts = roster.map(function(a){ return '<option value="'+(a.id||a.artistName)+'">'+a.artistName+'</option>'; }).join('');
+    suggestHtml += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:13px;margin-bottom:10px"><div style="font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:10px">You can <b style="color:var(--txt)">suggest</b> a collab between two of your artists. Each gets a notification and can accept or decline — you can\'t force it, but morale +3 each just from the ask.</div><div style="display:flex;gap:7px;margin-bottom:10px"><select id="llSuggestA1" style="flex:1;padding:8px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;font-size:12px;color:var(--txt);font-family:var(--fb)">'+selOpts+'</select><div style="font-weight:900;color:var(--mut);display:flex;align-items:center">+</div><select id="llSuggestA2" style="flex:1;padding:8px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;font-size:12px;color:var(--txt);font-family:var(--fb)">'+selOpts+'</select></div><button onclick="llSuggestCollab()" style="width:100%;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:var(--fb)">Suggest This Collab</button></div>';
+  }
+
+  var completedHtml = sh('Completed Roster Collabs');
+  if(!completed.length){
+    completedHtml += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:16px;text-align:center;color:var(--mut);font-size:12px">No completed collabs yet.</div>';
+  } else {
+    completed.forEach(function(c){
+      completedHtml += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:12px;margin-bottom:8px"><div style="font-size:12.5px;font-weight:700">'+c.title+'</div><div style="font-size:10.5px;color:var(--mut);margin-top:3px">Week '+(c.week||'?')+' · '+(c.streams?_fmt(c.streams)+' streams':'—')+' · Roster bonus applied</div></div>';
+    });
+  }
+
+  return bonusInfo + pendingHtml + suggestHtml + completedHtml;
+}
+
+// ── LABEL LIFE TAB: VELOUR SPOTLIGHT ──
+function _llVelour(){
+  var ol = GAME.ownedLabel;
+  if(!ol) return '';
+  var roster = ol.roster||[];
+  var now = GAME.week||1;
+  var tierKey = ol.tier||'indie';
+  var quotaMap = {indie:1,mid:2,major:3,global:5};
+  var quota = quotaMap[tierKey]||1;
+  var lastSubWeek = ol.velourSubmittedWeek||0;
+  var submittedThisMonth = (now - lastSubWeek) < 4;
+  var tierNames = {indie:'Indie',mid:'Mid-Indie',major:'Major (Boutique)',global:'Global Major'};
+  var tierName = tierNames[tierKey]||'Indie';
+
+  var gateHtml = '<div style="background:linear-gradient(150deg,#1a1a1a,#2a1e3a);border:1px solid #3a2a55;border-radius:14px;padding:16px;text-align:center;margin-bottom:12px"><div style="font-family:Georgia,serif;font-size:26px;letter-spacing:4px;color:#e8d9b0">V E L O U R</div><div style="font-size:11px;color:rgba(255,255,255,.5);letter-spacing:2px;margin-top:3px">the industry\'s most coveted feature</div><div style="font-size:10.5px;color:var(--mut);margin-top:10px;line-height:1.6">Label-exclusive. Unsigned artists cannot apply. Build something worth writing about first.</div></div>';
+
+  var sh = '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">';
+
+  // Find eligible artists
+  var eligibleArtists = roster.filter(function(a){
+    var fans = a.fans||a.fanCount||0;
+    var hasChartEntry = (a.songs||[]).some(function(s){ return s.chartPosition && (now-(s.releaseWeek||0))<8; });
+    return fans >= 50000 && hasChartEntry;
+  });
+
+  var tierEligible = (tierKey==='mid'||tierKey==='major'||tierKey==='global');
+  var labelRep = ol.rep||0;
+  var repOk = labelRep >= 4.0;
+
+  if(!tierEligible){
+    return gateHtml + sh+'Eligibility</div><div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:13px"><div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:.8px;margin-bottom:6px">REQUIREMENTS NOT MET</div><div style="display:flex;justify-content:space-between;font-size:11.5px;padding:6px 0;border-bottom:1px solid var(--bord)"><span>Label tier: Mid-Indie or above</span><span style="color:var(--red);font-weight:700">✗ '+tierName+'</span></div><div style="display:flex;justify-content:space-between;font-size:11.5px;padding:6px 0;border-bottom:1px solid var(--bord)"><span>Label rep: 4.0+</span><span style="color:'+(repOk?'var(--green)':'var(--red)')+';font-weight:700">'+(repOk?'✓ '+labelRep.toFixed(1):'✗ '+labelRep.toFixed(1))+'</span></div><div style="display:flex;justify-content:space-between;font-size:11.5px;padding:6px 0"><span>Artist: 50K+ fans + chart entry in last 8 weeks</span><span style="color:var(--mut)">—</span></div></div>';
+  }
+
+  var appHtml = sh+'Label Application</div>';
+  if(submittedThisMonth){
+    appHtml += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:14px;text-align:center;color:var(--mut);font-size:12px">Already submitted this month ('+quota+' per month for '+tierName+'). Check back in '+(4-(now-lastSubWeek))+' weeks.</div>';
+  } else if(!eligibleArtists.length){
+    appHtml += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:14px"><div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:.8px;margin-bottom:8px">ELIGIBILITY CHECK</div><div style="display:flex;justify-content:space-between;font-size:11.5px;padding:6px 0;border-bottom:1px solid var(--bord)"><span>Label tier: Mid-Indie or above</span><span style="color:var(--green);font-weight:700">✓ '+tierName+'</span></div><div style="display:flex;justify-content:space-between;font-size:11.5px;padding:6px 0;border-bottom:1px solid var(--bord)"><span>Label rep: 4.0+</span><span style="color:'+(repOk?'var(--green)':'var(--red)')+';font-weight:700">'+(repOk?'✓ '+labelRep.toFixed(1):'✗ '+labelRep.toFixed(1))+'</span></div><div style="display:flex;justify-content:space-between;font-size:11.5px;padding:6px 0"><span>Artist: 50K+ fans + chart entry in last 8 weeks</span><span style="color:var(--red);font-weight:700">✗ No eligible artists</span></div></div>';
+  } else {
+    var logoInitials = (ol.name||'?').slice(0,3).toUpperCase();
+    appHtml += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:14px;margin-bottom:10px"><div style="display:flex;gap:10px;align-items:flex-start"><div style="width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#1a1a1a,#2a1e3a);border:1px solid #3a2a55;flex:none;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-size:13px;letter-spacing:1px;color:#e8d9b0">'+logoInitials+'</div><div><h4 style="font-size:14px;font-weight:700;line-height:1.35;margin:0">'+ol.name+' — Artist Feature</h4><p style="font-size:11.5px;color:var(--mut);line-height:1.55;margin:5px 0 0">Submit one eligible artist for Velour consideration. If accepted: Hype +8 on their next release · Fans +3–5% · Label rep +0.5</p></div></div><div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px;margin-top:10px"><div style="font-size:9.5px;font-weight:800;color:var(--mut);letter-spacing:.8px;margin-bottom:6px">ELIGIBILITY CHECK</div><div style="display:flex;justify-content:space-between;font-size:11.5px;padding:6px 0;border-bottom:1px solid var(--bord)"><span>Label tier: Mid-Indie or above</span><span style="color:var(--green);font-weight:700">✓ '+tierName+'</span></div><div style="display:flex;justify-content:space-between;font-size:11.5px;padding:6px 0;border-bottom:1px solid var(--bord)"><span>Label rep: 4.0+</span><span style="color:'+(repOk?'var(--green)':'var(--red)')+';font-weight:700">'+(repOk?'✓ '+labelRep.toFixed(1):'✗ '+labelRep.toFixed(1))+'</span></div><div style="display:flex;justify-content:space-between;font-size:11.5px;padding:6px 0"><span>Eligible artists (50K+ fans + chart entry)</span><span style="color:var(--green);font-weight:700">✓ '+eligibleArtists.length+' eligible</span></div></div>';
+    if(repOk){
+      var selOpts = eligibleArtists.map(function(a){ return '<option value="'+(a.id||a.artistName)+'">'+a.artistName+' ('+(Math.round((a.fans||a.fanCount||0)/1000))+'K fans)'+'</option>'; }).join('');
+      appHtml += '<div style="margin-top:10px"><select id="llVelourArtist" style="width:100%;padding:9px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;font-size:12px;color:var(--txt);font-family:var(--fb);margin-bottom:8px">'+selOpts+'</select><button onclick="llSubmitVelour()" style="width:100%;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:var(--fb)">Submit for Velour Feature</button></div>';
+    }
+    appHtml += '</div>';
+  }
+
+  var resultHtml = sh+'If Accepted — What Happens</div><div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:13px;font-size:11.5px;color:var(--mut);line-height:1.7"><b style="color:var(--txt);display:block;margin-bottom:4px">Velour publishes a prestige feature article (AI-generated, Velour voice).</b>Hype +8 on artist\'s next release · Fans +3–5% · Label rep +0.5 · Chartwell usually follows with a business piece. Quota: '+quota+'/month for '+tierName+' labels. Rejection gives feedback so you know what to fix.</div>';
+
+  return gateHtml + appHtml + resultHtml;
+}
+
+// ── LABEL LIFE TAB: YEAR-END RANKINGS ──
+function _llYearEnd(){
+  var ol = GAME.ownedLabel;
+  if(!ol) return '';
+  var score = _labelYearEndScore(ol);
+  var now = GAME.week||1;
+  var gameYear = Math.floor((now-1)/52)+1;
+  var weeksLeft = 52 - ((now-1)%52);
+
+  var headerHtml = '<div style="border-radius:10px;overflow:hidden;border:1px solid var(--bord);margin-bottom:10px"><div style="height:100px;background:linear-gradient(135deg,var(--acc-bg),#2a1e3a);display:flex;align-items:center;justify-content:center;font-size:38px;position:relative"><span>🏆</span><span style="position:absolute;top:10px;left:12px;font-family:Georgia,serif;font-size:13px;letter-spacing:4px;color:#e8d9b0">C H A R T W E L L</span></div><div style="padding:10px 13px;background:var(--card)"><div style="font-size:8.5px;letter-spacing:2px;color:var(--acc);font-weight:800">Annual Report · Year '+gameYear+'</div><h4 style="font-family:Georgia,serif;font-size:15px;margin:3px 0 0;line-height:1.3">The Labels That Defined Year '+gameYear+'</h4><p style="font-size:11px;color:var(--mut);line-height:1.5;margin:4px 0 0">Chartwell ranks every player-owned label by chart points, total streams, artist growth, and rep. Rankings run at Week 52.</p></div></div>';
+
+  var sh = '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">';
+
+  var yourHtml = sh+'Your Label\'s Score</div><div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;overflow:hidden;margin-bottom:10px"><div style="padding:12px 14px;background:linear-gradient(135deg,var(--acc-bg),var(--card));border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:10px"><div style="font-family:Georgia,serif;font-size:28px;font-weight:900;color:var(--acc);width:40px;flex:none">—</div><div><b style="font-size:14px;display:block">'+(ol.logoEmoji||'🏢')+' '+ol.name+'</b><span style="font-size:10.5px;color:var(--mut)">Owner: '+(GAME.sn||'You')+' · '+((Object.keys({indie:true,mid:true,major:true,global:true})[0]===ol.tier?'Indie':ol.tier==='mid'?'Mid-Indie':ol.tier==='major'?'Major':ol.tier==='global'?'Global Major':'Indie'))+'</span></div></div><div style="padding:10px 14px"><div style="display:flex;gap:12px;font-size:10.5px;color:var(--mut);font-weight:600"><span>Est. pts <b style="color:var(--txt)">'+score+'</b></span><span>Artists <b style="color:var(--txt)">'+(ol.roster||[]).length+'</b></span><span>Rep <b style="color:var(--txt)">'+(ol.rep||0).toFixed(1)+'⭐</b></span></div><div style="height:7px;border-radius:4px;background:var(--surf);overflow:hidden;margin-top:8px"><div style="height:100%;width:'+Math.min(100,score/10)+'%;background:linear-gradient(90deg,var(--purple),var(--acc));border-radius:4px"></div></div></div></div>';
+
+  var infoHtml = sh+'How Year-End Works</div><div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:13px;font-size:11.5px;color:var(--mut);line-height:1.7"><b style="color:var(--txt);display:block;margin-bottom:4px">Four things happen at Week 52:</b>1. Chartwell publishes the ranked article — visible to all players<br>2. Velour does a "Labels to Watch" for top 3 rising indie labels<br>3. A <b style="color:var(--txt)">Year in Review</b> tab appears in the news feed for 4 game weeks<br>4. #1 label gets a permanent 🏆 badge on their label page<br><br><b style="color:var(--txt)">Scoring:</b> chart entries (weighted by peak position) + combined roster streams + label rep + artist fan growth. Ties broken by rep.<br><br>';
+
+  infoHtml += '<b style="color:var(--acc)">'+weeksLeft+' week'+(weeksLeft===1?'':'s')+' until year-end rankings.</b></div>';
+
+  return headerHtml + yourHtml + infoHtml;
+}
+
+function _labelYearEndScore(ol){
+  if(!ol) return 0;
+  var score = 0;
+  // Chart points (simplified: count songs with chart positions)
+  (ol.roster||[]).forEach(function(a){
+    (a.songs||[]).forEach(function(s){
+      if(s.peakPosition){ score += Math.max(1, Math.round((100-s.peakPosition)*2)); }
+    });
+  });
+  // Streams
+  var totalStreams = (ol.roster||[]).reduce(function(sum,a){ return sum+(a.totalStreams||0); },0);
+  score += Math.round(totalStreams/100000);
+  // Rep
+  score += Math.round((ol.rep||0)*10);
+  // Fan growth
+  score += (ol.roster||[]).reduce(function(sum,a){ return sum+Math.round((a.fans||a.fanCount||0)/10000); },0);
+  return score;
+}
+
+// ── LABEL LIFE: ACTION HANDLERS ──
+function llSendGift(artistId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  if((GAME.money||0)<800){ showToast('Not enough money. Need $800.','red'); return; }
+  var artist = (ol.roster||[]).find(function(a){ return (a.id||a.userId||a.artistName)===artistId; });
+  if(!artist){ showToast('Artist not found.','red'); return; }
+  GAME.money -= 800;
+  artist._moraleGiftBonus = (artist._moraleGiftBonus||0) + 8;
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'Sent a gift to <strong>'+artist.artistName+'</strong>. Morale +8.',color:'#a855f7',time:'now'});
+  markDirty(); saveToCloud();
+  showToast('Gift sent! +8 morale · -$800','green');
+  window._llTab && window._llTab(0);
+}
+function llCheckIn(artistId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var artist = (ol.roster||[]).find(function(a){ return (a.id||a.userId||a.artistName)===artistId; });
+  if(!artist){ return; }
+  artist._moraleLastContact = GAME.week||1;
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'Checked in with <strong>'+artist.artistName+'</strong>. Morale +6.',color:'#3b82f6',time:'now'});
+  markDirty(); saveToCloud();
+  showToast('Check-in done! Morale +6.','green');
+  window._llTab && window._llTab(0);
+}
+function llSpotlight(artistId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var artist = (ol.roster||[]).find(function(a){ return (a.id||a.userId||a.artistName)===artistId; });
+  if(!artist){ return; }
+  artist.spotlight = true;
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'<strong>'+artist.artistName+'</strong> spotlighted on label page.',color:'#f59e0b',time:'now'});
+  markDirty(); saveToCloud();
+  showToast(artist.artistName+' spotlighted!','gold');
+  window._llTab && window._llTab(0);
+}
+function llToggleAutoApprove(artistId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  ol.autoApprove = ol.autoApprove||{};
+  ol.autoApprove[artistId] = !ol.autoApprove[artistId];
+  markDirty(); saveToCloud();
+  showToast('Auto-approve '+(ol.autoApprove[artistId]?'on':'off')+' for this artist.', ol.autoApprove[artistId]?'green':'red');
+  window._llTab && window._llTab(0);
+}
+function llSetStudioTier(i){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var costs = [0,20000,80000,250000];
+  var cur = ol.studioTier||0;
+  if(i<=cur){ showToast('Already at this tier or higher.','red'); return; }
+  var cost = costs[i]-costs[cur];
+  if((GAME.money||0)<cost){ showToast('Need $'+_fmt(cost)+' to upgrade.','red'); return; }
+  if(!confirm('Upgrade label studio to '+['Home','Project','Pro','Elite'][i]+' tier for $'+_fmt(cost)+'?')) return;
+  GAME.money -= cost;
+  ol.studioTier = i;
+  // Morale bonus for roster on upgrade
+  (ol.roster||[]).forEach(function(a){ a._moraleGiftBonus = (a._moraleGiftBonus||0) + 3; });
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'Label studio upgraded to <strong>'+['Home','Project','Pro','Elite'][i]+'</strong> tier. Roster morale +3 each.',color:'#3b82f6',time:'now'});
+  markDirty(); saveToCloud();
+  showToast('Studio upgraded! Roster morale +3 each.','green');
+  window._llTab && window._llTab(2);
+}
+function llBuyEquipment(key, price){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  ol.equipment = ol.equipment||[];
+  if(ol.equipment.includes(key)){ showToast('Already owned.','red'); return; }
+  if((GAME.money||0)<price){ showToast('Need $'+_fmt(price)+'.','red'); return; }
+  if(!confirm('Buy this equipment for $'+_fmt(price)+'?')) return;
+  GAME.money -= price;
+  ol.equipment.push(key);
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'Purchased studio equipment: <strong>'+key.replace(/_/g,' ')+'</strong>.',color:'#3b82f6',time:'now'});
+  markDirty(); saveToCloud();
+  showToast('Equipment installed!','green');
+  window._llTab && window._llTab(2);
+}
+function llInboxApproveRelease(artistId, releaseId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var artist = (ol.roster||[]).find(function(a){ return (a.id||a.userId||a.artistName)===artistId; });
+  if(!artist) return;
+  var rel = (artist.pendingReleases||[]).find(function(r){ return r.id===releaseId; });
+  if(!rel) return;
+  rel.status = 'approved';
+  artist._moraleReleaseApproved = (artist._moraleReleaseApproved||0)+1;
+  ol.rep = Math.min(5,(ol.rep||5)+0.1);
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'Approved <strong>'+rel.title+'</strong> by '+artist.artistName+'. Morale +12.',color:'#22c55e',time:'now'});
+  markDirty(); saveToCloud();
+  showToast('Release approved! Morale +12.','green');
+  window._llTab && window._llTab(1);
+}
+function llInboxRejectRelease(artistId, releaseId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var artist = (ol.roster||[]).find(function(a){ return (a.id||a.userId||a.artistName)===artistId; });
+  if(!artist) return;
+  var rel = (artist.pendingReleases||[]).find(function(r){ return r.id===releaseId; });
+  if(!rel) return;
+  rel.status = 'rejected';
+  artist._moraleReleaseRejected = (artist._moraleReleaseRejected||0)+1;
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'Rejected <strong>'+rel.title+'</strong> by '+artist.artistName+'. Morale -15.', color:'#ef4444',time:'now'});
+  markDirty(); saveToCloud();
+  showToast('Release rejected. Morale -15.','red');
+  window._llTab && window._llTab(1);
+}
+function llInboxApproveCollab(collabReqId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var reqs = ol.pendingCollabRequests||[];
+  var cr = reqs.find(function(r){ return r.id===collabReqId; });
+  if(!cr) return;
+  // +5 morale each, +15% streams bonus tracked
+  var a1 = (ol.roster||[]).find(function(a){ return (a.id||a.artistName)===cr.artist1Id; });
+  var a2 = (ol.roster||[]).find(function(a){ return (a.id||a.artistName)===cr.artist2Id; });
+  if(a1){ a1._moraleGiftBonus=(a1._moraleGiftBonus||0)+5; a1._moraleLastCollab=GAME.week||1; }
+  if(a2){ a2._moraleGiftBonus=(a2._moraleGiftBonus||0)+5; a2._moraleLastCollab=GAME.week||1; }
+  ol.pendingCollabRequests = reqs.filter(function(r){ return r.id!==collabReqId; });
+  ol.completedCollabs = ol.completedCollabs||[];
+  ol.completedCollabs.push({title:cr.artist1Name+' + '+cr.artist2Name+' — "'+cr.songTitle+'"',week:GAME.week||1,rosterBonus:true});
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'Approved roster collab: <strong>'+cr.artist1Name+' + '+cr.artist2Name+'</strong>. Morale +5 each. +15% streams bonus.',color:'#a855f7',time:'now'});
+  markDirty(); saveToCloud();
+  showToast('Collab approved! Morale +5 each.','green');
+  window._llTab && window._llTab(1);
+}
+function llInboxBlockCollab(collabReqId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var reqs = ol.pendingCollabRequests||[];
+  var cr = reqs.find(function(r){ return r.id===collabReqId; });
+  if(!cr) return;
+  var a1 = (ol.roster||[]).find(function(a){ return (a.id||a.artistName)===cr.artist1Id; });
+  var a2 = (ol.roster||[]).find(function(a){ return (a.id||a.artistName)===cr.artist2Id; });
+  if(a1){ a1._moraleGiftBonus=(a1._moraleGiftBonus||0)-6; }
+  if(a2){ a2._moraleGiftBonus=(a2._moraleGiftBonus||0)-6; }
+  ol.pendingCollabRequests = reqs.filter(function(r){ return r.id!==collabReqId; });
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'Blocked collab: <strong>'+cr.artist1Name+' + '+cr.artist2Name+'</strong>. Morale -6 each.',color:'#ef4444',time:'now'});
+  markDirty(); saveToCloud();
+  showToast('Collab blocked. Morale -6 each.','red');
+  window._llTab && window._llTab(1);
+}
+function llSuggestCollab(){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var sel1 = document.getElementById('llSuggestA1');
+  var sel2 = document.getElementById('llSuggestA2');
+  if(!sel1||!sel2) return;
+  var id1 = sel1.value; var id2 = sel2.value;
+  if(id1===id2){ showToast('Pick two different artists.','red'); return; }
+  var a1 = (ol.roster||[]).find(function(a){ return (a.id||a.artistName)===id1; });
+  var a2 = (ol.roster||[]).find(function(a){ return (a.id||a.artistName)===id2; });
+  if(!a1||!a2){ showToast('Artists not found.','red'); return; }
+  // Morale +3 each just from the suggestion
+  a1._moraleGiftBonus = (a1._moraleGiftBonus||0)+3;
+  a2._moraleGiftBonus = (a2._moraleGiftBonus||0)+3;
+  // Add pending collab request
+  ol.pendingCollabRequests = ol.pendingCollabRequests||[];
+  ol.pendingCollabRequests.push({id:'cr_'+Date.now(),artist1Id:id1,artist2Id:id2,artist1Name:a1.artistName,artist2Name:a2.artistName,songTitle:'Untitled Collab',genre:a1.genre||'Pop',emoji1:a1.profilePic||'🎤',emoji2:a2.profilePic||'🎹',suggestedByOwner:true});
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'Suggested collab: <strong>'+a1.artistName+' + '+a2.artistName+'</strong>. Morale +3 each.',color:'#a855f7',time:'now'});
+  markDirty(); saveToCloud();
+  showToast('Collab suggested! Morale +3 each.','green');
+  window._llTab && window._llTab(3);
+}
+function llPressDismiss(pressReqId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  ol.pendingPressRequests = (ol.pendingPressRequests||[]).filter(function(pr){ return pr.id!==pressReqId; });
+  markDirty(); saveToCloud();
+  showToast('No comment. Rumor will run its course.','red');
+  window._llTab && window._llTab(1);
+}
+function llSubmitVelour(){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var sel = document.getElementById('llVelourArtist');
+  var artistId = sel ? sel.value : null;
+  var artist = artistId ? (ol.roster||[]).find(function(a){ return (a.id||a.artistName)===artistId; }) : null;
+  if(!artist){ showToast('No eligible artist selected.','red'); return; }
+  ol.velourSubmittedWeek = GAME.week||1;
+  ol.activity = ol.activity||[];
+  ol.activity.unshift({text:'Submitted <strong>'+artist.artistName+'</strong> for Velour Spotlight.',color:'#a855f7',time:'now'});
+  // Trigger article generation if in multiplayer
+  if(GAME_MODE==='multi' && typeof supabase!=='undefined'){
+    var facts = {artist:artist.artistName,label:ol.name,fans:artist.fans||artist.fanCount||0,game_week:GAME.week||1,player_id:GAME.playerId||null};
+    fetch((window.SUPABASE_URL||'')+'/functions/v1/generate-article',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(window.SUPABASE_ANON_KEY||'')},body:JSON.stringify({trigger_type:'velour_spotlight',trigger_key:'velour_'+ol.id+'_'+(GAME.week||1),outlet:'Velour',facts:facts})}).catch(function(){});
+  }
+  markDirty(); saveToCloud();
+  showToast('Submitted! Velour editors will review by end of Week '+(GAME.week+1)+'.','gold');
+  window._llTab && window._llTab(4);
+}
+
+// ── PRESS STATEMENT OVERLAY ──
+function showPressStatement(pressReqId){
+  var ol = GAME.ownedLabel;
+  if(!ol){ showToast('Label owners only.','red'); return; }
+  var pr = pressReqId ? (ol.pendingPressRequests||[]).find(function(r){ return r.id===pressReqId; }) : null;
+  var logoInitials = (ol.name||'?').slice(0,3).toUpperCase();
+  var presets = [
+    'We are aware of the speculation and want to address it directly. Bloomington Records takes every concern seriously.',
+    'Our artists\' wellbeing is our absolute priority. We want to be clear: they are valued and supported.',
+    ol.name+' does not comment on internal matters. What we will say is that our working relationship is strong.',
+    'The claims being circulated are entirely false. We stand fully behind our roster and our practices.'
+  ];
+
+  var html = '<div style="padding:0 0 80px"><div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surf);border-bottom:1px solid var(--bord);position:sticky;top:0;z-index:10"><button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer;padding:0;line-height:1;flex:none">‹</button><div style="font-family:Georgia,serif;font-size:16px;font-weight:700;flex:1">Issue a Statement</div></div><div style="padding:16px">';
+
+  // Outlet header
+  html += '<div style="background:linear-gradient(135deg,var(--card),var(--surf));border:1px solid var(--bord);border-radius:14px;padding:14px;margin-bottom:12px;display:flex;gap:12px;align-items:center"><div style="width:48px;height:48px;border-radius:11px;background:#0a0a0a;border:1px solid #333;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-size:13px;letter-spacing:1.5px;color:#e8d9b0;flex:none">'+logoInitials+'</div><div><div style="font-family:Georgia,serif;font-size:17px;font-weight:700">'+ol.name+'</div><span style="font-size:10.5px;color:var(--mut)">Official Statement · Verified Label · appears in The Press</span></div></div>';
+
+  // Tone chips
+  html += '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">Tone</div>';
+  html += '<div style="display:flex;gap:7px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px">';
+  ['Professional','Warm','Firm','Dismissive'].forEach(function(tone,i){
+    html += '<span onclick="llStmtTone(this,\''+tone+'\')" style="flex:none;font-size:11px;font-weight:700;border:1px solid '+(i===0?'var(--txt)':'var(--bord)')+';border-radius:99px;padding:7px 13px;color:'+(i===0?'var(--bg)':'var(--mut)')+';background:'+(i===0?'var(--txt)':'var(--card)')+';cursor:pointer">'+tone+'</span>';
+  });
+  html += '</div>';
+
+  // Presets
+  html += '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:7px">Presets — tap to load</div>';
+  var icons = ['📋','❤️','🤐','🔥'];
+  presets.forEach(function(p,i){
+    html += '<button onclick="document.getElementById(\'stmtBody\').value=\''+p.replace(/'/g,"\\'")+'\';" style="display:block;width:100%;text-align:left;background:var(--surf);border:1px solid var(--bord);border-radius:9px;padding:9px 12px;font-size:11.5px;color:var(--txt);margin-bottom:6px;cursor:pointer;line-height:1.4;font-family:var(--fb)">'+icons[i]+' "'+p.slice(0,60)+'..."</button>';
+  });
+
+  // Article preview (editable)
+  html += '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:12px 0 7px">Your Statement</div>';
+  html += '<div style="background:#fdf9f3;border-radius:10px;padding:14px;margin-bottom:12px;position:relative"><div style="font-size:8.5px;font-weight:900;letter-spacing:2px;color:#1a1a1a;margin-bottom:6px">'+ol.name.toUpperCase()+' — OFFICIAL STATEMENT</div><div id="stmtHead" contenteditable="true" style="font-family:Georgia,serif;font-size:16.5px;color:#1a1410;line-height:1.3;font-weight:900;margin-bottom:8px;outline:none" data-placeholder="Statement headline...">'+(pr?'Label Addresses '+pr.artistName+' Reports':'Label Addresses Recent Speculation')+'</div><textarea id="stmtBody" rows="5" style="width:100%;background:none;border:none;outline:none;font-size:11.5px;color:#4a3a2a;line-height:1.65;resize:none;font-family:Georgia,serif;padding:0;min-height:110px">'+(pr?'We are aware of reports concerning '+pr.artistName+'. '+presets[0]:''+presets[0])+'</textarea><div style="font-size:9.5px;color:#9a8a7a;font-style:italic;margin-top:8px;border-top:1px solid #e8ddd0;padding-top:7px">— '+ol.name+' · Week '+(GAME.week||1)+' · Official Statement</div></div>';
+
+  // Publish / save
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px"><button onclick="llPublishStatement(\''+( pressReqId||'')+'\',\''+( pr?pr.id||'':''  )+'\')" style="background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:var(--fb)">📤 Publish to News</button><button onclick="showToast(\'Draft saved.\',\'green\')" style="background:var(--surf);color:var(--txt);border:1px solid var(--bord);border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:var(--fb)">💾 Save Draft</button></div>';
+
+  html += '</div></div>';
+  _insertOverlay(html);
+}
+function llStmtTone(el, tone){
+  el.parentElement.querySelectorAll('span').forEach(function(s){
+    s.style.background='var(--card)';s.style.color='var(--mut)';s.style.borderColor='var(--bord)';
+  });
+  el.style.background='var(--txt)';el.style.color='var(--bg)';el.style.borderColor='var(--txt)';
+}
+function llPublishStatement(pressReqId, prId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var headEl = document.getElementById('stmtHead');
+  var bodyEl = document.getElementById('stmtBody');
+  var headline = headEl ? headEl.innerText.trim() : 'Label Statement';
+  var content = bodyEl ? bodyEl.value.trim() : '';
+  if(!content){ showToast('Write something first.','red'); return; }
+  // Insert as article
+  var article = {type:'statement',source:'label-official',week:GAME.week||1,timestamp:Date.now(),headline:headline,content:content,preview:content.split('.')[0]+'.',artistName:GAME.sn||'',player_id:GAME.playerId||null,generated:false,verified:true};
+  if(typeof _pushArticle==='function') _pushArticle(article);
+  // Rep modifier +1 short term
+  ol.rep = Math.min(5,(ol.rep||5)+0.1);
+  // Remove press request
+  if(prId) ol.pendingPressRequests=(ol.pendingPressRequests||[]).filter(function(r){ return r.id!==prId; });
+  ol.activity=ol.activity||[];
+  ol.activity.unshift({text:'Published official statement: "'+headline+'". Rep +0.1.',color:'#3b82f6',time:'now'});
+  markDirty(); saveToCloud();
+  showToast('Statement published to The Press!','green');
+  _closeOverlay(document.getElementById('stmtHead'));
+}
+
+// ── SONG REVIEW OVERLAY ──
+function showSongReview(artistId, releaseId){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var artist = (ol.roster||[]).find(function(a){ return (a.id||a.userId||a.artistName)===artistId; });
+  if(!artist){ showToast('Artist not found.','red'); return; }
+  var rel = (artist.pendingReleases||[]).find(function(r){ return r.id===releaseId; });
+  if(!rel){ showToast('Release not found.','red'); return; }
+
+  var q = rel.quality||50;
+  var qColor = q>=80?'var(--green)':q>=60?'var(--acc)':'var(--red)';
+  var breakdown = rel.breakdown||{writing:Math.round(q*0.9+Math.random()*10),production:Math.round(q*0.85+Math.random()*12),vocals:Math.round(q*0.8+Math.random()*15),concept:Math.round(q*0.75+Math.random()*20)};
+  var studioBonus = ol.studioTier ? ([0,5,14,22,32][ol.studioTier]||0) : 0;
+  var featArtist = rel.featuredArtist ? (ol.roster||[]).find(function(a){ return a.artistName===rel.featuredArtist; }) : null;
+  var projHype = q>=80?'High':q>=60?'Medium':'Low';
+  var projFan = q>=80?'+3–5%':q>=60?'+1–3%':'+0–1%';
+  var relWeek = rel.proposedWeek||(GAME.week||1)+1;
+  window._srRelWeek = relWeek;
+  window._srArtistId = artistId;
+  window._srReleaseId = releaseId;
+
+  var html = '<div style="padding:0 0 80px"><div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surf);border-bottom:1px solid var(--bord);position:sticky;top:0;z-index:10"><button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer;padding:0;line-height:1;flex:none">‹</button><div style="font-family:Georgia,serif;font-size:16px;font-weight:700;flex:1">Review Release</div></div><div style="padding:16px">';
+
+  // Song cover hero
+  var gradient = 'linear-gradient(145deg,#2a4a7e,#12203a)';
+  html += '<div style="border-radius:16px;overflow:hidden;margin-bottom:14px;position:relative;border:1px solid var(--bord)"><div style="height:140px;background:'+gradient+';display:flex;align-items:center;justify-content:center;font-size:60px;position:relative">🌙<div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(13,15,20,.92))"></div></div><div style="position:absolute;bottom:0;left:0;right:0;padding:14px;z-index:2"><div style="font-size:8.5px;font-weight:900;letter-spacing:2px;color:var(--yellow)">PENDING APPROVAL</div><h3 style="font-family:Georgia,serif;font-size:20px;color:#fff;margin:3px 0 0">'+rel.title+'</h3><div style="font-size:11.5px;color:rgba(255,255,255,.75);margin-top:2px">'+artist.artistName+(rel.featuredArtist?' ft. '+rel.featuredArtist:'')+' · '+(rel.format||'Single')+' · '+(rel.genre||'Pop')+'</div></div></div>';
+
+  // Quality bar
+  html += '<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:800;color:var(--mut);margin-bottom:5px"><span>OVERALL QUALITY</span><span style="color:'+qColor+';font-size:13px;font-weight:900">'+q+' / 100</span></div><div style="height:10px;border-radius:4px;background:var(--surf);overflow:hidden"><div style="height:100%;width:'+q+'%;background:linear-gradient(90deg,var(--purple),var(--acc));border-radius:4px"></div></div></div>';
+
+  // Breakdown
+  html += '<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:4px 12px;margin-bottom:12px">';
+  var bdRows = [['Writing',breakdown.writing],['Production',breakdown.production],['Vocals',breakdown.vocals],['Concept match',breakdown.concept]];
+  bdRows.forEach(function(row){
+    var c = row[1]>=80?'var(--green)':row[1]>=60?'var(--acc)':'var(--red)';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:6px 0;border-bottom:1px solid var(--bord)"><span>'+row[0]+'</span><b style="color:'+c+'">'+row[1]+' / 100</b></div>';
+  });
+  if(studioBonus>0){
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:6px 0"><span>Studio bonus (label)</span><b style="color:var(--blue)">+'+studioBonus+'%</b></div>';
+  }
+  html += '</div>';
+
+  // Featured artist card
+  if(featArtist){
+    var featFans = featArtist.fans||featArtist.fanCount||0;
+    var featFanStr = featFans>=1000?(Math.round(featFans/1000)+'K'):featFans;
+    html += '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">Featured Artist</div><div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:11px 13px;margin-bottom:12px;display:flex;gap:11px;align-items:center"><div style="width:42px;height:42px;border-radius:50%;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:19px;flex:none">'+(featArtist.profilePic||'🎹')+'</div><div style="flex:1"><b style="font-size:13.5px">'+featArtist.artistName+'</b><span style="font-size:10.5px;color:var(--mut);display:block;margin-top:2px">On your roster</span><span style="color:var(--purple);font-weight:700;font-size:10px">Roster collab bonus: +15% streams</span></div><div style="text-align:right"><b style="font-size:13px;color:var(--green);display:block">'+featFanStr+'</b><span style="font-size:9.5px;color:var(--mut)">fans</span></div></div>';
+  }
+
+  // Projections
+  html += '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">Projections</div><div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:12px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><b style="display:block;font-size:16px;font-weight:900;color:var(--acc)">'+projHype+'</b><span style="font-size:9px;color:var(--mut);font-weight:700;text-transform:uppercase;margin-top:2px;display:block">projected hype</span></div><div><b style="display:block;font-size:16px;font-weight:900;color:var(--green)">'+projFan+'</b><span style="font-size:9px;color:var(--mut);font-weight:700;text-transform:uppercase;margin-top:2px;display:block">fan growth</span></div><div><b style="display:block;font-size:16px;font-weight:900;color:var(--blue)">Wk '+relWeek+'</b><span style="font-size:9px;color:var(--mut);font-weight:700;text-transform:uppercase;margin-top:2px;display:block">proposed release</span></div><div><b style="display:block;font-size:16px;font-weight:900;color:var(--txt)">'+(rel.format||'Single')+'</b><span style="font-size:9px;color:var(--mut);font-weight:700;text-transform:uppercase;margin-top:2px;display:block">format</span></div></div>';
+
+  // Week picker
+  html += '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">Schedule</div><div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px">Proposed release week</span><div style="display:flex;gap:6px;align-items:center"><button onclick="window._srRelWeek=Math.max((GAME.week||1),window._srRelWeek-1);document.getElementById(\'srWkLbl\').textContent=\'Week \'+window._srRelWeek" style="background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:6px 10px;font-size:13px;color:var(--txt);cursor:pointer;font-family:var(--fb)">‹</button><b id="srWkLbl" style="font-size:14px;min-width:60px;text-align:center">Week '+relWeek+'</b><button onclick="window._srRelWeek++;document.getElementById(\'srWkLbl\').textContent=\'Week \'+window._srRelWeek" style="background:var(--surf);border:1px solid var(--bord);border-radius:7px;padding:6px 10px;font-size:13px;color:var(--txt);cursor:pointer;font-family:var(--fb)">›</button></div></div>';
+
+  // Decision buttons
+  html += '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">Decision</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px"><button onclick="llSRApprove()" style="background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:var(--fb)">✅ Approve</button><button onclick="llSRSchedule()" style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:var(--fb)">📅 Schedule</button></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px"><button onclick="llSRShelve()" style="background:var(--surf);color:var(--txt);border:1px solid var(--bord);border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:var(--fb)">📦 Shelve</button><button onclick="document.getElementById(\'srNote\').style.display=\'block\'" style="background:var(--red);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:var(--fb)">↩ Send Back</button></div><div id="srNote" style="display:none;background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px;margin-bottom:10px"><div style="font-size:10.5px;font-weight:800;color:var(--mut);letter-spacing:.8px">NOTE TO ARTIST (optional)</div><textarea id="srNoteTA" placeholder="Tell them why..." style="width:100%;background:none;border:none;outline:none;font-size:12px;color:var(--txt);resize:none;min-height:60px;margin-top:6px;font-family:var(--fb)"></textarea><button onclick="llSRSendBack()" style="width:100%;background:var(--surf);color:var(--txt);border:1px solid var(--bord);border-radius:9px;padding:9px;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--fb);margin-top:6px">Send Back with Note</button></div>';
+
+  html += '</div></div>';
+  _insertOverlay(html);
+}
+function _srAction(status, moraleDelta, msg, color){
+  var ol = GAME.ownedLabel;
+  if(!ol) return;
+  var artist = (ol.roster||[]).find(function(a){ return (a.id||a.userId||a.artistName)===window._srArtistId; });
+  if(!artist) return;
+  var rel = (artist.pendingReleases||[]).find(function(r){ return r.id===window._srReleaseId; });
+  if(!rel) return;
+  rel.status = status;
+  rel.proposedWeek = window._srRelWeek;
+  if(status==='approved') artist._moraleReleaseApproved=(artist._moraleReleaseApproved||0)+1;
+  if(status==='rejected'||status==='returned') artist._moraleReleaseRejected=(artist._moraleReleaseRejected||0)+1;
+  ol.activity=ol.activity||[];
+  ol.activity.unshift({text:msg,color:color,time:'now'});
+  markDirty(); saveToCloud();
+  showToast(msg,'green');
+  _closeOverlay(document.getElementById('srWkLbl')||document.body);
+}
+function llSRApprove(){ _srAction('approved',12,'✅ Approved — drops Week '+window._srRelWeek+'. Morale +12.','#22c55e'); }
+function llSRSchedule(){ _srAction('scheduled',4,'📅 Scheduled for Week '+window._srRelWeek+'. Morale +4.','#3b82f6'); }
+function llSRShelve(){ _srAction('shelved',-5,'📦 Shelved. Can resubmit later. Morale -5.','#f59e0b'); }
+function llSRSendBack(){
+  var note = document.getElementById('srNoteTA') ? document.getElementById('srNoteTA').value : '';
+  _srAction('returned',-10,'↩ Sent back'+(note?'with note.':'.')+' Morale -10.','#ef4444');
+}
+
+// ── COLLAB COMPARE OVERLAY ────────────────────────────────────────────────────
+// showCollabCompare(collabReqId)
+// Shows side-by-side artist cards, compatibility score breakdown, last 3 songs
+// each, proposed song card, and 3 action buttons.
+function showCollabCompare(collabReqId){
+  var ol = GAME.ownedLabel;
+  if(!ol){ showToast('No label found','red'); return; }
+  ol.pendingCollabRequests = ol.pendingCollabRequests||[];
+  var req = ol.pendingCollabRequests.find(function(r){ return r.id===collabReqId; });
+  if(!req){ showToast('Collab request not found','red'); return; }
+
+  var roster = ol.roster||[];
+  var a1 = roster.find(function(a){ return (a.id||a.artistName)===req.artist1Id; });
+  var a2 = roster.find(function(a){ return (a.id||a.artistName)===req.artist2Id; });
+  if(!a1||!a2){ showToast('Artist(s) not on roster','red'); return; }
+
+  // ── Compatibility scoring (6 factors, each 0–100, averaged) ──────────────
+  function genreOverlap(x,y){
+    var g1=(x.genre||'').toLowerCase(), g2=(y.genre||'').toLowerCase();
+    if(!g1||!g2) return 50;
+    if(g1===g2) return 90;
+    var related={pop:['rnb','dance','edm'],rnb:['pop','soul','hiphop'],hiphop:['rnb','trap','rap'],rock:['indie','alt','punk'],indie:['rock','folk','alt']};
+    var matches=(related[g1]||[]).filter(function(g){ return g2.indexOf(g)!==-1; });
+    return matches.length?70:40;
+  }
+  function fanOverlap(x,y){
+    var f1=x.fans||0, f2=y.fans||0;
+    if(!f1&&!f2) return 50;
+    var ratio=Math.min(f1,f2)/(Math.max(f1,f2)||1);
+    return Math.round(40+ratio*50);
+  }
+  function chartForm(x){
+    var songs=x.songs||[];
+    var recent=songs.slice(-5);
+    if(!recent.length) return 50;
+    var peaks=recent.map(function(s){ return s.chartPeak||s.peak||0; });
+    var avg=peaks.reduce(function(a,b){return a+b;},0)/peaks.length;
+    return avg>=1?95:avg>=5?80:avg>=20?65:avg>=50?50:40;
+  }
+  function workloadScore(x){
+    var hasActive=(GAME.collabs||[]).some(function(c){ return c.status==='active'&&(c.artist1Id===(x.id||x.artistName)||c.artist2Id===(x.id||x.artistName)); });
+    return hasActive?35:85;
+  }
+  function collabHistory(x,y){
+    var prev=(ol.completedCollabs||[]).filter(function(c){ return (c.a1===req.artist1Id&&c.a2===req.artist2Id)||(c.a1===req.artist2Id&&c.a2===req.artist1Id); });
+    return prev.length?75:55;
+  }
+  function moraleScore(x){ return Math.min(100,Math.max(0,_computeMorale(x,ol))); }
+
+  var f1=genreOverlap(a1,a2), f2=fanOverlap(a1,a2), f3=Math.round((chartForm(a1)+chartForm(a2))/2), f4=Math.round((workloadScore(a1)+workloadScore(a2))/2), f5=collabHistory(a1,a2), f6=Math.round((moraleScore(a1)+moraleScore(a2))/2);
+  var compat=Math.round((f1+f2+f3+f4+f5+f6)/6);
+  var compatColor=compat>=70?'var(--green)':compat>=45?'var(--acc)':'var(--red)';
+
+  function factorBar(label,val){
+    var c=val>=70?'var(--green)':val>=45?'var(--acc)':'var(--red)';
+    return '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:2px"><span>'+label+'</span><span style="color:'+c+';font-weight:700">'+val+'</span></div><div style="background:var(--bord);border-radius:4px;height:5px"><div style="width:'+val+'%;background:'+c+';border-radius:4px;height:5px"></div></div></div>';
+  }
+
+  // Active collab warning
+  var a1Active=(GAME.collabs||[]).some(function(c){return c.status==='active'&&(c.artist1Id===(a1.id||a1.artistName)||c.artist2Id===(a1.id||a1.artistName));});
+  var a2Active=(GAME.collabs||[]).some(function(c){return c.status==='active'&&(c.artist1Id===(a2.id||a2.artistName)||c.artist2Id===(a2.id||a2.artistName));});
+  var warnHtml='';
+  if(a1Active||a2Active){
+    var who=(a1Active?a1.artistName:'')+(a1Active&&a2Active?' and ':'')+(a2Active?a2.artistName:'');
+    warnHtml='<div style="background:#4c1d95;border:1px solid #7c3aed;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#e9d5ff">⚠️ <strong>Active Collab Warning:</strong> '+who+' already '+(a1Active&&a2Active?'have':'has')+' an active collab. Quality may be split.</div>';
+  }
+
+  // Last 3 songs for each artist
+  function songMiniCards(artist){
+    var songs=(artist.songs||[]).slice(-3).reverse();
+    if(!songs.length) return '<div style="font-size:11px;color:var(--mut);padding:8px 0">No releases yet</div>';
+    return songs.map(function(s){
+      var streams=s.streams||0;
+      var label=streams>=1000000?(streams/1000000).toFixed(1)+'M':streams>=1000?Math.round(streams/1000)+'K':String(streams);
+      var peak=s.chartPeak||s.peak||0;
+      return '<div style="background:var(--card);border:1px solid var(--bord);border-radius:8px;padding:8px 10px;margin-bottom:6px"><div style="font-size:12px;font-weight:700;color:var(--txt)">'+s.title+'</div><div style="font-size:11px;color:var(--mut);margin-top:2px">'+label+' streams'+(peak?' · Peak #'+peak:'')+'</div></div>';
+    }).join('');
+  }
+
+  function artistCard(artist){
+    var m=_computeMorale(artist,ol);
+    var fans=artist.fans||0;
+    var fLabel=fans>=1000000?(fans/1000000).toFixed(1)+'M':fans>=1000?Math.round(fans/1000)+'K':String(fans);
+    var emoji=artist.emoji||'🎤';
+    return '<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:14px;flex:1;min-width:0">'+
+      '<div style="font-size:28px;text-align:center;margin-bottom:6px">'+emoji+'</div>'+
+      '<div style="font-size:13px;font-weight:800;color:var(--txt);text-align:center">'+artist.artistName+'</div>'+
+      '<div style="font-size:11px;color:var(--mut);text-align:center;margin-bottom:8px">'+(artist.genre||'Pop')+' · '+fLabel+' fans</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-bottom:4px">Morale: <span style="color:'+(m>=70?'var(--green)':m>=40?'var(--acc)':'var(--red)')+';font-weight:700">'+m+'</span></div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Last 3 releases:</div>'+
+      songMiniCards(artist)+
+      '</div>';
+  }
+
+  // Proposed song card
+  var songCard='';
+  if(req.songTitle){
+    songCard='<div style="background:var(--card);border:1.5px solid var(--acc);border-radius:12px;padding:14px;margin-bottom:14px">'+
+      '<div style="font-size:11px;color:var(--acc);font-weight:700;margin-bottom:4px">🎵 PROPOSED COLLAB</div>'+
+      '<div style="font-size:15px;font-weight:800;color:var(--txt)">'+req.songTitle+'</div>'+
+      (req.genre?'<div style="font-size:11px;color:var(--mut);margin-top:2px">'+req.genre+'</div>':'')+
+      '<div style="font-size:11px;color:var(--green);margin-top:6px">Roster bonus: +15% first-week streams on approval ✓</div>'+
+      '</div>';
+  }
+
+  var html='<div style="padding:20px;max-width:480px;margin:0 auto">'+
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">'+
+      '<button onclick="_closeOverlay(this)" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--txt);padding:0;line-height:1">←</button>'+
+      '<div><div style="font-size:17px;font-weight:800;color:var(--txt)">Collab Compare</div>'+
+      '<div style="font-size:11px;color:var(--mut)">Decide on this roster collab request</div></div>'+
+    '</div>'+
+
+    // Artist side-by-side
+    '<div style="display:flex;gap:10px;margin-bottom:14px">'+
+      artistCard(a1)+
+      '<div style="display:flex;align-items:center;font-size:18px;flex-shrink:0">⚡</div>'+
+      artistCard(a2)+
+    '</div>'+
+
+    warnHtml+
+
+    // Compatibility score
+    '<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:14px;margin-bottom:14px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+        '<div style="font-size:13px;font-weight:700;color:var(--txt)">Compatibility Score</div>'+
+        '<div style="font-size:22px;font-weight:800;color:'+compatColor+'">'+compat+'</div>'+
+      '</div>'+
+      factorBar('Genre Overlap',f1)+
+      factorBar('Fan Audience Overlap',f2)+
+      factorBar('Chart Form',f3)+
+      factorBar('Workload',f4)+
+      factorBar('Previous Collab History',f5)+
+      factorBar('Morale',f6)+
+    '</div>'+
+
+    songCard+
+
+    // Action buttons
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px">'+
+      '<button onclick="llInboxApproveCollab(\''+collabReqId+'\');_closeOverlay(this)" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:12px 6px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">✅ Approve</button>'+
+      '<button onclick="llInboxBlockCollab(\''+collabReqId+'\');_closeOverlay(this)" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:12px 6px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">🚫 Block</button>'+
+      '<button onclick="_closeOverlay(this);setTimeout(function(){window._llTab&&window._llTab(3)},120)" style="background:var(--surf);color:var(--txt);border:1px solid var(--bord);border-radius:8px;padding:12px 6px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">💡 Suggest\nDifferent</button>'+
+    '</div>'+
+  '</div>';
+
+  _insertOverlay(html);
+}
+
 function showCounterOffer(offerId){
   const offer = (GAME.labelOffersPending||[]).find(o=>o.id===offerId);
   if(!offer){ showToast('Offer not found','red'); return; }
@@ -36991,12 +37899,7 @@ function loadDiscoverContent(){
             <div style="font-size:11px;color:var(--mut)">${o.terms?.cut||25}% cut · ${o.terms?.length||'1 year'}</div></div>
           </div>
           <button onclick="showLabelsSystem()" style="background:var(--acc);color:white;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb)">Review</button>
-        </div>`).join('') : `<div onclick="showLabelsSystem()" style="${ri};border-bottom:none;cursor:pointer">
-        <div style="${ric};background:var(--bord)">🏷️</div>
-        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt)">Manage your label career</div>
-        <div style="font-size:11px;color:var(--mut);margin-top:1px">Sign to a label, start your own, hire managers</div></div>
-        <div style="${ra}">Open →</div>
-      </div>`}
+        </div>`).join('') : ''}
     </div>` : ''}
 
     <!-- FIND PLAYERS & LABELS (multi) / QIKIPEDIA (single) -->
