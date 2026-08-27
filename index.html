@@ -10195,10 +10195,13 @@ function goToSleepInternal(){
   const hypeChange=-1; // Lose 1 hype per week
   let inspChange=Math.floor(Math.random()*10)+5; // 5-15 inspiration gain base
   
-  // Housing affects creativity!
-  if(GAME.housing && GAME.housing.type === 'Shared Room'){
-    inspChange -= 10; // Cramped living drains creativity
-    console.log('🏠 Shared Room penalty: -10 creativity');
+  // Housing affects creativity (daily penalty already applied in applyDailyRefresh;
+  // this weekly summary reflects it for display purposes only — no double-dip)
+  if(GAME.housing && typeof GAME.housing.creativityChange === 'number' && GAME.housing.creativityChange < 0){
+    console.log('🏠 Housing creativity change:', GAME.housing.creativityChange, '(', GAME.housing.type, ')');
+  } else if(GAME.housing && GAME.housing.type === 'Shared Room'){
+    // Legacy save without creativityChange stored
+    console.log('🏠 Shared Room legacy penalty: -10 creativity');
   }
   
   // Calculate THIS WEEK'S UPCOMING EARNINGS (before nextDay adds them)
@@ -10285,161 +10288,275 @@ function goToSleepInternal(){
   }
 }
 
+function _finWkRows(h, inc, exp){
+  var net = inc - exp;
+  var fmt2 = function(v){ return '$'+Math.round(Math.abs(v)).toLocaleString(); };
+  var fmtSign2 = function(v){ return (v>=0?'+':'-')+'$'+Math.round(Math.abs(v)).toLocaleString(); };
+  return `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+      <div style="width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;background:#1a3a2a">📈</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--txt)">Total income</div><div style="font-size:10.5px;color:var(--mut)">Streams + gigs + collabs + work</div></div>
+      <div style="font-size:14px;font-weight:800;color:var(--green,#4cc98a)">+${fmt2(inc)}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+      <div style="width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;background:#2a1a1a">📉</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--txt)">Total expenses</div><div style="font-size:10.5px;color:var(--mut)">Rent + promo + manager</div></div>
+      <div style="font-size:14px;font-weight:800;color:var(--red,#e06666)">-${fmt2(exp)}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+      <div style="width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;background:#1a2a3e">💳</div>
+      <div style="flex:1;font-size:13px;font-weight:600;color:var(--txt)">Net this week</div>
+      <div style="font-size:14px;font-weight:800;color:${net>=0?'var(--green,#4cc98a)':'var(--red,#e06666)'}">${fmtSign2(net)}</div>
+    </div>
+  `;
+}
+
+function _finTab(i){
+  [0,1].forEach(function(j){
+    var body = document.getElementById('ftab-'+j);
+    var btn  = document.getElementById('ftab-btn-'+j);
+    if(body){ body.style.display = j===i ? '' : 'none'; }
+    if(btn){
+      if(j===i){
+        btn.style.background='var(--card)';btn.style.color='var(--txt)';btn.style.boxShadow='0 1px 4px rgba(0,0,0,.3)';
+      } else {
+        btn.style.background='transparent';btn.style.color='var(--mut)';btn.style.boxShadow='none';
+      }
+    }
+  });
+}
+
+function _finSelWk(wkNum){
+  var h = (window._finHistory||[]).find(function(x){ return x.week===wkNum; })||{};
+  var iK = window._finIncKeys||[];
+  var eK = window._finExpKeys||[];
+  var inc = iK.reduce(function(s,k){ return s+(h[k]||0); },0);
+  var exp = eK.reduce(function(s,k){ return s+(h[k]||0); },0);
+  var det = document.getElementById('fin-wk-detail');
+  var rows = document.getElementById('fin-wk-rows');
+  if(det) det.textContent = 'Week '+wkNum+' — Quick View';
+  if(rows) rows.innerHTML = _finWkRows(h, inc, exp);
+  document.querySelectorAll('.fin-wkpill').forEach(function(p){
+    var on = parseInt(p.dataset.fw)===wkNum;
+    p.style.background = on?'var(--acc)':'var(--card)';
+    p.style.color = on?'var(--acc-txt,#0d0f14)':'var(--mut)';
+    p.style.borderColor = on?'var(--acc)':'var(--bord)';
+  });
+}
+
 function showFinances(){
   if(!GAME) return;
-  const history = (GAME.financeHistory||[]).slice().sort((a,b)=>a.week-b.week);
-  const currentWeek = GAME.week||1;
-  const fmt = v => '$'+Math.round(Math.abs(v)).toLocaleString();
-  const fmtSign = v => (v>=0?'+':'-')+'$'+Math.round(Math.abs(v)).toLocaleString();
+  var history = (GAME.financeHistory||[]).slice().sort(function(a,b){ return a.week-b.week; });
+  var currentWeek = GAME.week||1;
+  var balance = Math.round(GAME.money||0);
+  var incKeys = ['streamingRevenue','jobPay','gigPay','tipsPay','minigamePay','tourEarnings','collabRoyalties','syncPay'];
+  var expKeys = ['rent','promo','managerFees','studioCost','collabFeesPaid'];
 
-  // Rows to show in Income and Expense sections (using latest week)
-  const latest = history.length ? history[history.length-1] : {};
-  const incRows = [
-    {cat:'Streaming',       key:'streamingRevenue'},
-    {cat:'Job / Work',      key:'jobPay'},
-    {cat:'Gigs & Shows',    key:'gigPay'},
-    {cat:'Tips & Busking',  key:'tipsPay'},
-    {cat:'Minigame Winnings',key:'minigamePay'},
-    {cat:'Tour Earnings',   key:'tourEarnings'},
-    {cat:'Collab Royalties',key:'collabRoyalties'},
-    {cat:'Sync Deals',      key:'syncPay'},
-  ].filter(r => history.some(h=>(h[r.key]||0)>0));
+  function wInc(h){ return incKeys.reduce(function(s,k){ return s+(h[k]||0); },0); }
+  function wExp(h){ return expKeys.reduce(function(s,k){ return s+(h[k]||0); },0); }
+  function wNet(h){ return wInc(h)-wExp(h); }
+  var fmt  = function(v){ return '$'+Math.round(Math.abs(v)).toLocaleString(); };
+  var fmtS = function(v){ return (v>=0?'+':'-')+'$'+Math.round(Math.abs(v)).toLocaleString(); };
 
-  const expRows = [
-    {cat:'Rent / Housing',  key:'rent'},
-    {cat:'Promo Campaigns', key:'promo'},
-    {cat:'Manager Fees',    key:'managerFees'},
-    {cat:'Studio Costs',    key:'studioCost'},
-    {cat:'Collab Fees Paid',key:'collabFeesPaid'},
-  ].filter(r => history.some(h=>(h[r.key]||0)>0));
+  var curH   = history.find(function(h){ return h.week===currentWeek; })||{};
+  var curInc = wInc(curH), curExp = wExp(curH), curNet = curInc-curExp;
 
-  // Spreadsheet: show last 8 weeks as columns
-  const cols = history.slice(-8);
+  var allInc = history.reduce(function(s,h){ return s+wInc(h); },0);
+  var allExp = history.reduce(function(s,h){ return s+wExp(h); },0);
+  var nets   = history.map(wNet);
+  var bestNet  = nets.length ? Math.max.apply(null,nets) : 0;
+  var worstNet = nets.length ? Math.min.apply(null,nets) : 0;
+  var bestWk   = history[nets.indexOf(bestNet)]||{};
+  var worstWk  = history[nets.indexOf(worstNet)]||{};
 
-  // Helper: th style
-  const TH = 'padding:8px 6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;text-align:right;white-space:nowrap;border-bottom:2px solid #c0c0c0;';
-  const TD = 'padding:7px 6px;font-size:11px;text-align:right;font-family:monospace;border-bottom:1px solid #e8e8e8;';
-  const TDCAT = 'padding:7px 6px 7px 12px;font-size:12px;text-align:left;border-bottom:1px solid #e8e8e8;';
-  const TDBOLD = 'padding:8px 6px;font-size:12px;font-weight:800;text-align:right;font-family:monospace;border-top:2px solid #c0c0c0;border-bottom:2px solid #c0c0c0;';
-  const TDBOLDCAT = 'padding:8px 6px 8px 12px;font-size:12px;font-weight:800;text-align:left;border-top:2px solid #c0c0c0;border-bottom:2px solid #c0c0c0;';
-
-  function cellVal(h, key) {
-    const v = h[key]||0;
-    return v > 0 ? fmt(v) : '—';
-  }
-  function netRow(h) {
-    const inc = (h.streamingRevenue||0)+(h.jobPay||0)+(h.gigPay||0)+(h.tipsPay||0)+(h.minigamePay||0)+(h.tourEarnings||0)+(h.collabRoyalties||0)+(h.syncPay||0);
-    const exp = (h.rent||0)+(h.promo||0)+(h.managerFees||0)+(h.studioCost||0)+(h.collabFeesPaid||0);
-    return inc - exp;
-  }
-
-  const colHeaders = cols.map(h =>
-    `<th style="${TH};color:${h.week===currentWeek?'#667eea':'#555'}">${h.week===currentWeek?`Wk ${h.week} ◀`:`Wk ${h.week}`}</th>`
-  ).join('');
-
-  function buildRows(rows, colorKey) {
-    return rows.map(r => {
-      const cells = cols.map(h => {
-        const v = h[r.key]||0;
-        return `<td style="${TD};color:${v>0?colorKey:'#bbb'}">${v>0?fmt(v):'—'}</td>`;
-      }).join('');
-      const total = history.reduce((s,h)=>s+(h[r.key]||0),0);
-      return `<tr>
-        <td style="${TDCAT};color:#222">${r.cat}</td>
-        ${cells}
-        <td style="${TD};font-weight:700;color:${total>0?colorKey:'#bbb'}">${total>0?fmt(total):'—'}</td>
-      </tr>`;
-    }).join('');
-  }
-
-  function buildTotalRow(label, keys, color) {
-    const cells = cols.map(h => {
-      const v = keys.reduce((s,k)=>s+(h[k]||0),0);
-      return `<td style="${TDBOLD};color:${color}">${v>0?fmt(v):'—'}</td>`;
-    }).join('');
-    const grand = history.reduce((s,h)=>s+keys.reduce((ss,k)=>ss+(h[k]||0),0),0);
-    return `<tr style="background:#f8f8ff">
-      <td style="${TDBOLDCAT};color:#222">${label}</td>
-      ${cells}
-      <td style="${TDBOLD};color:${color}">${grand>0?fmt(grand):'—'}</td>
-    </tr>`;
-  }
-
-  const netCells = cols.map(h => {
-    const n = netRow(h);
-    const isCurr = h.week===currentWeek;
-    return `<td style="${TDBOLD};background:${isCurr?'#eef0ff':'transparent'};color:${n>=0?'#1a7a4a':'#c0392b'}">${fmtSign(n)}</td>`;
+  // Sparkline (last 8 weeks)
+  var spark8   = history.slice(-8).map(wNet);
+  var sparkMax = Math.max.apply(null, spark8.map(Math.abs).concat([1]));
+  var sparkBars = spark8.map(function(v,i){
+    var h = Math.max(8,(Math.abs(v)/sparkMax)*100);
+    var col = v>=0 ? 'var(--green,#4cc98a)' : 'var(--red,#e06666)';
+    var cur = i===spark8.length-1 ? ';outline:2px solid var(--acc,#e8b44c);outline-offset:1px' : '';
+    return '<div style="flex:1;min-height:4px;height:'+h+'%;border-radius:3px;background:'+col+cur+'"></div>';
   }).join('');
-  const grandNet = history.reduce((s,h)=>s+netRow(h),0);
 
-  const incKeys = incRows.map(r=>r.key);
-  const expKeys = expRows.map(r=>r.key);
+  // Trend chart
+  var recentWks = history.slice(-8);
+  var trendMax  = Math.max.apply(null, recentWks.map(function(h){ return Math.abs(wNet(h)); }).concat([1]));
+  var trendBars = recentWks.map(function(h,i){
+    var n = wNet(h); var barH = Math.max(6,(Math.abs(n)/trendMax)*64);
+    var col = n>=0 ? 'var(--green,#4cc98a)' : 'var(--red,#e06666)';
+    var op  = (0.45+i*0.07).toFixed(2);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div style="border-radius:3px 3px 0 0;width:100%;background:${col};opacity:${op};height:${barH}px"></div>
+      <div style="font-size:8px;color:var(--mut);font-weight:700">W${h.week}</div>
+      <div style="font-size:7.5px;color:var(--mut)">${n>=0?'+':''}${(Math.round(n/100)/10).toFixed(1)}K</div>
+    </div>`;
+  }).join('');
 
-  const html = `
-  <div style="min-height:100%;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  // Week pills
+  var wkPills = recentWks.map(function(h){
+    var on = h.week===currentWeek;
+    return `<div onclick="_finSelWk(${h.week})" data-fw="${h.week}" class="fin-wkpill" style="flex:none;font-size:11px;font-weight:700;border:1px solid ${on?'var(--acc)':'var(--bord)'};border-radius:99px;padding:6px 13px;color:${on?'var(--acc-txt,#0d0f14)':'var(--mut)'};background:${on?'var(--acc)':'var(--card)'};cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent">Wk ${h.week}${on?' ◀':''}</div>`;
+  }).join('');
 
-    <!-- Header -->
-    <div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:16px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">
-      <button onclick="_closeOverlay(this)" style="background:rgba(255,255,255,0.25);color:white;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;flex-shrink:0">←</button>
-      <div style="flex:1">
-        <div style="font-size:18px;font-weight:800;color:white">💰 Finances</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.8)">Week ${currentWeek} · Balance: <strong>$${Math.round(GAME.money||0).toLocaleString()}</strong></div>
+  // Income rows
+  var incRowDefs = [
+    {cat:'Streaming',      emoji:'🎵',bg:'#1a3a2a',key:'streamingRevenue'},
+    {cat:'Gigs & Shows',   emoji:'🎤',bg:'#1a2a3e',key:'gigPay'},
+    {cat:'Collab Royalties',emoji:'🤝',bg:'#2a1e3a',key:'collabRoyalties'},
+    {cat:'Job / Work',     emoji:'💼',bg:'#2a2412',key:'jobPay'},
+    {cat:'Tips & Busking', emoji:'🎸',bg:'#1a2a1a',key:'tipsPay'},
+    {cat:'Tour Earnings',  emoji:'🚌',bg:'#1a2030',key:'tourEarnings'},
+    {cat:'Sync Deals',     emoji:'🎬',bg:'#2a1a20',key:'syncPay'},
+    {cat:'Minigame Wins',  emoji:'🎮',bg:'#1e1a2a',key:'minigamePay'},
+  ].filter(function(r){ return (curH[r.key]||0)>0; });
+
+  var expRowDefs = [
+    {cat:'Rent / Housing', emoji:'🏠',bg:'#2a1a1a',key:'rent'},
+    {cat:'Promo Campaigns',emoji:'📣',bg:'#1e2a3e',key:'promo'},
+    {cat:'Manager Fee',    emoji:'👔',bg:'#1a1a2a',key:'managerFees'},
+    {cat:'Studio Costs',   emoji:'🎙',bg:'#2a1e1a',key:'studioCost'},
+    {cat:'Collab Fees',    emoji:'🤜',bg:'#1a2a1e',key:'collabFeesPaid'},
+  ].filter(function(r){ return (curH[r.key]||0)>0; });
+
+  function mkRow(r, sign){
+    var v = curH[r.key]||0;
+    var col = sign==='+' ? 'var(--green,#4cc98a)' : 'var(--red,#e06666)';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+      <div style="width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;background:${r.bg}">${r.emoji}</div>
+      <div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--txt)">${r.cat}</div>
+      <div style="font-size:14px;font-weight:800;color:${col};white-space:nowrap">${sign}${fmt(v)}</div>
+    </div>`;
+  }
+
+  var incHtml = incRowDefs.length ? incRowDefs.map(function(r){ return mkRow(r,'+'); }).join('')
+    : '<div style="padding:14px 0;font-size:12px;color:var(--mut);text-align:center">No income this week</div>';
+  var expHtml = expRowDefs.length ? expRowDefs.map(function(r){ return mkRow(r,'-'); }).join('')
+    : '<div style="padding:14px 0;font-size:12px;color:var(--mut);text-align:center">No expenses this week</div>';
+
+  var netGradient = curNet>=0
+    ? 'linear-gradient(135deg,#1a3a2a,#0d1a12)'
+    : 'linear-gradient(135deg,#3a1a1a,#1a0d0d)';
+  var netBorder = curNet>=0 ? '#2a5a3a' : '#5a2a2a';
+
+  // Store for onclick helpers
+  window._finHistory = history;
+  window._finIncKeys = incKeys;
+  window._finExpKeys = expKeys;
+
+  _insertOverlay(`
+  <div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">
+
+    <!-- STICKY HEADER -->
+    <div style="background:linear-gradient(150deg,#1a1230,var(--bg));padding:16px 16px 14px;flex:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="_closeOverlay(this)" style="background:rgba(255,255,255,.1);color:var(--txt);border:none;border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">←</button>
+          <h2 style="font-family:var(--fd),'Georgia',serif;font-size:21px;color:var(--txt)">Finances</h2>
+        </div>
+        <div style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;color:var(--mut)">📅 Week ${currentWeek}</div>
+      </div>
+
+      <!-- NET BALANCE CARD -->
+      <div style="background:linear-gradient(135deg,var(--surf),var(--card));border:1px solid var(--bord);border-radius:16px;padding:16px;margin-bottom:12px">
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:1.2px;color:var(--mut);text-transform:uppercase;margin-bottom:4px">Current Balance</div>
+        <div style="font-size:36px;font-weight:900;letter-spacing:-1px;color:${balance>=0?'var(--green,#4cc98a)':'var(--red,#e06666)'}">${fmt(balance)}</div>
+        <div style="font-size:11px;color:var(--mut);margin-top:4px">All-time earned · ${fmt(allInc)} · Spent · ${fmt(allExp)}</div>
+        <div style="font-size:12px;font-weight:700;margin-top:8px;color:${curNet>=0?'var(--green,#4cc98a)':'var(--red,#e06666)'}">${fmtS(curNet)} this week</div>
+        <div style="display:flex;gap:4px;margin-top:10px;align-items:flex-end;height:28px">${sparkBars}</div>
+      </div>
+
+      <!-- SEGMENT TABS -->
+      <div style="display:flex;background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:3px">
+        <span id="ftab-btn-0" onclick="_finTab(0)" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border-radius:7px;cursor:pointer;background:var(--card);color:var(--txt);box-shadow:0 1px 4px rgba(0,0,0,.3)">This Week</span>
+        <span id="ftab-btn-1" onclick="_finTab(1)" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border-radius:7px;cursor:pointer;color:var(--mut)">History</span>
       </div>
     </div>
 
-    <div style="padding:14px;overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <!-- TAB BODIES -->
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:68px">
 
-      <!-- SPREADSHEET TABLE -->
-      <div style="background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);min-width:340px">
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <!-- TAB 0: THIS WEEK -->
+      <div id="ftab-0" style="padding:0 16px 16px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">Income</div>
+        ${incHtml}
+        <div style="background:var(--surf);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <span style="font-size:14px;font-weight:700;color:var(--txt)">Total Income</span>
+          <span style="font-size:18px;font-weight:900;color:var(--green,#4cc98a)">+${fmt(curInc)}</span>
+        </div>
 
-          <!-- HEADER ROW -->
-          <thead>
-            <tr style="background:#f0f0f8">
-              <th style="${TH};text-align:left;padding-left:12px;min-width:120px;color:#444">Category</th>
-              ${colHeaders}
-              <th style="${TH};color:#444">Total</th>
-            </tr>
-          </thead>
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">Expenses</div>
+        ${expHtml}
+        <div style="background:var(--surf);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <span style="font-size:14px;font-weight:700;color:var(--txt)">Total Expenses</span>
+          <span style="font-size:18px;font-weight:900;color:var(--red,#e06666)">-${fmt(curExp)}</span>
+        </div>
 
-          <tbody>
-            <!-- INCOME section -->
-            <tr style="background:#e8f5e9">
-              <td colspan="${cols.length+2}" style="padding:6px 12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#2e7d32">Income</td>
-            </tr>
-            ${incRows.length ? buildRows(incRows,'#1a7a4a') : `<tr><td colspan="${cols.length+2}" style="${TDCAT};color:#bbb">No income recorded</td></tr>`}
-            ${buildTotalRow('Total Income', incKeys, '#1a7a4a')}
-
-            <!-- spacer -->
-            <tr><td colspan="${cols.length+2}" style="padding:4px;background:#f5f5f5"></td></tr>
-
-            <!-- EXPENSES section -->
-            <tr style="background:#fce4e4">
-              <td colspan="${cols.length+2}" style="padding:6px 12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#b71c1c">Expenses</td>
-            </tr>
-            ${expRows.length ? buildRows(expRows,'#c0392b') : `<tr><td colspan="${cols.length+2}" style="${TDCAT};color:#bbb">No expenses recorded</td></tr>`}
-            ${buildTotalRow('Total Expenses', expKeys, '#c0392b')}
-
-            <!-- spacer -->
-            <tr><td colspan="${cols.length+2}" style="padding:4px;background:#f5f5f5"></td></tr>
-
-            <!-- NET row -->
-            <tr style="background:#eef0ff">
-              <td style="${TDBOLDCAT};color:#333">Net Income</td>
-              ${netCells}
-              <td style="${TDBOLD};color:${grandNet>=0?'#1a7a4a':'#c0392b'}">${fmtSign(grandNet)}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">Week ${currentWeek} Net</div>
+        <div style="background:${netGradient};border:1px solid ${netBorder};border-radius:14px;padding:16px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut)">NET THIS WEEK</div>
+            <div style="font-size:28px;font-weight:900;color:${curNet>=0?'var(--green,#4cc98a)':'var(--red,#e06666)'};margin-top:3px">${fmtS(curNet)}</div>
+          </div>
+          <div style="text-align:right;font-size:11px;color:var(--mut);line-height:1.7">Income ${fmt(curInc)}<br>Expenses ${fmt(curExp)}<br>Balance ${fmt(balance)}</div>
+        </div>
       </div>
 
-      <div style="font-size:10px;color:#aaa;text-align:center;margin-top:10px;padding-bottom:20px">
-        Showing last ${cols.length} weeks · Week ${currentWeek} is current ◀
+      <!-- TAB 1: HISTORY -->
+      <div id="ftab-1" style="display:none;padding:0 16px 16px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">Week</div>
+        <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none;-webkit-overflow-scrolling:touch">${wkPills}</div>
+
+        <div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:14px;margin:4px 0 12px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+            <span style="font-size:13px;font-weight:700;color:var(--txt)">Net earnings — last ${recentWks.length} wks</span>
+            <span style="font-size:10px;color:var(--mut)">tap a pill</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:flex-end;height:70px">${trendBars}</div>
+        </div>
+
+        <div id="fin-wk-detail" style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">Week ${currentWeek} — Quick View</div>
+        <div id="fin-wk-rows">${_finWkRows(curH,curInc,curExp)}</div>
+
+        <div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:16px 0 8px">All-time Totals</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+          <div style="flex:1;font-size:13px;font-weight:600;color:var(--txt)">Total earned (all time)</div>
+          <div style="font-size:14px;font-weight:800;color:var(--green,#4cc98a)">${fmt(allInc)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+          <div style="flex:1;font-size:13px;font-weight:600;color:var(--txt)">Total spent (all time)</div>
+          <div style="font-size:14px;font-weight:800;color:var(--red,#e06666)">${fmt(allExp)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--txt)">Best single week</div><div style="font-size:10.5px;color:var(--mut)">Week ${bestWk.week||'—'}</div></div>
+          <div style="font-size:14px;font-weight:800;color:var(--green,#4cc98a)">${fmt(bestNet)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--txt)">Worst single week</div><div style="font-size:10.5px;color:var(--mut)">Week ${worstWk.week||'—'}</div></div>
+          <div style="font-size:14px;font-weight:800;color:${worstNet<0?'var(--red,#e06666)':'var(--mut)'}">${fmtS(worstNet)}</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- STICKY BOTTOM BAR -->
+    <div style="position:absolute;bottom:0;left:0;right:0;background:var(--surf);border-top:1px solid var(--bord);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;z-index:5">
+      <div style="text-align:center">
+        <span style="display:block;font-size:9px;font-weight:800;letter-spacing:.8px;color:var(--mut);text-transform:uppercase">Balance</span>
+        <span style="display:block;font-size:16px;font-weight:900;margin-top:1px;color:${balance>=0?'var(--green,#4cc98a)':'var(--red,#e06666)'}">${fmt(balance)}</span>
+      </div>
+      <div style="width:1px;height:28px;background:var(--bord)"></div>
+      <div style="text-align:center">
+        <span style="display:block;font-size:9px;font-weight:800;letter-spacing:.8px;color:var(--mut);text-transform:uppercase">This Wk In</span>
+        <span style="display:block;font-size:16px;font-weight:900;margin-top:1px;color:var(--green,#4cc98a)">+${fmt(curInc)}</span>
+      </div>
+      <div style="width:1px;height:28px;background:var(--bord)"></div>
+      <div style="text-align:center">
+        <span style="display:block;font-size:9px;font-weight:800;letter-spacing:.8px;color:var(--mut);text-transform:uppercase">This Wk Out</span>
+        <span style="display:block;font-size:16px;font-weight:900;margin-top:1px;color:var(--red,#e06666)">-${fmt(curExp)}</span>
       </div>
     </div>
-  </div>`;
-
-  _insertOverlay(html);
+  </div>`);
 }
 function showBusiness(){
   const html=`
@@ -10460,187 +10577,467 @@ function showBusiness(){
 }
 
 function showHousing(){
-  const rent = GAME.housing?.rent || 300;
-  const type = GAME.housing?.type || 'Shared Room';
-  const missed = GAME.housing?.missedPayments || 0;
-  const region = GAME.homeRegion || 'North America';
-  // City based on region
-  const regionCity = {
-    'North America':'Los Angeles','Europe':'London','Asia':'Seoul',
-    'Africa':'Lagos','South America':'São Paulo','Oceania':'Sydney'
+  // ── Regional config ──────────────────────────────────────────────────────────
+  var HOUSING_REGIONS = {
+    'North America':{mult:1,    city:'Los Angeles', flag:'🌎', tiers:[
+      {name:'Shared Room',     local:'Shared Room',           hood:'4C Broad St, Downtown LA'},
+      {name:'Shared Apartment',local:'Shared Apartment',      hood:'2B Maple Ave, Silver Lake'},
+      {name:'Studio Apartment',local:'Studio',                hood:'Studio 7, 221 Arts District Way'},
+      {name:'1BR Apartment',   local:'1-Bedroom',             hood:'Apt 12A, 555 Midtown Blvd'},
+      {name:'Penthouse',       local:'Penthouse',             hood:'Penthouse, 1 Skyline Tower'}
+    ]},
+    'Europe':{mult:1.4, city:'London', flag:'🌍', tiers:[
+      {name:'Shared Room',     local:'Bedsit',                hood:'Flat 3, 14 Brixton Rd, Brixton'},
+      {name:'Shared Apartment',local:'Houseshare',            hood:'Flat B, 88 Hackney Rd, Hackney'},
+      {name:'Studio Apartment',local:'Studio Flat',           hood:'Studio 4, 33 Shoreditch High St'},
+      {name:'1BR Apartment',   local:'One-Bed Flat',          hood:'Flat 6, 12 Camden High St'},
+      {name:'Penthouse',       local:'Penthouse Suite',       hood:'Penthouse, 1 The Shard'}
+    ]},
+    'Africa':{mult:0.45, city:'Lagos', flag:'🌍', tiers:[
+      {name:'Shared Room',     local:'Face-Me-I-Face-You',    hood:'No. 7 Ojuelegba Rd, Surulere'},
+      {name:'Shared Apartment',local:'Shared Flat',           hood:'Block C, 22 Yaba Close, Yaba'},
+      {name:'Studio Apartment',local:'Self-Contain',          hood:'Suite 5, 4 Allen Ave, Ikeja'},
+      {name:'1BR Apartment',   local:'Mini Flat',             hood:'Apt 8, 11 Lekki Phase 1'},
+      {name:'Penthouse',       local:'Penthouse',             hood:'Penthouse, Eko Atlantic City'}
+    ]},
+    'Asia':{mult:0.9, city:'Seoul', flag:'🌏', tiers:[
+      {name:'Shared Room',     local:'Gosiwon',               hood:'Gosi 7, 33 Sinchon-ro, Mapo-gu'},
+      {name:'Shared Apartment',local:'Sharedhouse',           hood:'3F, 18 Hongdae-ro, Mapo-gu'},
+      {name:'Studio Apartment',local:'Oneroom',               hood:'Suite 201, 44 Gangnam-daero'},
+      {name:'1BR Apartment',   local:'Officetel',             hood:'1104, Itaewon Heights, Yongsan-gu'},
+      {name:'Penthouse',       local:'Penthouse',             hood:'Penthouse, Lotte World Tower, Jamsil'}
+    ]},
+    'South America':{mult:0.6, city:'São Paulo', flag:'🌎', tiers:[
+      {name:'Shared Room',     local:'Quarto Compartilhado',  hood:'Rua Augusta 120, Centro'},
+      {name:'Shared Apartment',local:'República',             hood:'Ap. 3B, Rua Frei Caneca, Consolação'},
+      {name:'Studio Apartment',local:'Kitnet',                hood:'Studio 5, Rua Oscar Freire, Jardins'},
+      {name:'1BR Apartment',   local:'Apartamento',           hood:'Ap. 802, Av. Paulista, Bela Vista'},
+      {name:'Penthouse',       local:'Cobertura',             hood:'Cobertura, Edifício Infinity, Itaim'}
+    ]},
+    'Oceania':{mult:1.15, city:'Sydney', flag:'🌏', tiers:[
+      {name:'Shared Room',     local:'Shareroom',             hood:'Rm 3, 44 King St, Newtown'},
+      {name:'Shared Apartment',local:'Sharehouse',            hood:'Flat B, 88 Crown St, Surry Hills'},
+      {name:'Studio Apartment',local:'Studio',                hood:'Studio 6, 12 Oxford St, Darlinghurst'},
+      {name:'1BR Apartment',   local:'1 Bedder',              hood:'Apt 14, 8 Circular Quay West'},
+      {name:'Penthouse',       local:'Penthouse',             hood:'Penthouse, Barangaroo Tower'}
+    ]}
   };
-  const city = regionCity[region] || 'Los Angeles';
 
-  // Tier definitions — locked values per tutorial reference
-  const options = [
-    {tier:1, type:'Shared Room',    rent:300,  deposit:150,  energyRegen:0,  creativityPenalty:10, extras:[]},
-    {tier:2, type:'Shared Apartment',rent:600, deposit:600,  energyRegen:5,  creativityPenalty:0,  extras:[]},
-    {tier:3, type:'Studio Apartment',rent:1200,deposit:1200, energyRegen:10, creativityPenalty:0,  extras:['Home recording']},
-    {tier:4, type:'1BR Apartment',  rent:2000, deposit:2000, energyRegen:15, creativityPenalty:0,  extras:['Stress -3/day']},
-    {tier:5, type:'Penthouse',      rent:4000, deposit:4000, energyRegen:20, creativityPenalty:0,  extras:['Rep bonus']}
+  var BASE_RENTS  = [300,600,1200,2000,4000];
+  var BASE_DEPS   = [150,600,1200,2000,4000];
+  var ENERGY_BONUS     = [-10,-5,0,2,5];
+  var CREATIVITY_CHANGE= [-10,-8,-5,-2,0];
+
+  var TIER_EMOJIS = ['🛏️','🛋️','🏙️','🌆','🌃'];
+  var TIER_GRADS  = [
+    'linear-gradient(135deg,#2a2a3a,#1c1c2a)',
+    'linear-gradient(135deg,#1e3a2e,#121a18)',
+    'linear-gradient(135deg,#1e2a3e,#121824)',
+    'linear-gradient(135deg,#3a2a1e,#2a1a0e)',
+    'linear-gradient(135deg,#2a1e3a,#1a1028)'
   ];
 
-  const tierEmoji = ['🛏️','🛋️','🏙️','🏠','🏰'];
+  var PERKS = [
+    [{cls:'p-bad',txt:'−10 energy/day'},{cls:'p-bad',txt:'−10 creativity/day'}],
+    [{cls:'p-bad',txt:'−5 energy/day'}, {cls:'p-bad',txt:'−8 creativity/day'}],
+    [{cls:'p-cr', txt:'Energy neutral'},{cls:'p-bad',txt:'−5 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'}],
+    [{cls:'p-en', txt:'⚡ +2 energy/day'},{cls:'p-bad',txt:'−2 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'},{cls:'p-st',txt:'🧘 Stress −3/day'},{cls:'p-cr',txt:'Collab speed +10%'}],
+    [{cls:'p-en', txt:'⚡ +5 energy/day'},{cls:'p-cr',txt:'No creativity loss'},{cls:'p-cr',txt:'🏆 Studio-quality home'},{cls:'p-st',txt:'👑 Rep +0.2/wk'},{cls:'p-st',txt:'📰 Velour-worthy address'}]
+  ];
 
-  let optionsHTML = '';
-  options.forEach(function(opt, idx){
-    const isCurrent = opt.type === type;
-    const canAfford = (GAME.money||0) >= opt.deposit;
-    const tierBadge = '<div style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.5);color:#fff;font-size:9px;font-weight:800;letter-spacing:.5px;padding:2px 7px;border-radius:3px">Tier '+opt.tier+'</div>';
-    // Stat pills
-    let pills = '';
-    if(opt.energyRegen > 0) pills += '<span style="background:rgba(34,197,94,0.15);color:#16a34a;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;margin-right:5px">+'+opt.energyRegen+' energy/day</span>';
-    if(opt.creativityPenalty > 0) pills += '<span style="background:rgba(239,68,68,0.1);color:#ef4444;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;margin-right:5px">-'+opt.creativityPenalty+' creativity/day</span>';
-    opt.extras.forEach(function(e){ pills += '<span style="background:rgba(168,85,247,0.12);color:#a855f7;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;margin-right:5px">'+e+'</span>'; });
+  var region = GAME.homeRegion || 'North America';
+  var rd = HOUSING_REGIONS[region] || HOUSING_REGIONS['North America'];
+  var curType  = GAME.housing ? (GAME.housing.type || 'Shared Room') : 'Shared Room';
+  var missed   = GAME.housing ? (GAME.housing.missedPayments || 0) : 0;
+  var curTierIdx = ['Shared Room','Shared Apartment','Studio Apartment','1BR Apartment','Penthouse'].indexOf(curType);
+  if(curTierIdx < 0) curTierIdx = 0;
 
-    optionsHTML += '<div style="background:var(--card);border:2px solid '+(isCurrent?'var(--green)':'var(--bord)')+';border-radius:14px;margin-bottom:12px;overflow:hidden">'
-      + '<div style="background:var(--surf);height:60px;position:relative;display:flex;align-items:center;justify-content:center;font-size:28px">'
-      + tierEmoji[idx] + tierBadge
+  function hRent(r, i){ return Math.round(BASE_RENTS[i] * (HOUSING_REGIONS[r]||rd).mult / 50) * 50; }
+  function hDep(r, i){  return Math.round(BASE_DEPS[i]  * (HOUSING_REGIONS[r]||rd).mult / 50) * 50; }
+  function fmt(n){ return '$' + Math.round(n).toLocaleString(); }
+
+  // Build the perk pill HTML
+  function perkPills(i){
+    return PERKS[i].map(function(p){
+      return '<span style="' + ({
+        'p-en':'background:#1a3a2a;color:var(--green,#4cc98a)',
+        'p-cr':'background:#1e2a3e;color:var(--blue,#5a9df3)',
+        'p-st':'background:#1e1a2e;color:var(--purple,#a97de8)',
+        'p-bad':'background:#2a1212;color:var(--red,#e06666)'
+      }[p.cls]||'') + ';font-size:9.5px;font-weight:700;border-radius:99px;padding:3px 9px;display:inline-block;margin:2px">' + p.txt + '</span>';
+    }).join('');
+  }
+
+  // Build lease document HTML (cream style)
+  function leaseDoc(i, r){
+    var t = (HOUSING_REGIONS[r]||rd).tiers[i];
+    var wrent = hRent(r,i);
+    var wdep  = hDep(r,i);
+    var en = ENERGY_BONUS[i];
+    var cr = CREATIVITY_CHANGE[i];
+    var extras = [
+      'This unit is a shared living space. Tenant acknowledges limited privacy and shared common areas.',
+      'This unit is a shared apartment. Tenant shares space with up to 2 roommates. Common areas maintained jointly.',
+      'This unit is a self-contained studio. Tenant has full private occupancy. Home recording permitted within noise ordinance hours.',
+      'This unit is a private one-bedroom apartment. Full occupancy with dedicated bedroom. Recording and creative work permitted.',
+      'This unit is a luxury penthouse suite. Tenant receives concierge access, priority maintenance, and full building amenities. Velour magazine has been known to reference this address.'
+    ];
+    var crTxt = cr < 0
+      ? '<span style="background:#fde8e8;color:#8b1a1a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">' + cr + ' creativity / day</span>'
+      : '<span style="background:#d4f5e5;color:#1a5c3a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">No creativity penalty</span>';
+    var enTxt = en > 0
+      ? '<span style="background:#d4f5e5;color:#1a5c3a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">+' + en + ' energy regen / day</span>'
+      : '<span style="background:#fde8e8;color:#8b1a1a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">No energy regen bonus</span>';
+    var artistName = GAME.artistName || GAME.sn || 'Artist';
+    return '<div style="font-family:Georgia,serif;color:#1a1410">'
+      + '<div style="text-align:center;border-bottom:2px solid #1a1410;padding-bottom:12px;margin-bottom:12px">'
+      + '<div style="font-size:10px;font-weight:800;letter-spacing:3px;color:#888;margin-bottom:4px">SOUND CHECK REALTY CO.</div>'
+      + '<h4 style="font-size:15px;letter-spacing:1px;text-transform:uppercase;margin:0">Residential Lease Agreement</h4>'
+      + '<div style="font-size:10px;color:#666;margin-top:3px;font-style:italic">' + t.name + ' · ' + t.hood + '</div>'
       + '</div>'
-      + '<div style="padding:14px">'
-        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'
-          + '<div style="font-size:15px;font-weight:800;color:var(--txt)">'+opt.type+'</div>'
-          + '<div style="text-align:right"><div style="font-size:16px;font-weight:800;color:var(--txt)">$'+opt.rent.toLocaleString()+'</div><div style="font-size:10px;color:var(--mut)">/week · $'+opt.deposit.toLocaleString()+' dep.</div></div>'
-        + '</div>'
-        + (pills ? '<div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px">'+pills+'</div>' : '')
-        + (isCurrent
-          ? '<div style="background:var(--green);color:#0d1a12;text-align:center;border-radius:9px;padding:10px;font-size:13px;font-weight:800">✓ Current Home</div>'
-          : '<div style="display:flex;gap:7px">'
-            + '<button onclick="viewLeaseContract(\''+opt.type+'\','+opt.rent+','+opt.deposit+')" style="flex:1;background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:9px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">View Lease</button>'
-            + '<button onclick="moveToNewPlace(\''+opt.type+'\','+opt.rent+','+opt.deposit+')" '+(canAfford?'':'disabled')+' style="flex:1;background:'+(canAfford?'var(--acc)':'var(--bord)')+';color:'+(canAfford?'var(--acc-txt)':'var(--mut)')+';border:none;border-radius:9px;padding:10px;font-size:12px;font-weight:700;cursor:'+(canAfford?'pointer':'not-allowed')+';font-family:var(--fb)">'+(canAfford?'Move In':'Need $'+(opt.deposit-(GAME.money||0)).toLocaleString()+' more')+'</button>'
-            + '</div>'
-        )
+      + '<div style="font-size:10.5px;color:#4a3a2a;margin-bottom:10px;line-height:1.6;border-bottom:1px solid #d8cec0;padding-bottom:10px">'
+      + '<b>Landlord:</b> Sound Check Realty Co.<br><b>Tenant:</b> ' + artistName + '<br><b>Property:</b> ' + t.hood + '<br><b>Term:</b> Week-to-week tenancy'
       + '</div>'
-    + '</div>';
-  });
+      + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 1 — RENT</div>'
+      + '<p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Tenant shall pay <b>' + fmt(wrent) + ' per game week</b>, deducted automatically. A security deposit of <b>' + fmt(wdep) + '</b> is due upon signing, refundable on good standing exit.</p></div>'
+      + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 2 — PREMISES</div>'
+      + '<p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">' + extras[i] + ' ' + crTxt + ' ' + enTxt + '</p></div>'
+      + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 3 — MISSED PAYMENTS</div>'
+      + '<p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Three consecutive missed rent payments will result in automatic eviction to the lowest available tier. Deposit is forfeited upon eviction.</p></div>'
+      + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 4 — TERMINATION</div>'
+      + '<p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Either party may terminate at any time. Moving to a new property automatically terminates this agreement.</p></div>'
+      + '<div style="display:flex;gap:16px;margin-top:14px;border-top:1px solid #d8cec0;padding-top:12px">'
+      + '<div style="flex:1"><div style="border-bottom:1.5px solid #1a1410;height:28px;display:flex;align-items:flex-end;padding-bottom:2px;font-family:\'Brush Script MT\',cursive;font-size:17px;color:#1a3a6b">Sound Check Realty</div><div style="font-size:9px;color:#888;letter-spacing:.8px;text-transform:uppercase;margin-top:4px">Landlord</div></div>'
+      + '<div style="flex:1"><div style="border-bottom:1.5px solid #1a1410;height:28px;display:flex;align-items:flex-end;padding-bottom:2px;font-family:\'Brush Script MT\',cursive;font-size:17px;color:#1a3a6b" id="hsg-sig-' + i + '"></div><div style="font-size:9px;color:#888;letter-spacing:.8px;text-transform:uppercase;margin-top:4px">Tenant — sign on move-in</div></div>'
+      + '</div></div>';
+  }
 
-  var html = '<div>'
-    + '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surf);border-bottom:1px solid var(--bord);position:sticky;top:0;z-index:10">'
-      + '<button onclick="_closeOverlay(this)" style="background:none;border:none;color:var(--mut);font-size:22px;cursor:pointer;padding:0;line-height:1;flex:none">←</button>'
-      + '<div style="font-size:16px;font-weight:800;color:var(--txt);flex:1">Housing</div>'
-      + '<div style="font-size:11px;font-weight:700;color:var(--mut);background:var(--card);border:1px solid var(--bord);border-radius:20px;padding:5px 10px">🌍 '+region+'</div>'
+  // Build listing cards
+  var listingsHtml = '';
+  for(var i = 0; i < 5; i++){
+    var t = rd.tiers[i];
+    var wrent = hRent(region, i);
+    var wdep  = hDep(region, i);
+    var isCurrent = (curType === t.name);
+    var canAfford = (GAME.money || 0) >= wdep;
+    var actBtns = isCurrent
+      ? '<button style="flex:1;background:var(--green,#4cc98a);color:#071a0e;border:none;border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:default">✓ Current Home</button>'
+      : '<button id="hsg-lb-' + i + '" onclick="hsgToggleLease(' + i + ')" style="flex:0 0 38%;background:var(--surf);color:var(--txt);border:1px solid var(--bord);border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:pointer">View Lease</button>'
+        + '<button onclick="hsgConfirm(' + i + ')" style="flex:1;background:var(--acc,#e8b44c);color:var(--acc-txt,#0d0f14);border:1px solid var(--acc,#e8b44c);border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:pointer">Move In</button>';
+
+    listingsHtml += '<div style="margin:0 16px 12px;border-radius:18px;overflow:hidden;border:2px solid ' + (isCurrent ? 'var(--green,#4cc98a)' : 'var(--bord)') + '">'
+      + '<div style="height:80px;display:flex;align-items:center;justify-content:center;font-size:40px;position:relative;background:' + TIER_GRADS[i] + '">'
+      + TIER_EMOJIS[i]
+      + '<span style="position:absolute;top:8px;right:10px;font-size:9px;font-weight:800;letter-spacing:.8px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.5);color:rgba(255,255,255,.8)">Tier ' + (i+1) + '</span>'
+      + '</div>'
+      + '<div style="padding:12px 14px;background:var(--card)">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">'
+      + '<div><div style="font-size:15.5px;font-weight:800;color:var(--txt)">' + t.name + '</div>'
+      + (t.local !== t.name ? '<div style="font-size:10px;color:var(--mut);font-style:italic;margin-top:1px">"' + t.local + '"</div>' : '')
+      + '</div>'
+      + '<div style="text-align:right"><b style="font-size:16px;font-weight:900;display:block;color:var(--txt)">' + fmt(wrent) + '</b><span style="font-size:10px;color:var(--mut)">/week · ' + fmt(wdep) + ' dep.</span></div>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--mut);margin-bottom:8px">📍 ' + t.hood + '</div>'
+      + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">' + perkPills(i) + '</div>'
+      + '<div style="display:flex;gap:7px">' + actBtns + '</div>'
+      + '</div>'
+      + '<div id="hsg-lease-' + i + '" style="max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease;background:#f5f0e8;border-top:0 solid var(--bord)"></div>'
+      + '</div>';
+  }
+
+  // Current home stats
+  var curEn  = ENERGY_BONUS[curTierIdx];
+  var curCr  = CREATIVITY_CHANGE[curTierIdx];
+  var curRentAmt = hRent(region, curTierIdx);
+  var curHood = rd.tiers[curTierIdx].hood;
+  var curLocalName = rd.tiers[curTierIdx].name + (rd.tiers[curTierIdx].local !== rd.tiers[curTierIdx].name ? ' — ' + rd.tiers[curTierIdx].local : '');
+
+  var city = rd.city;
+
+  var html = '<div style="background:linear-gradient(160deg,#1a1230 0%,#1e2a3e 55%,#0d0f14 100%);padding:18px 16px 16px;position:relative;overflow:hidden;flex:none">'
+    + '<svg style="position:absolute;bottom:0;left:0;right:0;height:54px;opacity:.15;width:100%" viewBox="0 0 390 54" preserveAspectRatio="none">'
+    + '<rect x="8" y="18" width="16" height="36" fill="#fff"/><rect x="12" y="10" width="8" height="10" fill="#fff"/>'
+    + '<rect x="30" y="28" width="20" height="26" fill="#fff"/><rect x="57" y="12" width="12" height="42" fill="#fff"/>'
+    + '<rect x="76" y="22" width="24" height="32" fill="#fff"/><rect x="130" y="16" width="18" height="38" fill="#fff"/>'
+    + '<rect x="186" y="20" width="16" height="34" fill="#fff"/><rect x="236" y="14" width="14" height="40" fill="#fff"/>'
+    + '<rect x="286" y="18" width="16" height="36" fill="#fff"/><rect x="340" y="20" width="16" height="34" fill="#fff"/>'
+    + '</svg>'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;position:relative;z-index:2">'
+    + '<button onclick="document.querySelectorAll(\'body > div[data-app-overlay]\').forEach(function(el){el.remove()})" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:16px;cursor:pointer">‹</button>'
+    + '<span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.65)">Housing</span>'
+    + '<span style="margin-left:auto;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:rgba(255,255,255,.8);font-size:10px;font-weight:700;padding:5px 10px">' + rd.flag + ' ' + rd.city + '</span>'
     + '</div>'
-    + '<div style="padding:16px;padding-bottom:80px">'
-      + '<div style="margin-bottom:4px">'
-        + '<div style="font-size:22px;font-weight:800;color:var(--txt)">Your Place in '+city+'</div>'
-        + '<div style="font-size:12px;color:var(--mut);margin-top:2px">📍 '+city+' · Week '+(GAME.week||1)+'</div>'
-      + '</div>'
-      + (missed>0 ? '<div style="background:rgba(239,68,68,0.1);border:1px solid var(--red);border-radius:10px;padding:10px 12px;margin:12px 0;font-size:12px;color:var(--red);font-weight:700">⚠️ Missed '+missed+' payment'+(missed>1?'s':'')+'. '+(missed>=2?'Eviction imminent!':'One more and you\'re out!')+'</div>' : '')
-      + '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin:14px 0 8px">Available Places</div>'
-      + optionsHTML
-      + '<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.4);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--txt);line-height:1.6">'
-        + '⚠️ Miss 3 rent payments in a row → auto-eviction to Shared Room. Rent is deducted every game week.'
-      + '</div>'
+    + '<div style="font-family:Georgia,serif;font-size:22px;color:#fff;position:relative;z-index:2" id="hsg-htitle">Your Place in ' + city + '</div>'
+    + '<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;position:relative;z-index:2" id="hsg-haddr">' + rd.flag + ' ' + city + ' · Week ' + (GAME.week || 1) + '</div>'
     + '</div>'
-  + '</div>';
+    // Current home card
+    + '<div style="margin:14px 16px 0;background:var(--card);border:1px solid var(--bord);border-radius:18px;overflow:hidden">'
+    + '<div style="padding:14px;background:linear-gradient(135deg,#1a2a3e,#141a2a)">'
+    + '<div style="font-size:9px;font-weight:800;letter-spacing:1.5px;color:var(--blue,#5a9df3);margin-bottom:4px">CURRENTLY LIVING IN</div>'
+    + '<div style="font-family:Georgia,serif;font-size:20px;color:#fff" id="hsg-cur-name">' + curLocalName + '</div>'
+    + '<div style="font-size:10.5px;color:var(--mut);margin-top:3px" id="hsg-cur-addr">' + curHood + '</div>'
+    + (missed > 0 ? '<div style="margin-top:8px;background:rgba(224,102,102,.15);border:1px solid var(--red,#e06666);border-radius:8px;padding:8px;font-size:11px;color:var(--red,#e06666);font-weight:700">⚠️ Missed ' + missed + ' payment' + (missed > 1 ? 's' : '') + (missed >= 2 ? ' — eviction imminent!' : '') + '</div>' : '')
+    + '</div>'
+    + '<div style="display:flex">'
+    + '<div style="flex:1;padding:10px;text-align:center;border-top:1px solid var(--bord);border-right:1px solid var(--bord)"><b style="display:block;font-size:15px;font-weight:900;color:var(--red,#e06666)" id="hsg-cur-rent">' + fmt(curRentAmt) + '</b><small style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin-top:1px;display:block">Per Week</small></div>'
+    + '<div style="flex:1;padding:10px;text-align:center;border-top:1px solid var(--bord);border-right:1px solid var(--bord)"><b style="display:block;font-size:15px;font-weight:900;color:' + (curEn > 0 ? 'var(--green,#4cc98a)' : curEn < 0 ? 'var(--red,#e06666)' : 'var(--mut)') + '">' + (curEn > 0 ? '+' : '') + curEn + '</b><small style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin-top:1px;display:block">Energy/Day</small></div>'
+    + '<div style="flex:1;padding:10px;text-align:center;border-top:1px solid var(--bord)"><b style="display:block;font-size:15px;font-weight:900;color:var(--red,#e06666)">' + (curCr < 0 ? curCr : '0') + '</b><small style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin-top:1px;display:block">Creativity/Day</small></div>'
+    + '</div></div>'
+    // Listings
+    + '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);padding:14px 16px 8px">Available Places</div>'
+    + '<div id="hsg-listings">' + listingsHtml + '</div>'
+    + '<div style="height:20px"></div>';
 
   _insertOverlay(html);
+
 }
 
-// old viewLeaseContract removed
-
-function viewLeaseContract(type,rent,deposit){
-  var eb={'Shared Room':0,'Shared Apartment':5,'Studio Apartment':10,'1BR Apartment':15,'Penthouse':20};
-  var addr={'Shared Room':'43 Broad St, Apt 4C, Los Angeles','Shared Apartment':'118 Maple Ave, Apt 2B, Los Angeles','Studio Apartment':'221 Arts District Way, Studio 7, Los Angeles','1BR Apartment':'555 Midtown Blvd, Apt 12A, Los Angeles','Penthouse':'1 Skyline Tower, Penthouse, Los Angeles'};
-  var bonus=eb[type]||0;
-  var totalDue=rent+deposit;
-  var canAfford=(GAME.money||0)>=deposit;
-  var isCurrent=GAME.housing&&GAME.housing.type===type;
-  var artistName=GAME.artistName||GAME.sn||'Artist';
-  var signDate=typeof gameWeekToShortDate==='function'?gameWeekToShortDate(GAME.week||1,1):'Week '+(GAME.week||1);
-
-  var overlayId='lease-overlay-'+Date.now();
-  var phone=document.getElementById('phone')||document.querySelector('.phone');
-  var themeClass=phone?phone.className:'';
-  var html='<div id="'+overlayId+'" class="'+themeClass+'" style="position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:200000;overflow-y:auto">'  
-    +'<div style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--surf);border-bottom:1px solid var(--bord);position:sticky;top:0;z-index:10">'
-    +'<button onclick="document.getElementById(\''+overlayId+'\').remove()" style="background:var(--surf);border:1.5px solid var(--bord);color:var(--txt);border-radius:50%;width:38px;height:38px;font-size:18px;cursor:pointer;touch-action:manipulation">←</button>'
-    +'<div style="font-size:15px;font-weight:700;color:var(--txt)">📋 Lease Agreement</div>'
-    +'</div>'
-    +'<div style="max-width:520px;margin:0 auto;padding:20px;padding-bottom:60px">'
-    // Header
-    +'<div style="text-align:center;margin-bottom:24px;border-bottom:3px solid var(--txt);padding-bottom:20px">'
-    +'<div style="font-size:22px;font-weight:bold;color:var(--txt);letter-spacing:1px;font-family:Georgia,serif">📋 LEASE AGREEMENT</div>'
-    +'<div style="font-size:11px;color:var(--mut);margin-top:6px;letter-spacing:1px">OFFICIAL RESIDENTIAL LEASE CONTRACT</div>'
-    +'</div>'
-    // Property grid
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">'
-    +'<div><div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:4px">PROPERTY</div><div style="font-size:15px;font-weight:bold;color:var(--txt)">'+type+'</div></div>'
-    +'<div><div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:4px">ADDRESS</div><div style="font-size:12px;font-weight:bold;color:var(--txt)">'+addr[type]+'</div></div>'
-    +'</div>'
-    // Rent + deposit
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">'
-    +'<div><div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:4px">WEEKLY RENT</div><div style="font-size:20px;font-weight:bold;color:var(--acc)">$'+rent.toLocaleString()+'</div></div>'
-    +'<div><div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:4px">SECURITY DEPOSIT</div><div style="font-size:18px;font-weight:bold;color:#ff9800">$'+deposit.toLocaleString()+'</div><div style="font-size:11px;color:var(--mut)">(refundable)</div></div>'
-    +'</div>'
-    // Lease term card
-    +'<div style="background:var(--surf);border-left:4px solid var(--txt);padding:14px;border-radius:4px;margin-bottom:20px">'
-    +'<div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:6px">LEASE TERM</div>'
-    +'<div style="font-size:16px;font-weight:bold;color:var(--txt)">52 weeks (1 year)</div>'
-    +'<div style="font-size:12px;color:var(--mut);margin-top:4px">Rent deducted weekly automatically.</div>'
-    +(bonus>0?'<div style="font-size:12px;color:#2ed573;margin-top:4px;font-weight:700">⚡ +'+bonus+' Energy per day</div>':'')
-    +'</div>'
-    // Cost summary
-    +'<div style="background:var(--acc-bg);border:1px solid var(--acc);padding:14px;border-radius:8px;margin-bottom:20px">'
-    +'<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;color:var(--txt)"><span>First Week Rent:</span><strong>$'+rent.toLocaleString()+'</strong></div>'
-    +'<div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bord);padding-bottom:8px;margin-bottom:8px;font-size:13px;color:var(--txt)"><span>Security Deposit:</span><strong>$'+deposit.toLocaleString()+'</strong></div>'
-    +'<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:bold;color:var(--txt)"><span>TOTAL DUE TODAY:</span><span style="color:var(--acc)">$'+totalDue.toLocaleString()+'</span></div>'
-    +'</div>'
-    // Terms
-    +'<div style="background:var(--surf);border-top:2px solid var(--txt);padding:14px;margin-bottom:20px">'
-    +'<div style="font-size:12px;font-weight:bold;color:var(--txt);margin-bottom:10px;letter-spacing:1px">TERMS & CONDITIONS</div>'
-    +'<ul style="margin:0;padding-left:18px;font-size:12px;color:var(--txt);line-height:1.9">'
-    +'<li>Rent deducted weekly from your earnings</li>'
-    +'<li>Miss 1 payment = formal warning</li>'
-    +'<li>Miss 2 payments = immediate eviction</li>'
-    +'<li>Breaking lease: forfeits deposit + $800 fee</li>'
-    +'<li>Security deposit refunded on good standing exit</li>'
-    +'</ul></div>'
-    // Signature
-    +'<div style="margin-top:28px;padding-top:20px;border-top:2px solid var(--bord)">'
-    +'<div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:14px">TENANT SIGNATURE</div>'
-    +'<div style="border-bottom:2px solid var(--txt);height:44px;margin-bottom:8px;display:flex;align-items:flex-end;padding-bottom:4px">'
-    +(isCurrent?'<div style="font-size:26px;color:var(--txt);font-style:italic;font-family:Georgia,serif">'+artistName+'</div>':'')
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;font-size:11px;color:var(--mut)">'
-    +'<div><strong style="display:block">Tenant Name (Print)</strong><span style="color:var(--txt)">'+artistName+'</span></div>'
-    +'<div><strong style="display:block">Date Signed</strong><span style="color:var(--txt)">'+(isCurrent?signDate:'—')+'</span></div>'
-    +'</div></div>'
-    // Agreement checkbox
-    +'<div style="margin-top:20px;padding:14px;background:var(--surf);border-left:4px solid #ffc107;border-radius:4px">'
-    +'<div style="display:flex;gap:10px;align-items:center">'
-    +'<input type="checkbox" id="leaseAgreeBox" style="width:20px;height:20px;cursor:pointer;accent-color:var(--acc)" '+(isCurrent?'checked disabled':'')+'>'
-    +'<div style="font-size:13px;color:var(--txt)"><strong>I agree to all terms and conditions above.</strong><br><span style="font-size:12px;color:var(--mut)">By signing, you legally bind yourself to this lease.</span></div>'
-    +'</div></div>'
-    // Buttons
-    +'<div style="display:flex;gap:10px;margin-top:20px">'
-    +(isCurrent
-      ?'<div style="flex:1;padding:14px;background:var(--acc-bg);color:var(--acc);border:2px solid var(--acc);border-radius:8px;font-weight:bold;text-align:center">✓ Currently Living Here</div>'
-      :(canAfford
-        ?'<button id="signLeaseBtn" data-oid="'+overlayId+'" data-type="'+type+'" data-rent="'+rent+'" data-deposit="'+deposit+'" onclick="(function(btn){var cb=document.getElementById(\'leaseAgreeBox\');if(!cb||!cb.checked){showToast(\'Please agree to the terms first\',\'red\');return;}var oid=btn.getAttribute(\'data-oid\');var t=btn.getAttribute(\'data-type\');var r=parseInt(btn.getAttribute(\'data-rent\'));var d=parseInt(btn.getAttribute(\'data-deposit\'));if(oid)document.getElementById(oid).remove();moveToNewPlace(t,r,d);})(this)" style="flex:1;padding:14px;background:#2ed573;color:white;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:14px;touch-action:manipulation">✍️ Sign Lease & Move In</button>'
-        :'<div style="flex:1;padding:14px;background:var(--surf);border:2px solid var(--bord);color:var(--mut);border-radius:8px;font-weight:bold;text-align:center;font-size:13px">Need $'+(deposit-Math.floor(GAME.money||0)).toLocaleString()+' more</div>')
-    )
-    +'<button onclick="document.getElementById(\''+overlayId+'\').remove()" style="padding:14px 20px;background:var(--surf);border:2px solid var(--bord);color:var(--txt);border-radius:8px;font-weight:bold;cursor:pointer;touch-action:manipulation">Cancel</button>'
-    +'</div></div></div>';
-  document.body.insertAdjacentHTML('beforeend',html);
+// ── Housing helper: toggle lease inline ───────────────────────────────────────
+function hsgToggleLease(i){
+  var sheet = document.getElementById('hsg-lease-' + i);
+  var btn   = document.getElementById('hsg-lb-' + i);
+  if(!sheet) return;
+  var isOpen = sheet.style.maxHeight && sheet.style.maxHeight !== '0px' && sheet.style.maxHeight !== '0';
+  if(!isOpen){
+    // Lazy-build the doc
+    if(!sheet.dataset.built){
+      var region = GAME.homeRegion || 'North America';
+      sheet.innerHTML = '<div style="padding:16px">' + _hsgLeaseDoc(i, region) + '</div>';
+      sheet.dataset.built = '1';
+    }
+    sheet.style.maxHeight = '600px';
+    sheet.style.borderTopWidth = '1px';
+    sheet.style.padding = '0';
+    if(btn){ btn.textContent = '✕ Close'; btn.style.background = 'var(--acc-bg)'; btn.style.color = 'var(--acc)'; btn.style.borderColor = 'var(--acc)'; }
+  } else {
+    sheet.style.maxHeight = '0';
+    sheet.style.borderTopWidth = '0';
+    if(btn){ btn.textContent = 'View Lease'; btn.style.background = 'var(--surf)'; btn.style.color = 'var(--txt)'; btn.style.borderColor = 'var(--bord)'; }
+  }
 }
 
-function moveToNewPlace(type,rent,deposit){
-  if(GAME.money<deposit){
-    showEvent('💰','Not Enough Money',`You need $${deposit} for the deposit!`,['OK']);
+// ── Housing helper: build lease document (internal) ───────────────────────────
+function _hsgLeaseDoc(i, region){
+  var HOUSING_REGIONS = {
+    'North America':{mult:1,    tiers:[{name:'Shared Room',local:'Shared Room',hood:'4C Broad St, Downtown LA'},{name:'Shared Apartment',local:'Shared Apartment',hood:'2B Maple Ave, Silver Lake'},{name:'Studio Apartment',local:'Studio',hood:'Studio 7, 221 Arts District Way'},{name:'1BR Apartment',local:'1-Bedroom',hood:'Apt 12A, 555 Midtown Blvd'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, 1 Skyline Tower'}]},
+    'Europe':{mult:1.4,         tiers:[{name:'Shared Room',local:'Bedsit',hood:'Flat 3, 14 Brixton Rd, Brixton'},{name:'Shared Apartment',local:'Houseshare',hood:'Flat B, 88 Hackney Rd, Hackney'},{name:'Studio Apartment',local:'Studio Flat',hood:'Studio 4, 33 Shoreditch High St'},{name:'1BR Apartment',local:'One-Bed Flat',hood:'Flat 6, 12 Camden High St'},{name:'Penthouse',local:'Penthouse Suite',hood:'Penthouse, 1 The Shard'}]},
+    'Africa':{mult:0.45,        tiers:[{name:'Shared Room',local:'Face-Me-I-Face-You',hood:'No. 7 Ojuelegba Rd, Surulere'},{name:'Shared Apartment',local:'Shared Flat',hood:'Block C, 22 Yaba Close, Yaba'},{name:'Studio Apartment',local:'Self-Contain',hood:'Suite 5, 4 Allen Ave, Ikeja'},{name:'1BR Apartment',local:'Mini Flat',hood:'Apt 8, 11 Lekki Phase 1'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Eko Atlantic City'}]},
+    'Asia':{mult:0.9,           tiers:[{name:'Shared Room',local:'Gosiwon',hood:'Gosi 7, 33 Sinchon-ro, Mapo-gu'},{name:'Shared Apartment',local:'Sharedhouse',hood:'3F, 18 Hongdae-ro, Mapo-gu'},{name:'Studio Apartment',local:'Oneroom',hood:'Suite 201, 44 Gangnam-daero'},{name:'1BR Apartment',local:'Officetel',hood:'1104, Itaewon Heights, Yongsan-gu'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Lotte World Tower, Jamsil'}]},
+    'South America':{mult:0.6,  tiers:[{name:'Shared Room',local:'Quarto Compartilhado',hood:'Rua Augusta 120, Centro'},{name:'Shared Apartment',local:'República',hood:'Ap. 3B, Rua Frei Caneca, Consolação'},{name:'Studio Apartment',local:'Kitnet',hood:'Studio 5, Rua Oscar Freire, Jardins'},{name:'1BR Apartment',local:'Apartamento',hood:'Ap. 802, Av. Paulista, Bela Vista'},{name:'Penthouse',local:'Cobertura',hood:'Cobertura, Edifício Infinity, Itaim'}]},
+    'Oceania':{mult:1.15,       tiers:[{name:'Shared Room',local:'Shareroom',hood:'Rm 3, 44 King St, Newtown'},{name:'Shared Apartment',local:'Sharehouse',hood:'Flat B, 88 Crown St, Surry Hills'},{name:'Studio Apartment',local:'Studio',hood:'Studio 6, 12 Oxford St, Darlinghurst'},{name:'1BR Apartment',local:'1 Bedder',hood:'Apt 14, 8 Circular Quay West'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Barangaroo Tower'}]}
+  };
+  var BASE_RENTS=[300,600,1200,2000,4000];
+  var BASE_DEPS=[150,600,1200,2000,4000];
+  var ENERGY_BONUS=[-10,-5,0,2,5];
+  var CREATIVITY_CHANGE=[-10,-8,-5,-2,0];
+  var rd = HOUSING_REGIONS[region] || HOUSING_REGIONS['North America'];
+  var t = rd.tiers[i];
+  var mult = rd.mult;
+  var wrent = Math.round(BASE_RENTS[i]*mult/50)*50;
+  var wdep  = Math.round(BASE_DEPS[i]*mult/50)*50;
+  var en = ENERGY_BONUS[i];
+  var cr = CREATIVITY_CHANGE[i];
+  var fmt = function(n){ return '$' + Math.round(n).toLocaleString(); };
+  var extras=['This unit is a shared living space. Tenant acknowledges limited privacy and shared common areas.','This unit is a shared apartment. Tenant shares space with up to 2 roommates. Common areas maintained jointly.','This unit is a self-contained studio. Tenant has full private occupancy. Home recording permitted within noise ordinance hours.','This unit is a private one-bedroom apartment. Full occupancy with dedicated bedroom. Recording and creative work permitted.','This unit is a luxury penthouse suite. Tenant receives concierge access, priority maintenance, and full building amenities. Velour magazine has been known to reference this address.'];
+  var crTxt = cr < 0
+    ? '<span style="background:#fde8e8;color:#8b1a1a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">' + cr + ' creativity / day</span>'
+    : '<span style="background:#d4f5e5;color:#1a5c3a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">No creativity penalty</span>';
+  var enTxt = en > 0
+    ? '<span style="background:#d4f5e5;color:#1a5c3a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">+' + en + ' energy regen / day</span>'
+    : '<span style="background:#fde8e8;color:#8b1a1a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">No energy regen bonus</span>';
+  var artistName = GAME.artistName || GAME.sn || 'Artist';
+  return '<div style="font-family:Georgia,serif;color:#1a1410">'
+    + '<div style="text-align:center;border-bottom:2px solid #1a1410;padding-bottom:12px;margin-bottom:12px">'
+    + '<div style="font-size:10px;font-weight:800;letter-spacing:3px;color:#888;margin-bottom:4px">SOUND CHECK REALTY CO.</div>'
+    + '<h4 style="font-size:15px;letter-spacing:1px;text-transform:uppercase;margin:0">Residential Lease Agreement</h4>'
+    + '<div style="font-size:10px;color:#666;margin-top:3px;font-style:italic">' + t.name + ' · ' + t.hood + '</div>'
+    + '</div>'
+    + '<div style="font-size:10.5px;color:#4a3a2a;margin-bottom:10px;line-height:1.6;border-bottom:1px solid #d8cec0;padding-bottom:10px"><b>Landlord:</b> Sound Check Realty Co.<br><b>Tenant:</b> ' + artistName + '<br><b>Property:</b> ' + t.hood + '<br><b>Term:</b> Week-to-week tenancy</div>'
+    + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 1 — RENT</div><p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Tenant shall pay <b>' + fmt(wrent) + ' per game week</b>, deducted automatically. A security deposit of <b>' + fmt(wdep) + '</b> is due upon signing, refundable on good standing exit.</p></div>'
+    + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 2 — PREMISES</div><p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">' + extras[i] + ' ' + crTxt + ' ' + enTxt + '</p></div>'
+    + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 3 — MISSED PAYMENTS</div><p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Three consecutive missed payments result in automatic eviction. Deposit is forfeited upon eviction.</p></div>'
+    + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 4 — TERMINATION</div><p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Either party may terminate at any time. Moving to a new property automatically terminates this agreement.</p></div>'
+    + '<div style="display:flex;gap:16px;margin-top:14px;border-top:1px solid #d8cec0;padding-top:12px">'
+    + '<div style="flex:1"><div style="border-bottom:1.5px solid #1a1410;height:28px;display:flex;align-items:flex-end;padding-bottom:2px;font-family:cursive;font-size:17px;color:#1a3a6b">Sound Check Realty</div><div style="font-size:9px;color:#888;letter-spacing:.8px;text-transform:uppercase;margin-top:4px">Landlord</div></div>'
+    + '<div style="flex:1"><div style="border-bottom:1.5px solid #1a1410;height:28px" id="hsg-sig-' + i + '"></div><div style="font-size:9px;color:#888;letter-spacing:.8px;text-transform:uppercase;margin-top:4px">Tenant — sign on move-in</div></div>'
+    + '</div></div>';
+}
+
+// ── Housing helper: show move-in confirm overlay ───────────────────────────────
+function hsgConfirm(i){
+  var HOUSING_REGIONS = {
+    'North America':{mult:1,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]},
+    'Europe':{mult:1.4,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]},
+    'Africa':{mult:0.45,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]},
+    'Asia':{mult:0.9,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]},
+    'South America':{mult:0.6,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]},
+    'Oceania':{mult:1.15,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]}
+  };
+  var BASE_RENTS=[300,600,1200,2000,4000];
+  var BASE_DEPS=[150,600,1200,2000,4000];
+  var ENERGY_BONUS=[-10,-5,0,2,5];
+  var CREATIVITY_CHANGE=[-10,-8,-5,-2,0];
+  var region = GAME.homeRegion || 'North America';
+  var rd = HOUSING_REGIONS[region] || HOUSING_REGIONS['North America'];
+  var mult = rd.mult;
+  var wrent = Math.round(BASE_RENTS[i]*mult/50)*50;
+  var wdep  = Math.round(BASE_DEPS[i]*mult/50)*50;
+  var en = ENERGY_BONUS[i];
+  var cr = CREATIVITY_CHANGE[i];
+  var tname = ['Shared Room','Shared Apartment','Studio Apartment','1BR Apartment','Penthouse'][i];
+  var fmt = function(n){ return '$' + Math.round(n).toLocaleString(); };
+  var bal = (GAME.money||0) - wdep;
+
+  // Find the confirm overlay placeholder inside the current overlay
+  var confHtml = '<div style="position:fixed;bottom:0;left:0;right:0;background:rgba(7,8,12,.9);padding:20px;z-index:300000;animation:none" id="hsg-conf-panel">'
+    + '<div style="background:var(--card);border:1px solid var(--bord);border-radius:20px;padding:20px">'
+    + '<h3 style="font-family:Georgia,serif;font-size:18px;margin-bottom:5px;color:var(--txt)">Moving to: ' + tname + '</h3>'
+    + '<p style="font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:12px">Deposit is refundable when you leave — unless you\'ve missed payments.</p>'
+    + '<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:11px 13px;margin-bottom:14px">'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--bord)"><span>Weekly rent</span><b style="color:var(--red,#e06666)">' + fmt(wrent) + '/week</b></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--bord)"><span>One-time deposit</span><b style="color:var(--red,#e06666)">' + fmt(wdep) + '</b></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--bord)"><span>Energy regen</span><b style="color:var(--green,#4cc98a)">' + (en > 0 ? '+'+en : en < 0 ? en : '0 (neutral)') + ' per day</b></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--bord)"><span>Creativity change</span><b style="color:' + (cr < 0 ? 'var(--red,#e06666)' : 'var(--green,#4cc98a)') + '">' + (cr < 0 ? cr+' per day' : 'No penalty') + '</b></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0"><span>Balance after move</span><b style="color:var(--acc,#e8b44c)">' + fmt(bal) + '</b></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="hsgDoMove(' + i + ')" style="flex:1;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:14px;background:var(--acc,#e8b44c);color:var(--acc-txt,#0d0f14);cursor:pointer">🏠 Move In</button>'
+    + '<button onclick="document.getElementById(\'hsg-conf-panel\').remove()" style="flex:1;border:1px solid var(--bord);border-radius:12px;padding:13px;font-weight:800;font-size:14px;background:var(--surf);color:var(--txt);cursor:pointer">Cancel</button>'
+    + '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', confHtml);
+}
+
+// ── Housing helper: do the actual move ────────────────────────────────────────
+function hsgDoMove(i){
+  var ENERGY_BONUS=[-10,-5,0,2,5];
+  var CREATIVITY_CHANGE=[-10,-8,-5,-2,0];
+  var COLLAB_SPEED=[0,0,0,0.1,0];
+  var STRESS_REDUCE=[0,0,0,3,6];
+  var HOME_RECORDING=[false,false,true,true,true];
+  var HOUSING_REGIONS = {
+    'North America':{mult:1,tiers:[{name:'Shared Room',hood:'4C Broad St, Downtown LA'},{name:'Shared Apartment',hood:'2B Maple Ave, Silver Lake'},{name:'Studio Apartment',hood:'Studio 7, 221 Arts District Way'},{name:'1BR Apartment',hood:'Apt 12A, 555 Midtown Blvd'},{name:'Penthouse',hood:'Penthouse, 1 Skyline Tower'}]},
+    'Europe':{mult:1.4,tiers:[{name:'Shared Room',hood:'Flat 3, 14 Brixton Rd, Brixton'},{name:'Shared Apartment',hood:'Flat B, 88 Hackney Rd, Hackney'},{name:'Studio Apartment',hood:'Studio 4, 33 Shoreditch High St'},{name:'1BR Apartment',hood:'Flat 6, 12 Camden High St'},{name:'Penthouse',hood:'Penthouse, 1 The Shard'}]},
+    'Africa':{mult:0.45,tiers:[{name:'Shared Room',hood:'No. 7 Ojuelegba Rd, Surulere'},{name:'Shared Apartment',hood:'Block C, 22 Yaba Close, Yaba'},{name:'Studio Apartment',hood:'Suite 5, 4 Allen Ave, Ikeja'},{name:'1BR Apartment',hood:'Apt 8, 11 Lekki Phase 1'},{name:'Penthouse',hood:'Penthouse, Eko Atlantic City'}]},
+    'Asia':{mult:0.9,tiers:[{name:'Shared Room',hood:'Gosi 7, 33 Sinchon-ro, Mapo-gu'},{name:'Shared Apartment',hood:'3F, 18 Hongdae-ro, Mapo-gu'},{name:'Studio Apartment',hood:'Suite 201, 44 Gangnam-daero'},{name:'1BR Apartment',hood:'1104, Itaewon Heights, Yongsan-gu'},{name:'Penthouse',hood:'Penthouse, Lotte World Tower, Jamsil'}]},
+    'South America':{mult:0.6,tiers:[{name:'Shared Room',hood:'Rua Augusta 120, Centro'},{name:'Shared Apartment',hood:'Ap. 3B, Rua Frei Caneca, Consolação'},{name:'Studio Apartment',hood:'Studio 5, Rua Oscar Freire, Jardins'},{name:'1BR Apartment',hood:'Ap. 802, Av. Paulista, Bela Vista'},{name:'Penthouse',hood:'Cobertura, Edifício Infinity, Itaim'}]},
+    'Oceania':{mult:1.15,tiers:[{name:'Shared Room',hood:'Rm 3, 44 King St, Newtown'},{name:'Shared Apartment',hood:'Flat B, 88 Crown St, Surry Hills'},{name:'Studio Apartment',hood:'Studio 6, 12 Oxford St, Darlinghurst'},{name:'1BR Apartment',hood:'Apt 14, 8 Circular Quay West'},{name:'Penthouse',hood:'Penthouse, Barangaroo Tower'}]}
+  };
+  var BASE_RENTS=[300,600,1200,2000,4000];
+  var BASE_DEPS=[150,600,1200,2000,4000];
+  var region = GAME.homeRegion || 'North America';
+  var rd = HOUSING_REGIONS[region] || HOUSING_REGIONS['North America'];
+  var mult = rd.mult;
+  var wrent = Math.round(BASE_RENTS[i]*mult/50)*50;
+  var wdep  = Math.round(BASE_DEPS[i]*mult/50)*50;
+  var tname = rd.tiers[i].name;
+  var thood = rd.tiers[i].hood;
+  var fmt = function(n){ return '$' + Math.round(n).toLocaleString(); };
+
+  if((GAME.money||0) < wdep){
+    var conf = document.getElementById('hsg-conf-panel');
+    if(conf) conf.remove();
+    showEvent('💰','Not Enough Money','You need ' + fmt(wdep) + ' for the deposit!',['OK']);
     return;
   }
-  
-  GAME.money-=deposit;
-  GAME.housing={type:type,rent:rent,missedPayments:0};
-  
-  // Close housing screen
-  const housingView=document.body.querySelector('[style*="position:fixed"][style*="z-index:9999"]');
-  if(housingView)housingView.remove();
-  
+
+  GAME.money = (GAME.money||0) - wdep;
+  GAME.housing = {
+    type:           tname,
+    rent:           wrent,
+    deposit:        wdep,
+    energyBonus:    ENERGY_BONUS[i],
+    creativityChange: CREATIVITY_CHANGE[i],
+    homeRecording:  HOME_RECORDING[i],
+    stressReduction: STRESS_REDUCE[i],
+    collabSpeedBonus: COLLAB_SPEED[i],
+    repBonusPerWeek: i === 4 ? 0.2 : 0,
+    address:        thood,
+    region:         region,
+    missedPayments: 0
+  };
+
+  // Close confirm panel and housing overlay
+  var conf = document.getElementById('hsg-conf-panel');
+  if(conf) conf.remove();
+  document.querySelectorAll('body > div[data-app-overlay]').forEach(function(el){ el.remove(); });
+
+  // Penthouse Velour press trigger (one-time only, only if has label)
+  if(i === 4 && !GAME.penthouseVelourFired && (GAME.signedLabel || GAME.ownedLabel)){
+    GAME.penthouseVelourFired = true;
+    var artistName = GAME.artistName || GAME.sn || 'The Artist';
+    _pushArticle({type:'mention', source:'velour', week:GAME.week||1, timestamp:Date.now(),
+      headline: artistName + ' Makes a Statement With New Penthouse Address',
+      preview: 'The industry is talking.',
+      content: 'Word has it ' + artistName + ' has just moved into one of the city\'s most coveted addresses. Velour can confirm the move — and so can the aesthetic.',
+      artistName: artistName, player_id: GAME.playerId||null});
+    addHype(3);
+  }
+
   updateStats();
-  showEvent('🏠','Moved!',`Welcome to your new ${type}!\n\n💰 Deposit paid: $${deposit}\n📅 New rent: $${rent}/week\n\nRemember to pay on time!`,['Love it!']);
+  saveGame();
+  showEvent('🏠','Moved In!','Welcome to your new ' + tname + '!\n\n💰 Deposit paid: ' + fmt(wdep) + '\n📅 Weekly rent: ' + fmt(wrent) + '/week\n\nYour daily energy and creativity will adjust tonight.',['Let\'s go!']);
 }
+
+// ── Housing helper: region switcher (rebuilds listings in the overlay) ─────────
+function hsgSetRegion(r){
+  // Just close and reopen with new region stored temporarily
+  // (region is cosmetic display only — GAME.homeRegion is the real value)
+  // For the demo switcher we rebuild in place
+  var listings = document.getElementById('hsg-listings');
+  if(!listings) return;
+  var htitle = document.getElementById('hsg-htitle');
+  var haddr  = document.getElementById('hsg-haddr');
+  var HOUSING_REGIONS = {
+    'North America':{mult:1,    city:'Los Angeles', flag:'🌎', tiers:[{name:'Shared Room',local:'Shared Room',hood:'4C Broad St, Downtown LA'},{name:'Shared Apartment',local:'Shared Apartment',hood:'2B Maple Ave, Silver Lake'},{name:'Studio Apartment',local:'Studio',hood:'Studio 7, 221 Arts District Way'},{name:'1BR Apartment',local:'1-Bedroom',hood:'Apt 12A, 555 Midtown Blvd'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, 1 Skyline Tower'}]},
+    'Europe':{mult:1.4,         city:'London', flag:'🌍', tiers:[{name:'Shared Room',local:'Bedsit',hood:'Flat 3, 14 Brixton Rd, Brixton'},{name:'Shared Apartment',local:'Houseshare',hood:'Flat B, 88 Hackney Rd, Hackney'},{name:'Studio Apartment',local:'Studio Flat',hood:'Studio 4, 33 Shoreditch High St'},{name:'1BR Apartment',local:'One-Bed Flat',hood:'Flat 6, 12 Camden High St'},{name:'Penthouse',local:'Penthouse Suite',hood:'Penthouse, 1 The Shard'}]},
+    'Africa':{mult:0.45,        city:'Lagos', flag:'🌍', tiers:[{name:'Shared Room',local:'Face-Me-I-Face-You',hood:'No. 7 Ojuelegba Rd, Surulere'},{name:'Shared Apartment',local:'Shared Flat',hood:'Block C, 22 Yaba Close, Yaba'},{name:'Studio Apartment',local:'Self-Contain',hood:'Suite 5, 4 Allen Ave, Ikeja'},{name:'1BR Apartment',local:'Mini Flat',hood:'Apt 8, 11 Lekki Phase 1'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Eko Atlantic City'}]},
+    'Asia':{mult:0.9,           city:'Seoul', flag:'🌏', tiers:[{name:'Shared Room',local:'Gosiwon',hood:'Gosi 7, 33 Sinchon-ro, Mapo-gu'},{name:'Shared Apartment',local:'Sharedhouse',hood:'3F, 18 Hongdae-ro, Mapo-gu'},{name:'Studio Apartment',local:'Oneroom',hood:'Suite 201, 44 Gangnam-daero'},{name:'1BR Apartment',local:'Officetel',hood:'1104, Itaewon Heights, Yongsan-gu'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Lotte World Tower, Jamsil'}]},
+    'South America':{mult:0.6,  city:'São Paulo', flag:'🌎', tiers:[{name:'Shared Room',local:'Quarto Compartilhado',hood:'Rua Augusta 120, Centro'},{name:'Shared Apartment',local:'República',hood:'Ap. 3B, Rua Frei Caneca, Consolação'},{name:'Studio Apartment',local:'Kitnet',hood:'Studio 5, Rua Oscar Freire, Jardins'},{name:'1BR Apartment',local:'Apartamento',hood:'Ap. 802, Av. Paulista, Bela Vista'},{name:'Penthouse',local:'Cobertura',hood:'Cobertura, Edifício Infinity, Itaim'}]},
+    'Oceania':{mult:1.15,       city:'Sydney', flag:'🌏', tiers:[{name:'Shared Room',local:'Shareroom',hood:'Rm 3, 44 King St, Newtown'},{name:'Shared Apartment',local:'Sharehouse',hood:'Flat B, 88 Crown St, Surry Hills'},{name:'Studio Apartment',local:'Studio',hood:'Studio 6, 12 Oxford St, Darlinghurst'},{name:'1BR Apartment',local:'1 Bedder',hood:'Apt 14, 8 Circular Quay West'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Barangaroo Tower'}]}
+  };
+  var BASE_RENTS=[300,600,1200,2000,4000];
+  var BASE_DEPS=[150,600,1200,2000,4000];
+  var ENERGY_BONUS=[-10,-5,0,2,5];
+  var TIER_EMOJIS=['🛏️','🛋️','🏙️','🌆','🌃'];
+  var TIER_GRADS=['linear-gradient(135deg,#2a2a3a,#1c1c2a)','linear-gradient(135deg,#1e3a2e,#121a18)','linear-gradient(135deg,#1e2a3e,#121824)','linear-gradient(135deg,#3a2a1e,#2a1a0e)','linear-gradient(135deg,#2a1e3a,#1a1028)'];
+  var PERKS=[
+    [{cls:'p-bad',txt:'−10 energy/day'},{cls:'p-bad',txt:'−10 creativity/day'}],
+    [{cls:'p-bad',txt:'−5 energy/day'},{cls:'p-bad',txt:'−8 creativity/day'}],
+    [{cls:'p-cr',txt:'Energy neutral'},{cls:'p-bad',txt:'−5 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'}],
+    [{cls:'p-en',txt:'⚡ +2 energy/day'},{cls:'p-bad',txt:'−2 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'},{cls:'p-st',txt:'🧘 Stress −3/day'},{cls:'p-cr',txt:'Collab speed +10%'}],
+    [{cls:'p-en',txt:'⚡ +5 energy/day'},{cls:'p-cr',txt:'No creativity loss'},{cls:'p-cr',txt:'🏆 Studio-quality home'},{cls:'p-st',txt:'👑 Rep +0.2/wk'},{cls:'p-st',txt:'📰 Velour-worthy address'}]
+  ];
+  var rd = HOUSING_REGIONS[r] || HOUSING_REGIONS['North America'];
+  var curType = GAME.housing ? (GAME.housing.type||'Shared Room') : 'Shared Room';
+  function fmt(n){ return '$'+Math.round(n).toLocaleString(); }
+  function perkPills(idx){ return PERKS[idx].map(function(p){ return '<span style="'+({p_en:'background:#1a3a2a;color:var(--green,#4cc98a)',p_cr:'background:#1e2a3e;color:var(--blue,#5a9df3)',p_st:'background:#1e1a2e;color:var(--purple,#a97de8)',p_bad:'background:#2a1212;color:var(--red,#e06666)'}[p.cls.replace('-','_')]||'')+';font-size:9.5px;font-weight:700;border-radius:99px;padding:3px 9px;display:inline-block;margin:2px">'+p.txt+'</span>'; }).join(''); }
+  var html='';
+  for(var idx=0;idx<5;idx++){
+    var t=rd.tiers[idx];
+    var wrent=Math.round(BASE_RENTS[idx]*rd.mult/50)*50;
+    var wdep=Math.round(BASE_DEPS[idx]*rd.mult/50)*50;
+    var isCurrent=(curType===t.name);
+    var actBtns=isCurrent
+      ?'<button style="flex:1;background:var(--green,#4cc98a);color:#071a0e;border:none;border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:default">✓ Current Home</button>'
+      :'<button id="hsg-lb-'+idx+'" onclick="hsgToggleLease('+idx+')" style="flex:0 0 38%;background:var(--surf);color:var(--txt);border:1px solid var(--bord);border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:pointer">View Lease</button>'
+       +'<button onclick="hsgConfirm('+idx+')" style="flex:1;background:var(--acc,#e8b44c);color:var(--acc-txt,#0d0f14);border:1px solid var(--acc,#e8b44c);border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:pointer">Move In</button>';
+    html+='<div style="margin:0 16px 12px;border-radius:18px;overflow:hidden;border:2px solid '+(isCurrent?'var(--green,#4cc98a)':'var(--bord)')+'">'
+      +'<div style="height:80px;display:flex;align-items:center;justify-content:center;font-size:40px;position:relative;background:'+TIER_GRADS[idx]+'">'+TIER_EMOJIS[idx]+'<span style="position:absolute;top:8px;right:10px;font-size:9px;font-weight:800;letter-spacing:.8px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.5);color:rgba(255,255,255,.8)">Tier '+(idx+1)+'</span></div>'
+      +'<div style="padding:12px 14px;background:var(--card)">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px"><div><div style="font-size:15.5px;font-weight:800;color:var(--txt)">'+t.name+'</div>'+(t.local!==t.name?'<div style="font-size:10px;color:var(--mut);font-style:italic;margin-top:1px">"'+t.local+'"</div>':'')+'</div><div style="text-align:right"><b style="font-size:16px;font-weight:900;display:block;color:var(--txt)">'+fmt(wrent)+'</b><span style="font-size:10px;color:var(--mut)">/week · '+fmt(wdep)+' dep.</span></div></div>'
+      +'<div style="font-size:10px;color:var(--mut);margin-bottom:8px">📍 '+t.hood+'</div>'
+      +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">'+perkPills(idx)+'</div>'
+      +'<div style="display:flex;gap:7px">'+actBtns+'</div>'
+      +'</div>'
+      +'<div id="hsg-lease-'+idx+'" style="max-height:0;overflow:hidden;transition:max-height .4s ease;background:#f5f0e8;border-top:0 solid var(--bord)"></div>'
+      +'</div>';
+  }
+  listings.innerHTML=html;
+  if(htitle) htitle.textContent='Your Place in '+rd.city;
+  if(haddr) haddr.textContent=rd.flag+' '+rd.city+' · Week '+(GAME.week||1);
+}
+
 
 // WORLD SIMULATION: Initialize NPCs with realistic release schedules
 // ARTIST TIER ASSIGNMENT - Determines release frequency and starting streams
@@ -34737,6 +35134,41 @@ async function showIndustryNews(){
   `);
 
   renderPressRoom();
+
+  // Subscribe to realtime article inserts so other players' news appears live
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined'){
+    // Unsubscribe any previous press channel
+    if(window._prRealtimeCh){
+      try{ supabase.removeChannel(window._prRealtimeCh); }catch(e){}
+      window._prRealtimeCh = null;
+    }
+    window._prRealtimeCh = supabase.channel('press-room-live')
+      .on('postgres_changes', {event:'INSERT', schema:'public', table:'industry_articles'}, function(payload){
+        var a = payload.new;
+        if(!a || !a.id) return;
+        // Avoid duplicates
+        if((GAME.newsArticles||[]).some(function(x){ return x.id === a.id; })) return;
+        _addLocalArticle({
+          id: a.id,
+          source: a.source,
+          week: a.week,
+          timestamp: a.timestamp || Date.now(),
+          type: a.type,
+          artistName: a.artist_name,
+          headline: a.headline,
+          preview: a.preview,
+          content: a.content,
+          is_rumor: a.is_rumor || false,
+          target_player_id: a.target_player_id || null,
+          expires_week: a.expires_week || null,
+          response: a.response || null
+        });
+        // Refresh the visible press room if it's open
+        if(document.getElementById('pr-body')) prApply();
+      })
+      .subscribe();
+    console.log('📡 Press room subscribed to realtime article inserts');
+  }
 }
 
 function _relTime(ts){
@@ -34781,7 +35213,11 @@ async function renderPressRoom(searchTerm='', filter='all'){
           artistName: a.artist_name,
           headline: a.headline,
           preview: a.preview,
-          content: a.content
+          content: a.content,
+          is_rumor: a.is_rumor || false,
+          target_player_id: a.target_player_id || null,
+          expires_week: a.expires_week || null,
+          response: a.response || null
         }));
       }
     } catch(e){
@@ -34961,10 +35397,10 @@ function _prRadio(art, idx){
 
 function _prHotTopic(topic, idx){
   const t = _relTime(topic.timestamp);
-  return `<div onclick="viewHotTopic(${idx})" style="background:var(--card);border:1px solid var(--bord);border-left:3px solid #e06666;border-radius:12px;padding:13px 14px;margin-bottom:12px;cursor:pointer">
+  return `<div onclick="viewHotTopic(${idx})" style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:13px 14px;margin-bottom:12px;cursor:pointer">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
       <span style="font-size:16px">${topic.emoji||'🔥'}</span>
-      <span style="font-size:9px;font-weight:900;letter-spacing:2px;color:#e06666">🔥 HOT TOPIC</span>
+      <span style="font-size:9px;font-weight:900;letter-spacing:2px;color:#e06666">HOT TOPIC</span>
       <span style="font-size:9px;color:var(--mut);margin-left:auto">${t}</span>
     </div>
     <div style="font-size:14px;font-weight:700;color:var(--txt);line-height:1.35">${topic.headline}</div>
@@ -34997,10 +35433,27 @@ function prRumorReply(articleId, choice){
   };
   const fx = { deny:{}, ignore:{}, lean:{hype:6, stress:4} };
   const e = fx[choice]||{};
-  if(e.hype)   S.hype   = Math.min(100, (S.hype||0)   + e.hype);
+  if(e.hype)   { if(!S.buzz) S.buzz=0; S.buzz   = Math.min(1000, S.buzz   + e.hype);   addHype(e.hype); }
   if(e.stress) S.stress = Math.min(100, (S.stress||0) + e.stress);
-  const article = (GAME.newsArticles||[]).find(a => a.id === articleId);
+
+  // Find article in local cache and/or the currently displayed list
+  let article = (GAME.newsArticles||[]).find(function(a){ return a.id === articleId; });
+  if(!article && window.displayedArticles){
+    article = window.displayedArticles.find(function(a){ return a.id === articleId; });
+    if(article){
+      // Also add it to local cache so it persists through prApply re-renders
+      if(!GAME.newsArticles) GAME.newsArticles = [];
+      GAME.newsArticles.push(article);
+    }
+  }
   if(article) article.response = choice;
+
+  // Persist response to Supabase so it survives reload
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && articleId && articleId.length > 5){
+    supabase.from('industry_articles').update({ response: choice }).eq('id', articleId)
+      .then(function(r){ if(r.error) console.warn('Failed to save rumor response:', r.error.message); });
+  }
+
   saveGame();
   _toast(msgs[choice]||'Responded.', 3500);
   prApply();
@@ -35124,6 +35577,39 @@ async function _pushArticle(article){
       }, { onConflict: 'id' });
       if(error) console.warn('_pushArticle upsert error:', error.message);
     } catch(e){ console.warn('_pushArticle error:', e); }
+  }
+}
+
+// In multiplayer, routes milestone articles through the edge function so they
+// reach Supabase (service-role insert) and all players can read them.
+// In single player, pushes locally only.
+function _milestoneFire(mkey, a, mOpts){
+  if(!GAME.newsArticles) GAME.newsArticles = [];
+  if(GAME.newsArticles.find(function(x){ return x.type === mkey; })) return;
+  if(!GAME._mfiring) GAME._mfiring = {};
+  if(GAME._mfiring[mkey]) return; // edge-fn call already in flight this session
+  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && currentUser){
+    GAME._mfiring[mkey] = true;
+    var outlet = mOpts.outlet || 'Chartwell';
+    _fireArticleTrigger({
+      triggerType: mOpts.triggerType || 'milestone',
+      triggerKey:  mkey,
+      outlet:      outlet,
+      facts:       mOpts.facts || {},
+      fallback:    { headline: a.headline, content: a.content },
+      onSuccess: function(art){
+        _addLocalArticle({
+          source: outlet.toLowerCase().replace(/ /g,'-'),
+          week: GAME.week, timestamp: Date.now(),
+          type: mkey, artistName: a.artistName,
+          preview: a.preview, headline: art.headline, content: art.content
+        });
+      }
+    });
+  } else {
+    _pushArticle(Object.assign({}, a, {
+      type: mkey, week: GAME.week, timestamp: Date.now(), isSystemPost: true
+    }));
   }
 }
 
@@ -35486,289 +35972,128 @@ async function generateNewsArticles(){
   // CHART MILESTONE ARTICLES (Your real achievements!)
   // ========================================
   if(GAME.songs && GAME.songs.length > 0){
-    GAME.songs.forEach(song => {
+    GAME.songs.forEach(function(song){
       if(!song.released) return;
-      
-      // 100K streams milestone
-      if(song.streams >= 100000 && song.streams < 110000 && !GAME.newsArticles.find(a=>a.type===`streams-100k-${song.id}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `streams-100k-${song.id}`,
-          artistName: S.artistName,
-          headline: `${S.artistName}'s "${song.title}" Hits 100K Streams`,
-          preview: `Rising ${S.genre} artist ${S.artistName} celebrates major milestone as "${song.title}" crosses 100,000 streams.`,
-          content: `"${song.title}" by ${S.artistName} has officially surpassed 100,000 streams across all platforms - a significant achievement for independent artists.\n\nThe ${S.genre.toLowerCase()} track has been steadily gaining traction, with listeners responding to its authentic sound and relatable themes.\n\n"Breaking 100K is when labels start paying attention," notes A&R executive Marcus Chen. "It proves there's real audience demand."\n\n${S.artistName} celebrated the milestone with fans on social media, promising more music is on the way.`
-        ,isSystemPost:GAME_MODE==="single"});
+      var sA = S.artistName, sT = song.title, sG = S.genre || 'Pop';
+      var stStr = song.streams >= 1000000 ? (song.streams/1000000).toFixed(1)+'M' : Math.floor((song.streams||0)/1000)+'K';
+
+      if(song.streams >= 100000 && song.streams < 110000){
+        _milestoneFire('streams-100k-'+song.id, {
+          artistName: sA,
+          headline: sA+`'s "${sT}" Hits 100K Streams`,
+          preview: `Rising ${sG} artist ${sA} crosses 100,000 streams — labels are starting to pay attention.`,
+          content: `"${sT}" by ${sA} has officially surpassed 100,000 streams across all platforms.\n\nThe ${sG.toLowerCase()} track has been steadily gaining traction with listeners.\n\n"Breaking 100K is when labels start paying attention," notes A&R executive Marcus Chen.\n\n${sA} celebrated the milestone with fans on social media, promising more music is on the way.`
+        },{ outlet:'Chartwell', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'100K',genre:sG,game_week:GAME.week} });
       }
-      
-      // 500K streams milestone
-      if(song.streams >= 500000 && song.streams < 520000 && !GAME.newsArticles.find(a=>a.type===`streams-500k-${song.id}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `streams-500k-${song.id}`,
-          artistName: S.artistName,
-          headline: `BREAKING: "${song.title}" Reaches Half a Million Streams`,
-          preview: `${S.artistName}'s viral hit "${song.title}" crosses 500,000 streams as momentum continues to build.`,
-          content: `${S.artistName} is having a moment. "${song.title}" has now been streamed over 500,000 times, cementing its status as a breakout hit.\n\nThe song's success has caught the attention of playlist curators and industry gatekeepers alike. "This is the kind of organic growth that can't be manufactured," says streaming analyst Jamie Rodriguez.\n\nFans have been sharing clips on social media, creating viral moments that drive even more streams.\n\n"We're just getting started," ${S.artistName} posted on social media. The artist's growing fanbase seems to agree.`
-        ,isSystemPost:GAME_MODE==="single"});
+
+      if(song.streams >= 500000 && song.streams < 520000){
+        _milestoneFire('streams-500k-'+song.id, {
+          artistName: sA,
+          headline: `BREAKING: "${sT}" Reaches Half a Million Streams`,
+          preview: `${sA}'s viral hit "${sT}" crosses 500,000 streams as momentum continues to build.`,
+          content: `${sA} is having a moment. "${sT}" has now been streamed over 500,000 times, cementing its status as a breakout hit.\n\nThe song's success has caught the attention of playlist curators and industry gatekeepers alike. "This is the kind of organic growth that can't be manufactured," says streaming analyst Jamie Rodriguez.\n\nFans have been sharing clips on social media, creating viral moments that drive even more streams.`
+        },{ outlet:'Chartwell', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'500K',genre:sG,game_week:GAME.week} });
       }
-      
-      // 1M streams milestone
-      if(song.streams >= 1000000 && song.streams < 1050000 && !GAME.newsArticles.find(a=>a.type===`streams-1m-${song.id}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `streams-1m-${song.id}`,
-          artistName: S.artistName,
-          headline: `🎉 ${S.artistName}'s "${song.title}" Goes PLATINUM with 1M Streams`,
-          preview: `The ${S.genre} sensation celebrates as "${song.title}" officially joins the million-stream club.`,
-          content: `It's official: "${song.title}" by ${S.artistName} has crossed the coveted 1 million stream threshold.\n\nThe milestone represents months of grassroots promotion, fan dedication, and undeniable talent. Industry veterans say reaching 1M streams independently is no small feat.\n\n"Most artists never see these numbers without label support," explains music business consultant Tanya Williams. "${S.artistName} is proving you can build a real career on your own terms."\n\nThe song continues to gain momentum on playlists and social media, with no signs of slowing down.`
-        ,isSystemPost:GAME_MODE==="single"});
+
+      if(song.streams >= 1000000 && song.streams < 1050000){
+        _milestoneFire('streams-1m-'+song.id, {
+          artistName: sA,
+          headline: `${sA}'s "${sT}" Goes PLATINUM with 1M Streams`,
+          preview: `The ${sG} sensation celebrates as "${sT}" officially joins the million-stream club.`,
+          content: `It's official: "${sT}" by ${sA} has crossed the coveted 1 million stream threshold.\n\nThe milestone represents months of grassroots promotion, fan dedication, and undeniable talent.\n\n"Most artists never see these numbers without label support," explains music business consultant Tanya Williams. "${sA} is proving you can build a real career on your own terms."\n\nThe song continues to gain momentum on playlists and social media, with no signs of slowing down.`
+        },{ outlet:'Velour', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'1M',genre:sG,game_week:GAME.week} });
       }
-      
-      // 5M streams milestone
-      if(song.streams >= 5000000 && song.streams < 5100000 && !GAME.newsArticles.find(a=>a.type===`streams-5m-${song.id}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `streams-5m-${song.id}`,
-          artistName: S.artistName,
-          headline: `CHART DOMINATION: "${song.title}" Hits 5 Million Streams`,
-          preview: `${S.artistName}'s monster hit "${song.title}" reaches 5M streams, solidifying artist as a major force in ${S.genre}.`,
-          content: `"${song.title}" by ${S.artistName} has officially entered the stratosphere with over 5 million streams.\n\nThe track's unprecedented success has industry insiders predicting major award nominations and lucrative partnership deals.\n\n"Five million streams means you're not just trending - you're a cultural phenomenon," says chart analyst David Park. "Labels will be fighting over ${S.artistName} now."\n\nFans worldwide have embraced the song, with viral dance challenges and cover versions flooding social media.\n\n"This is beyond anything I imagined," ${S.artistName} said in a recent interview. "But we're not stopping here."`
-        ,isSystemPost:GAME_MODE==="single"});
+
+      if(song.streams >= 5000000 && song.streams < 5100000){
+        _milestoneFire('streams-5m-'+song.id, {
+          artistName: sA,
+          headline: `CHART DOMINATION: "${sT}" Hits 5 Million Streams`,
+          preview: `${sA}'s monster hit "${sT}" reaches 5M streams, solidifying artist as a major force in ${sG}.`,
+          content: `"${sT}" by ${sA} has officially entered the stratosphere with over 5 million streams.\n\nThe track's unprecedented success has industry insiders predicting major award nominations and lucrative partnership deals.\n\n"Five million streams means you're not just trending — you're a cultural phenomenon," says chart analyst David Park. "Labels will be fighting over ${sA} now."\n\nFans worldwide have embraced the song, with viral dance challenges and cover versions flooding social media.`
+        },{ outlet:'Velour', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'5M',genre:sG,game_week:GAME.week} });
       }
-      
-      // Top 10 chart debut
-      if(song.chartPosition && song.chartPosition <= 10 && (song.weeksOnChart || 0) === 1 && !GAME.newsArticles.find(a=>a.type===`chart-top10-${song.id}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `chart-top10-${song.id}`,
-          artistName: S.artistName,
-          headline: `${S.artistName} Debuts at #${song.chartPosition} on Global Charts`,
-          preview: `"${song.title}" storms into the top 10 with ${song.streams >= 1000000 ? (song.streams/1000000).toFixed(1)+'M' : Math.floor((song.streams||0)/1000)+'K'} streams, marking ${S.artistName}'s highest chart position yet.`,
-          content: `In a stunning debut, "${song.title}" by ${S.artistName} has entered the Global Top 40 at #${song.chartPosition} with ${song.streams >= 1000000 ? (song.streams/1000000).toFixed(1)+' million' : Math.floor((song.streams||0)/1000)+'K'} streams in its first week.\n\nThe strong opening signals serious commercial potential and mainstream appeal. "Debuting in the top 10 is incredibly rare for independent artists," notes chart expert Lisa Chang.\n\nThe song is pulling ${Math.floor((song.streams||0)/Math.max(1,song.weeksOnChart||1)/1000)}K streams per week on average across all platforms, with Loopify leading the charge.\n\n"Chart positions like this change careers overnight," says music journalist Alex Torres. "${S.artistName} is officially a player now."`
-        ,isSystemPost:GAME_MODE==="single"});
+
+      if(song.chartPosition && song.chartPosition <= 10 && (song.weeksOnChart || 0) === 1){
+        _milestoneFire('chart-top10-'+song.id, {
+          artistName: sA,
+          headline: `${sA} Debuts at #${song.chartPosition} on Global Charts`,
+          preview: `"${sT}" storms into the top 10 with ${stStr} streams, marking ${sA}'s highest chart position yet.`,
+          content: `In a stunning debut, "${sT}" by ${sA} has entered the Global Top 40 at #${song.chartPosition} with ${stStr} streams in its first week.\n\nThe strong opening signals serious commercial potential and mainstream appeal. "Debuting in the top 10 is incredibly rare for independent artists," notes chart expert Lisa Chang.\n\n"Chart positions like this change careers overnight," says music journalist Alex Torres. "${sA} is officially a player now."`
+        },{ outlet:'AirTime', triggerType:'chart_debut', facts:{artist:sA,song:sT,position:song.chartPosition,streams:stStr,genre:sG,game_week:GAME.week} });
       }
-      
-      // SUSTAINED CHART SUCCESS — covers songs charting for weeks with rising streams.
-      // The debut article above only fires once on week 1, so anything past its first
-      // charting week (like 10+ weeks at #4) never got an article at all before this.
-      const chartMilestoneWeeks = [5, 10, 20, 30, 52];
-      if(song.chartPosition && chartMilestoneWeeks.includes(song.weeksOnChart || 0) && !GAME.newsArticles.find(a=>a.type===`chart-milestone-${song.id}-${song.weeksOnChart}`)){
-        _pushArticle({
-          source: sources[Math.floor(Math.random()*sources.length)],
-          week: GAME.week,
-          timestamp: Date.now(),
-          type: `chart-milestone-${song.id}-${song.weeksOnChart}`,
-          artistName: S.artistName,
-          headline: `"${song.title}" Marks ${song.weeksOnChart} Weeks on the Global Charts`,
-          preview: `${S.artistName}'s "${song.title}" holds at #${song.chartPosition} with ${song.streams >= 1000000 ? (song.streams/1000000).toFixed(1)+'M' : Math.floor((song.streams||0)/1000)+'K'} total streams and counting.`,
-          content: `"${song.title}" by ${S.artistName} is proving to have real staying power, holding strong at #${song.chartPosition} after ${song.weeksOnChart} consecutive weeks on the Global Top 40.\n\nWith ${song.streams >= 1000000 ? (song.streams/1000000).toFixed(2)+' million' : (song.streams||0).toLocaleString()} total streams and counting, the track is averaging ${Math.floor((song.streams||0)/Math.max(1,song.weeksOnChart||1)/1000)}K streams per week — defying the usual fast burnout cycle.\n\n"Longevity like this tells you a song actually connected with listeners, it wasn't just an algorithm push," says industry analyst Priya Shah. "${S.artistName} has a real hit on their hands."`
-        ,isSystemPost:GAME_MODE==="single"});
+
+      var chartMilestoneWeeks = [5, 10, 20, 30, 52];
+      if(song.chartPosition && chartMilestoneWeeks.indexOf(song.weeksOnChart || 0) !== -1){
+        var wksPerK = Math.floor((song.streams||0)/Math.max(1,song.weeksOnChart||1)/1000);
+        _milestoneFire('chart-milestone-'+song.id+'-'+song.weeksOnChart, {
+          artistName: sA,
+          headline: `"${sT}" Marks ${song.weeksOnChart} Weeks on the Global Charts`,
+          preview: `${sA}'s "${sT}" holds at #${song.chartPosition} with ${stStr} total streams and counting.`,
+          content: `"${sT}" by ${sA} is proving to have real staying power, holding strong at #${song.chartPosition} after ${song.weeksOnChart} consecutive weeks on the Global Top 40.\n\nWith ${stStr} total streams and counting, the track is averaging ${wksPerK}K streams per week — defying the usual fast burnout cycle.\n\n"Longevity like this tells you a song actually connected with listeners, it wasn't just an algorithm push," says industry analyst Priya Shah. "${sA} has a real hit on their hands."`
+        },{ outlet:'Chartwell', triggerType:'chart_milestone', facts:{artist:sA,song:sT,position:song.chartPosition,weeks:song.weeksOnChart,genre:sG,game_week:GAME.week} });
       }
     });
   }
-  
-  // Generate news based on milestones
-  if(myHype >= 100 && myHype < 110 && !GAME.newsArticles.find(a=>a.type==='hype-100')){
-    _pushArticle({
-      source: sources[Math.floor(Math.random()*sources.length)],
-      week: GAME.week,
-      timestamp: Date.now(),
-      type: 'hype-100',
+  // Generate news based on milestones — route through edge function in multiplayer
+  if(myHype >= 100 && myHype < 110){
+    _milestoneFire('hype-100', {
       artistName: S.artistName,
       headline: `${S.artistName} Building Momentum in ${S.genre} Scene`,
       preview: `Rising ${S.genre.toLowerCase()} artist ${S.artistName} is generating buzz online with growing fan engagement and social media presence.`,
       content: `${S.artistName}, an emerging ${S.genre.toLowerCase()} artist, has been steadily building momentum in recent weeks. Industry insiders are taking notice as the artist's hype continues to grow.\n\nWith a dedicated fanbase and consistent releases, ${S.artistName} is positioning themselves as one to watch in the ${S.genre.toLowerCase()} scene.\n\n"It's all about staying authentic and connecting with fans," sources close to the artist say.`
-    ,isSystemPost:GAME_MODE==="single"});
+    },{ outlet:'AirTime', triggerType:'hype_milestone', facts:{artist:S.artistName,hype:myHype,genre:S.genre,game_week:GAME.week} });
   }
-  
-  if(myHype >= 500 && myHype < 520 && !GAME.newsArticles.find(a=>a.type==='hype-500')){
-    _pushArticle({
-      source: sources[Math.floor(Math.random()*sources.length)],
-      week: GAME.week,
-      timestamp: Date.now(),
-      type: 'hype-500',
+
+  if(myHype >= 500 && myHype < 520){
+    _milestoneFire('hype-500', {
       artistName: S.artistName,
       headline: `TRENDING: ${S.artistName} Goes Viral`,
       preview: `${S.genre} sensation ${S.artistName} is trending across social media platforms as fans can't stop talking about their latest moves.`,
       content: `${S.artistName} has officially entered viral territory, with mentions skyrocketing across all major platforms.\n\nThe ${S.genre.toLowerCase()} artist's name has been trending for the past 24 hours, with fans sharing clips, creating memes, and spreading the word organically.\n\n"This is what happens when talent meets timing," music industry analyst Sarah Chen told us. "${S.artistName} has tapped into something real."`
-    ,isSystemPost:GAME_MODE==="single"});
+    },{ outlet:'Room Service', triggerType:'hype_milestone', facts:{artist:S.artistName,hype:myHype,genre:S.genre,game_week:GAME.week} });
   }
-  
-  if(myFans >= 1000 && myFans < 1100 && !GAME.newsArticles.find(a=>a.type==='fans-1k')){
-    _pushArticle({
-      source: sources[Math.floor(Math.random()*sources.length)],
-      week: GAME.week,
-      timestamp: Date.now(),
-      type: 'fans-1k',
+
+  if(myFans >= 1000 && myFans < 1100){
+    _milestoneFire('fans-1k', {
       artistName: S.artistName,
       headline: `${S.artistName} Hits 1,000 Fans Milestone`,
       preview: `Independent ${S.genre} artist ${S.artistName} celebrates reaching 1,000 dedicated fans without major label backing.`,
       content: `In an era where record labels dominate the charts, ${S.artistName} has proven that independent artists can still build meaningful fanbases.\n\nReaching 1,000 fans might not sound like much compared to major label artists, but industry veterans know this is where sustainable careers begin.\n\n"Every superstar started with their first thousand," notes music journalist Marcus Williams. "${S.artistName} is doing it the right way."`
-    ,isSystemPost:GAME_MODE==="single"});
+    },{ outlet:'Undertone', triggerType:'fans_milestone', facts:{artist:S.artistName,fans:myFans,genre:S.genre,game_week:GAME.week} });
   }
-  
-  // Check if any song is ACTUALLY #1 on a specific chart
-  if(GAME_MODE === 'multi' && typeof supabase !== 'undefined' && GAME.songs && GAME.songs.length > 0){
-    const releasedSongs = GAME.songs.filter(s => s.released);
-    
-    releasedSongs.forEach(async song => {
-      // Check global chart (top 40)
-      const allSongs = await getAllChartsData();
-      if(allSongs.length > 0 && allSongs[0].songId === song.id && allSongs[0].isPlayer){
-        // This song is #1 globally!
-        await createChartArticle('Global Charts', song, S.artistName, S.genre);
-      }
-      
-      // Check regional charts
-      const regions = ['North America', 'Europe', 'Asia', 'Africa', 'South America', 'Oceania'];
-      regions.forEach(async region => {
-        const regionStreams = song.streams?.[region] || 0;
-        if(regionStreams > 0){
-          // Get all songs for this region and check if this one is #1
-          const regionalSongs = allSongs
-            .filter(s => s.streams && s.streams[region] > 0)
-            .sort((a,b) => (b.streams?.[region]||0) - (a.streams?.[region]||0));
-          
-          if(regionalSongs.length > 0 && regionalSongs[0].songId === song.id){
-            // This song is #1 in this region!
-            await createChartArticle(region, song, S.artistName, S.genre);
-          }
-        }
-      });
-    });
-  }
-  
-  async function createChartArticle(chartName, song, artistName, genre){
-    // Check if article already exists in Supabase
-    try {
-      const { data: existing } = await supabase
-        .from('industry_articles')
-        .select('id')
-        .eq('type', 'chart-1-' + song.id + '-' + chartName)
-        .single();
-      
-      if(existing) return; // Article already exists
-      
-      // Create new article
-      const totalStreams = Object.values(song.streams || {}).reduce((a,b)=>a+b,0);
-      const sources = ['music-wire','beat-report','pop-culture'];
-      
-      await supabase.from('industry_articles').insert({
-        source: sources[Math.floor(Math.random()*sources.length)],
-        week: GAME.week,
-        timestamp: Date.now(),
-        type: 'chart-1-' + song.id + '-' + chartName,
-        artist_name: artistName,
-        player_id: currentUser ? currentUser.id : null,
-        headline: `${artistName}'s "${song.title}" Hits #1 on ${chartName}!`,
-        preview: `${genre} artist ${artistName} celebrates as "${song.title}" reaches the top spot on ${chartName} with over ${(totalStreams/1000).toFixed(0)}K streams.`,
-        content: `${artistName} has officially claimed the #1 spot on ${chartName} with "${song.title}", marking a major milestone in the ${genre.toLowerCase()} artist's career.\n\nThe song has amassed over ${(totalStreams/1000).toFixed(0)}K streams across all platforms, resonating with fans worldwide.\n\n"This is a dream come true," ${artistName} said in a statement. "Thank you to everyone who believed in this song."\n\nIndustry experts say this chart-topping success could open doors to major label deals and festival headlining slots.`
-      });
-      
-      console.log(`📰 Created #1 chart article for ${artistName} - ${song.title} on ${chartName}`);
-    } catch(e){
-      console.error('Failed to create chart article:', e);
-    }
-  }
-  
-  // Generate random industry news (ONLY if relevant)
-  if(Math.random() < 0.2){
-    const trendArticles = [];
-    
-    // Only generate crowdfunding article if there ARE active crowdfunding campaigns
+
+  // Generate random industry news (single-player only — in multi, the edge function handles this)
+  if(GAME_MODE !== 'multi' && Math.random() < 0.2){
+    var trendArticles = [];
     if(GAME.activeCrowdfunding){
-      const cf = GAME.activeCrowdfunding;
-      const progress = Math.floor((cf.raised / cf.goal) * 100);
+      var cf = GAME.activeCrowdfunding;
+      var progress = Math.floor((cf.raised / cf.goal) * 100);
       trendArticles.push({
         headline: `Crowdfunding Campaigns See ${progress > 50 ? 'Success' : 'Mixed Results'}`,
         preview: `Independent artists turn to fans for project funding as ${S.artistName || 'emerging artists'} raise money for new releases.`,
         content: `The music industry is seeing a surge in artist-funded projects, with crowdfunding platforms becoming a viable alternative to traditional label deals.\n\nRecent campaigns have raised anywhere from hundreds to tens of thousands of dollars, with fan engagement playing a crucial role in success rates.\n\n"Fans want to be part of the journey," notes music business analyst Jordan Lee. "When artists are transparent about their goals, backers respond positively."`
       });
     }
-    
-    // Only generate viral post article if player had recent viral posts
-    const recentViralPosts = (GAME.socialPosts || []).filter(p => p.isViral && p.viralBoostedUntil > GAME.week);
+    var recentViralPosts = (GAME.socialPosts || []).filter(function(p){ return p.isViral && p.viralBoostedUntil > GAME.week; });
     if(recentViralPosts.length > 0){
       trendArticles.push({
-        headline: `Social Media Virality Drives Music Discovery`,
-        preview: `Artists see massive streaming spikes after posts go viral, reshaping how music reaches audiences.`,
+        headline: 'Social Media Virality Drives Music Discovery',
+        preview: 'Artists see massive streaming spikes after posts go viral, reshaping how music reaches audiences.',
         content: `The traditional music marketing playbook is being rewritten as viral social media moments increasingly drive streaming success.\n\nRecent examples show artists gaining thousands of new followers overnight when content resonates with algorithms and audiences.\n\n"A single viral moment can change an artist's trajectory," says digital marketing expert Casey Morgan. "The key is authentic content that connects."`
       });
     }
-    
-    // Generic article about indie artists (always relevant)
     trendArticles.push({
-      headline: `Independent Artists Challenge Traditional Label Model`,
-      preview: `DIY musicians prove commercial success possible without major label backing.`,
+      headline: 'Independent Artists Challenge Traditional Label Model',
+      preview: 'DIY musicians prove commercial success possible without major label backing.',
       content: `The rise of streaming platforms and social media has empowered independent artists to build sustainable careers outside the traditional label system.\n\nWhile challenges remain, many artists report greater creative control and higher profit margins by staying independent.\n\n"The tools are there," notes independent music consultant Sam Rivera. "Artists just need to learn how to use them effectively."`
     });
-    
     if(trendArticles.length > 0){
-      const article = trendArticles[Math.floor(Math.random()*trendArticles.length)];
+      var article = trendArticles[Math.floor(Math.random()*trendArticles.length)];
       GAME.newsArticles.push({
         source: sources[Math.floor(Math.random()*sources.length)],
-        week: GAME.week,
-        timestamp: Date.now(),
-        type: 'random',
-        headline: article.headline,
-        preview: article.preview,
-        content: article.content
-      ,isSystemPost:GAME_MODE==="single"});
-    }
-  }
-  
-  // Save newly generated articles to Supabase in multiplayer mode
-  if(GAME_MODE === 'multi' && supabase){
-    try {
-      // Get articles that were just added (from this week)
-      const newArticles = GAME.newsArticles.filter(a => a.week === GAME.week && !a.id);
-      
-      if(newArticles.length > 0){
-        const articlesToSave = newArticles.map(a => ({
-          source: a.source,
-          week: a.week,
-          timestamp: a.timestamp || Date.now(),
-          type: a.type || 'generated',
-          artist_name: a.artistName || null,
-          player_id: currentUser ? currentUser.id : null,
-          headline: a.headline,
-          preview: a.preview,
-          content: a.content
-        }));
-        
-        const { data, error } = await supabase
-          .from('industry_articles')
-          .insert(articlesToSave)
-          .select();
-        
-        if(error) {
-          console.error('Error saving articles to Supabase:', error);
-        } else {
-          console.log(`✅ Saved ${newArticles.length} articles to Supabase for week ${GAME.week}`);
-          // Update local articles with IDs from Supabase
-          if(data){
-            data.forEach((savedArticle, i) => {
-              const localArticle = newArticles[i];
-              if(localArticle){
-                localArticle.id = savedArticle.id;
-              }
-            });
-          }
-        }
-      }
-    } catch(err){
-      console.error('Supabase save articles error:', err);
+        week: GAME.week, timestamp: Date.now(), type: 'random', isSystemPost: true,
+        headline: article.headline, preview: article.preview, content: article.content
+      });
     }
   }
   
@@ -35961,44 +36286,95 @@ async function generateHotTopics(){
 
 function viewArticle(index){
   const article = window.displayedArticles ? window.displayedArticles[index] : GAME.newsArticles[index];
-  if(!article){
-    console.error('Article not found at index:', index);
-    return;
-  }
-  
-  const sources = {
-    'music-wire': {name:'The Music Wire', color:'#FF6B6B'},
-    'beat-report': {name:'Beat Report', color:'#4ECDC4'},
-    'pop-culture': {name:'Pop Culture Daily', color:'#FFE66D'}
+  if(!article){ console.error('Article not found at index:', index); return; }
+
+  const src = (article.source||'').toLowerCase();
+  const isRumor = article.type === 'rumor' || article.is_rumor;
+  const isAboutMe = S && article.artistName && article.artistName === S.artistName;
+  const hasResponded = article.response;
+
+  // Outlet-specific visual config
+  const OC = {
+    'velour':       { name:'VELOUR',       tag:'The Sound of Prestige',     bg:'linear-gradient(170deg,#0d1a30 0%,#1a2e50 100%)', accent:'#e8b44c', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
+    'music-wire':   { name:'THE MUSIC WIRE', tag:'Breaking Music News',     bg:'linear-gradient(170deg,#1a0d2e 0%,#2a1050 100%)', accent:'#a97de8', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
+    'room-service': { name:'ROOM SERVICE', tag:'All the Tea',               bg:'#fdf6ec',                                          accent:'#c2185b', txt:'#1a1410', muted:'rgba(0,0,0,.45)', div:'rgba(0,0,0,.1)', cream:true },
+    'pop-culture':  { name:'ROOM SERVICE', tag:'All the Tea',               bg:'#fdf6ec',                                          accent:'#c2185b', txt:'#1a1410', muted:'rgba(0,0,0,.45)', div:'rgba(0,0,0,.1)', cream:true },
+    'chartwell':    { name:'CHARTWELL',    tag:'Business of Music',         bg:'linear-gradient(170deg,#071420 0%,#0d2035 100%)',  accent:'#5a9df3', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
+    'beat-report':  { name:'BEAT REPORT',  tag:'Data-Driven Music',         bg:'linear-gradient(170deg,#071420 0%,#0d2035 100%)',  accent:'#5a9df3', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
+    'undertone':    { name:'UNDERTONE',    tag:'Underground First',         bg:'linear-gradient(170deg,#110820 0%,#1e0a35 100%)',  accent:'#a97de8', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
+    'airtime':      { name:'AIRTIME',      tag:'On Air · All Day',          bg:'linear-gradient(170deg,#061412 0%,#0a2018 100%)',  accent:'#4cc98a', txt:'#fff', muted:'rgba(255,255,255,.5)', div:'rgba(255,255,255,.12)', cream:false },
   };
-  const source = sources[article.source] || sources['music-wire'];
-  
-  const html = `
-    <div id="articleView" style="position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:200000;overflow-y:auto">
-      <div style="max-width:700px;margin:0 auto;min-height:100vh;background:white">
-        <div style="background:${source.color};padding:20px">
-          <button onclick="document.getElementById('articleView').remove()" style="background:rgba(0,0,0,0.2);color:white;border:none;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer;margin-bottom:16px">←</button>
-          <div style="font-size:12px;font-weight:700;color:rgba(0,0,0,0.6);margin-bottom:8px;letter-spacing:1px">${source.name.toUpperCase()}</div>
-          <h1 style="margin:0;font-size:28px;font-weight:900;color:white;line-height:1.2;text-shadow:0 2px 4px rgba(0,0,0,0.1)">${article.headline}</h1>
-          <div style="font-size:13px;color:rgba(255,255,255,0.9);margin-top:12px">${_relTime(article.timestamp)}</div>
+  const o = OC[src] || OC['chartwell'];
+
+  const paragraphs = (article.content||'(No content.)').split('\n\n')
+    .map(p=>`<p style="margin:0 0 18px;line-height:1.8">${p}</p>`).join('');
+
+  const shortHeadline = article.headline.length > 60;
+
+  let rumorHtml = '';
+  if(isRumor && isAboutMe && !hasResponded){
+    rumorHtml = `
+      <div style="margin:28px 0;padding:18px 16px;background:${o.cream?'rgba(0,0,0,.05)':'rgba(255,255,255,.07)'};border-radius:14px;border:1px solid ${o.cream?'rgba(0,0,0,.1)':'rgba(255,255,255,.12)'}">
+        <div style="font-size:9px;font-weight:900;letter-spacing:2.5px;color:${o.accent};margin-bottom:14px">THIS RUMOR IS ABOUT YOU — RESPOND</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="event.stopPropagation();prRumorReply('${article.id||''}','deny');document.getElementById('articleView').remove()"
+            style="flex:1;padding:13px 4px;border-radius:10px;border:1.5px solid ${o.accent};background:transparent;color:${o.txt};font-size:10.5px;font-weight:800;cursor:pointer;letter-spacing:.3px">🗣 Deny</button>
+          <button onclick="event.stopPropagation();prRumorReply('${article.id||''}','ignore');document.getElementById('articleView').remove()"
+            style="flex:1;padding:13px 4px;border-radius:10px;border:1.5px solid ${o.accent};background:transparent;color:${o.txt};font-size:10.5px;font-weight:800;cursor:pointer;letter-spacing:.3px">😶 Ignore</button>
+          <button onclick="event.stopPropagation();prRumorReply('${article.id||''}','lean');document.getElementById('articleView').remove()"
+            style="flex:1;padding:13px 4px;border-radius:10px;border:none;background:${o.accent};color:${o.cream?'#fff':'#000'};font-size:10.5px;font-weight:800;cursor:pointer;letter-spacing:.3px">😏 Lean In</button>
         </div>
-        
-        <div style="padding:24px;line-height:1.8;font-size:16px;color:#333">
-          ${article.content.split('\n\n').map(p=>`<p style="margin-bottom:20px">${p}</p>`).join('')}
-        </div>
-        
-        <div style="padding:0 24px 24px;border-top:1px solid #eee;padding-top:24px;margin-top:24px">
-          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:#666">SHARE THIS ARTICLE</div>
-          <div style="display:flex;gap:8px">
-            <button onclick="shareArticleToSocial(${index},'instagram')" style="flex:1;padding:12px;background:linear-gradient(135deg,#f093fb,#f5576c);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">Share to Instagram</button>
-            <button onclick="shareArticleToSocial(${index},'tiktok')" style="flex:1;padding:12px;background:#fe2c55;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">Share to TikTok</button>
-            <button onclick="shareArticleToSocial(${index},'twitter')" style="flex:1;padding:12px;background:#1d9bf0;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">Share to X</button>
+      </div>`;
+  } else if(hasResponded){
+    const labels = { deny:'📢 You denied it', ignore:'😶 You ignored it', lean:'😏 You leaned in' };
+    rumorHtml = `<div style="margin:24px 0;padding:13px 16px;background:${o.cream?'rgba(0,0,0,.05)':'rgba(255,255,255,.07)'};border-radius:10px;font-size:10px;font-weight:800;letter-spacing:1.5px;color:${o.accent};text-transform:uppercase">${labels[hasResponded]||hasResponded}</div>`;
+  }
+
+  const btnStyle = `flex:1;padding:12px 4px;background:${o.cream?'rgba(0,0,0,.06)':'rgba(255,255,255,.09)'};color:${o.txt};border:1px solid ${o.cream?'rgba(0,0,0,.1)':'rgba(255,255,255,.13)'};border-radius:10px;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.3px`;
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="articleView" style="position:fixed;inset:0;background:${o.bg};z-index:200001;overflow-y:auto;-webkit-overflow-scrolling:touch">
+      <div style="max-width:500px;margin:0 auto;min-height:100%;display:flex;flex-direction:column">
+
+        <!-- BACK + OUTLET NAME -->
+        <div style="flex:none;padding:16px 18px 0;display:flex;align-items:center;gap:12px">
+          <button onclick="document.getElementById('articleView').remove()"
+            style="background:${o.cream?'rgba(0,0,0,.08)':'rgba(255,255,255,.12)'};color:${o.txt};border:none;border-radius:50%;width:36px;height:36px;font-size:17px;cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center">←</button>
+          <div>
+            <div style="font-family:var(--fd),'Georgia',serif;font-size:10px;letter-spacing:4px;font-weight:900;color:${o.accent}">${o.name}</div>
+            <div style="font-size:8.5px;letter-spacing:1.5px;color:${o.muted};text-transform:uppercase">${o.tag}</div>
           </div>
         </div>
+
+        <!-- HEADLINE BLOCK -->
+        <div style="flex:none;padding:20px 18px 18px">
+          ${article.artistName && !isAboutMe ? `<div style="font-size:9px;font-weight:900;letter-spacing:2px;color:${o.accent};margin-bottom:8px;text-transform:uppercase">Re: ${article.artistName}</div>` : ''}
+          ${isAboutMe ? `<div style="font-size:9px;font-weight:900;letter-spacing:2px;color:${o.accent};margin-bottom:8px">★ ABOUT YOU</div>` : ''}
+          <h1 style="font-family:var(--fd),'Georgia',serif;font-size:${shortHeadline?'21':'26'}px;font-weight:900;line-height:1.22;color:${o.txt};margin:0 0 14px">${article.headline}</h1>
+          ${article.preview ? `<p style="font-size:13px;font-style:italic;color:${o.muted};line-height:1.6;margin:0 0 14px;padding-left:12px;border-left:2px solid ${o.accent}">${article.preview}</p>` : ''}
+          <div style="font-size:9px;color:${o.muted};letter-spacing:.5px">${_relTime(article.timestamp)} · WEEK ${article.week||GAME.week||'?'}</div>
+          <div style="margin-top:16px;height:1px;background:${o.div}"></div>
+        </div>
+
+        <!-- ARTICLE BODY -->
+        <div style="flex:1;padding:0 18px 32px;font-size:14.5px;color:${o.cream?'#2a1f14':'rgba(255,255,255,.88)'}">
+          ${paragraphs}
+          ${rumorHtml}
+
+          <!-- SHARE -->
+          <div style="margin-top:28px;padding-top:18px;border-top:1px solid ${o.div}">
+            <div style="font-size:8.5px;letter-spacing:2px;font-weight:800;color:${o.muted};margin-bottom:12px">SHARE THIS STORY</div>
+            <div style="display:flex;gap:7px">
+              <button onclick="shareArticleToSocial(${index},'instagram');document.getElementById('articleView').remove()" style="${btnStyle}">📸 Instagram</button>
+              <button onclick="shareArticleToSocial(${index},'tiktok');document.getElementById('articleView').remove()" style="${btnStyle}">📱 TikTok</button>
+              <button onclick="shareArticleToSocial(${index},'twitter');document.getElementById('articleView').remove()" style="${btnStyle}">𝕏 Post</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
-  `;
-  document.body.insertAdjacentHTML('beforeend', html);
+  `);
 }
 
 function shareArticleToSocial(articleIndex, platform){
@@ -36493,23 +36869,26 @@ function _onDayAdvanced(newDay){
 
 function applyDailyRefresh(){
   if(!GAME) return;
-  // Restore energy each in-game day — base 120, reduced by stress, boosted by housing tier
+  // ── Energy: base 120, stress penalty, housing energy bonus (can be negative for lower tiers)
   const stressPenalty = Math.floor((GAME.stress||0) * 0.3);
-  const _housingEnergyBonus = {
-    'Shared Room':0,'Shared Apartment':5,'Studio Apartment':10,
-    '1BR Apartment':15,'Penthouse':20
-  };
-  const _housingType = (GAME.housing && GAME.housing.type) || '';
-  const housingBonus = _housingEnergyBonus[_housingType] || 0;
-  const newEnergy = Math.max(0, Math.min(140, 120 - stressPenalty + housingBonus));
+  // Use stored energyBonus from GAME.housing (set on move-in). Tiers: -10/-5/0/+2/+5
+  const housingEnergyBonus = (GAME.housing && typeof GAME.housing.energyBonus === 'number')
+    ? GAME.housing.energyBonus
+    : 0; // default 0 for legacy saves without energyBonus stored
+  const newEnergy = Math.max(0, Math.min(120, 120 - stressPenalty + housingEnergyBonus));
   GAME.energy = newEnergy;
 
-  // Restore creativity each in-game day
-  GAME.creativity = 100;
+  // ── Creativity: restore to 100, then apply housing creativity change
+  // Tiers: -10/-8/-5/-2/0 per day. Penthouse has no penalty (0).
+  const housingCreativityChange = (GAME.housing && typeof GAME.housing.creativityChange === 'number')
+    ? GAME.housing.creativityChange
+    : (GAME.housing && GAME.housing.type === 'Shared Room' ? -10 : 0); // legacy fallback
+  GAME.creativity = Math.max(0, 100 + housingCreativityChange);
   GAME._creativityRefreshedDay = GAME.day || 1;
-  // Shared Room: -10 creativity/day penalty (cramped living drains creativity)
-  if(_housingType === 'Shared Room'){
-    GAME.creativity = Math.max(0, GAME.creativity - 10);
+
+  // ── Stress reduction from housing (Tier 4: -3/day, Tier 5: -6/day)
+  if(GAME.housing && GAME.housing.stressReduction > 0){
+    GAME.stress = Math.max(0, (GAME.stress||0) - GAME.housing.stressReduction);
   }
 
   updateStats();
@@ -36591,6 +36970,16 @@ function checkDailyEconomy(){
     GAME.money = Math.max(0, (GAME.money||0) - GAME.housing.rent);
     _fw.rent = (_fw.rent||0) + GAME.housing.rent;
     addNotification('🏠 Rent Due','$'+(GAME.housing.rent).toLocaleString()+' deducted for rent.','finance');
+  }
+
+  // ── PENTHOUSE REP BONUS (weekly) ──────────────────────────────
+  if(info.dow === 0 && GAME.housing && GAME.housing.repBonusPerWeek > 0){
+    if(typeof GAME.reputation === 'number'){
+      GAME.reputation = Math.min(5, GAME.reputation + GAME.housing.repBonusPerWeek);
+    } else if(typeof S !== 'undefined' && typeof S.rep === 'number'){
+      S.rep = Math.min(5, S.rep + GAME.housing.repBonusPerWeek);
+    }
+    console.log('🏠 Penthouse rep bonus: +'+GAME.housing.repBonusPerWeek);
   }
 
   // ── STAFF/MANAGER FEES (weekly) ───────────────────────────────
