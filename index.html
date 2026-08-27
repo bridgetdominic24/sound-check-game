@@ -10765,14 +10765,7 @@ function showHousing(){
     + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;position:relative;z-index:2">'
     + '<button onclick="document.querySelectorAll(\'body > div[data-app-overlay]\').forEach(function(el){el.remove()})" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:16px;cursor:pointer">‹</button>'
     + '<span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.65)">Housing</span>'
-    + '<select onchange="hsgSetRegion(this.value)" style="margin-left:auto;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;font-size:10px;font-weight:700;padding:5px 8px;cursor:pointer" id="hsg-region-sel">'
-    + '<option value="North America">🌎 North America</option>'
-    + '<option value="Europe">🌍 Europe</option>'
-    + '<option value="Africa">🌍 Africa</option>'
-    + '<option value="Asia">🌏 Asia</option>'
-    + '<option value="South America">🌎 South America</option>'
-    + '<option value="Oceania">🌏 Oceania</option>'
-    + '</select>'
+    + '<span style="margin-left:auto;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:rgba(255,255,255,.8);font-size:10px;font-weight:700;padding:5px 10px">' + rd.flag + ' ' + rd.city + '</span>'
     + '</div>'
     + '<div style="font-family:Georgia,serif;font-size:22px;color:#fff;position:relative;z-index:2" id="hsg-htitle">Your Place in ' + city + '</div>'
     + '<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;position:relative;z-index:2" id="hsg-haddr">' + rd.flag + ' ' + city + ' · Week ' + (GAME.week || 1) + '</div>'
@@ -10797,9 +10790,6 @@ function showHousing(){
 
   _insertOverlay(html);
 
-  // Set region select to current
-  var sel = document.getElementById('hsg-region-sel');
-  if(sel) sel.value = region;
 }
 
 // ── Housing helper: toggle lease inline ───────────────────────────────────────
@@ -15510,7 +15500,11 @@ function _llMorale(){
     var fRows = factors.map(function(f){
       return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:4px 0;border-bottom:1px solid var(--bord)"><span style="color:var(--txt)">'+f[0]+'</span><span style="font-weight:700;color:'+(f[2]==='pos'?'var(--green)':f[2]==='neg'?'var(--red)':'var(--mut)')+'">'+f[1]+'</span></div>';
     }).join('');
-    var fanStr = (a.fans||a.fanCount||0) >= 1000 ? (((a.fans||a.fanCount||0)/1000).toFixed(0)+'K') : (a.fans||a.fanCount||0);
+    var isPlayerEntry = !!(window.currentUser && (a.userId===currentUser.id || (a.id && a.id===currentUser.id)));
+    var rawFans = isPlayerEntry
+      ? (GAME.fans || Object.values(GAME.fansByRegion||{}).reduce(function(s,v){return s+(v||0);},0) || 0)
+      : (a.fans||a.fanCount||0);
+    var fanStr = rawFans>=1000000?(rawFans/1000000).toFixed(1)+'M':rawFans>=1000?Math.round(rawFans/1000)+'K':String(rawFans);
     var autoOn = !!(ol.autoApprove||{})[a.id];
     var warnHtml = score < 20 ? '<div style="background:#3a1212;border:1px solid var(--red);border-radius:9px;padding:9px 11px;font-size:11px;color:#f08a8a;margin-top:8px;line-height:1.55">⚠ Room Service is watching. If morale drops to 0, '+a.artistName+' may formally request release.</div>' : '';
     var aid = a.id||a.userId||a.artistName;
@@ -15777,6 +15771,11 @@ function llSendGift(artistId){
   artist._moraleGiftBonus = (artist._moraleGiftBonus||0) + 8;
   ol.activity = ol.activity||[];
   ol.activity.unshift({text:'Sent a gift to <strong>'+artist.artistName+'</strong>. Morale +8.',color:'#a855f7',time:'now'});
+  // Log to finance history
+  if(!GAME.financeHistory) GAME.financeHistory = [];
+  var fw = GAME.financeHistory.find(function(h){ return h.week===(GAME.week||1); });
+  if(!fw){ fw={week:GAME.week||1,streamingRevenue:0,jobPay:0,gigPay:0,tipsPay:0,minigamePay:0,managerFees:0,rent:0,promo:0,labelSpend:0}; GAME.financeHistory.push(fw); }
+  fw.labelSpend = (fw.labelSpend||0) + 800;
   markDirty(); saveToCloud();
   showToast('Gift sent! +8 morale · -$800','green');
   window._llTab && window._llTab(0);
@@ -38079,7 +38078,7 @@ function showToast(msg, color){
   if(old) old.remove();
   var toast = document.createElement('div');
   toast.id = 'gameToast';
-  toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:'+bg+';color:#fff;padding:12px 20px;border-radius:24px;font-size:14px;font-weight:700;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3);pointer-events:none;max-width:80%;text-align:center';
+  toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:'+bg+';color:#fff;padding:12px 20px;border-radius:24px;font-size:14px;font-weight:700;z-index:300000;box-shadow:0 4px 20px rgba(0,0,0,0.3);pointer-events:none;max-width:80%;text-align:center';
   toast.innerHTML = msg;
   document.body.appendChild(toast);
   setTimeout(function(){ if(toast.parentNode) toast.remove(); }, 3000);
