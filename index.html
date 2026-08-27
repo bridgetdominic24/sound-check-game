@@ -8106,12 +8106,16 @@ async function getAllChartsData(){
   }
 
   // Generate press articles for other real players who just hit the top 10.
-  // Fires once per song (guarded by GAME._otherChartArticles).
+  // Fires once per game week (GAME._otherChartArticlesWeek guard) so opening the
+  // chart screen multiple times in the same week doesn't re-trigger article generation.
+  // Within a week, each song is also individually guarded by GAME._otherChartArticles.
   // Outlet assignment follows outlet voices from CLAUDE.md:
-  //   Velour (#1 only)  — prestige, cover story, elegant prose
-  //   AirTime (#2–5)    — radio-DJ, bright upbeat, heavy rotation voice
-  //   Chartwell (#6–10) — dry trade/data, charts & business
-  if(GAME_MODE === 'multi' && typeof _pushArticle === 'function'){
+  //   Velour (#1 only, signed only) — prestige, cover story, elegant prose
+  //   AirTime (#1 unsigned, #2–5)   — radio-DJ, bright upbeat, heavy rotation voice
+  //   Chartwell (#6–10)             — dry trade/data, charts & business
+  var _currentWeek = GAME.week || 1;
+  if(GAME_MODE === 'multi' && typeof _pushArticle === 'function' && GAME._otherChartArticlesWeek !== _currentWeek){
+    GAME._otherChartArticlesWeek = _currentWeek;
     if(!GAME._otherChartArticles) GAME._otherChartArticles = {};
     allSongs.forEach(function(song){
       if(song.isPlayer) return; // skip own songs — handled by milestone system
