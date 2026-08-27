@@ -5104,30 +5104,53 @@ function checkViralMoment(){
     windowWeeks:viral.streamWindowWeeks
   });
 
-  // Push a press article about the viral moment
+  // Push a press article about the viral moment.
+  // Outlet voices (per CLAUDE.md):
+  //   Undertone  — warm indie discovery voice  → tiktok/Rookie trend, meme (underground origin)
+  //   Room Service — cheeky tabloid gossip     → celebrity co-sign (gossip/drama angle)
+  //   AirTime    — bright radio-DJ upbeat      → playlist feature, radio play (heavy rotation)
+  //   Chartwell  — dry trade/data voice        → chart surge (data-driven analysis)
   var artistName = GAME.sn || GAME.artistName || 'Artist';
   var viralArticleId = 'viral_'+viral.type+'_'+(GAME.playerId||'local')+'_w'+thisWeek;
-  // Pick outlet: meme/tiktok → Undertone, playlist/radio → AirTime, chart_surge → Chartwell, celeb → Room Service
-  var outletMap = {tiktok_trend:'undertone',meme:'undertone',celebrity_cosign:'room_service',playlist_feature:'airtime',radio_play:'airtime',chart_surge:'chartwell'};
+  var outletMap = {tiktok_trend:'undertone', meme:'undertone', celebrity_cosign:'room_service', playlist_feature:'airtime', radio_play:'airtime', chart_surge:'chartwell'};
   var articleOutlet = outletMap[viral.type] || 'undertone';
-  var outletDisplayMap = {undertone:'Undertone',room_service:'Room Service',airtime:'AirTime',chartwell:'Chartwell'};
+  var outletDisplayMap = {undertone:'Undertone', room_service:'Room Service', airtime:'AirTime', chartwell:'Chartwell'};
   var outletDisplay = outletDisplayMap[articleOutlet] || 'Undertone';
+
+  // Headlines written in each outlet's distinct voice
   var viralArticleHeadlines = {
-    tiktok_trend: `"${song.title}" Is Everywhere on Rookie Right Now`,
-    meme: `How "${song.title}" Became the Meme Everyone Can\'t Escape`,
-    celebrity_cosign: `${artistName}\'s "${song.title}" Gets a Major Co-Sign`,
-    playlist_feature: `"${song.title}" Lands on an Editorial Playlist — Streams Are Surging`,
-    radio_play: `${artistName} Breaks Through to Radio With "${song.title}"`,
-    chart_surge: `Surprise: "${song.title}" Is Climbing the Charts Fast`
+    // Undertone: warm, discovery-forward indie voice
+    tiktok_trend: `"${song.title}" Is Having a Rookie Moment Nobody Saw Coming`,
+    meme: `The Internet Found "${song.title}" and Now It Won\'t Let Go`,
+    // Room Service: cheeky, gossipy, tabloid energy
+    celebrity_cosign: `So Apparently ${artistName}\'s "${song.title}" Is Celebrity-Approved Now`,
+    // AirTime: bright, upbeat, radio-DJ excitement
+    playlist_feature: `"${song.title}" Just Hit a Major Playlist — And The Numbers Are Moving`,
+    radio_play: `${artistName} Is Now In Rotation. "${song.title}" Breaks Through.`,
+    // Chartwell: dry, data-driven trade publication
+    chart_surge: `"${song.title}" Registers Unexpected Chart Surge — Streams Up Sharply`
   };
   var viralPreviewMap = {
-    tiktok_trend: `The Rookie algorithm has its claws in "${song.title}" and it\'s not letting go.`,
-    meme: `Nobody planned this, but "${song.title}" is now the soundtrack to a thousand memes.`,
-    celebrity_cosign: `One post changed everything for ${artistName}.`,
-    playlist_feature: `Landing on a playlist this size can change a career. ${artistName}\'s streaming numbers say it already has.`,
-    radio_play: `Radio listeners are hearing "${song.title}" for the first time — and they\'re responding.`,
-    chart_surge: `"${song.title}" wasn\'t supposed to be charting like this, but here we are.`
+    // Undertone: warm indie tone
+    tiktok_trend: `The Rookie algorithm picked up "${song.title}" and the unsigned scene is taking notice. Real momentum, no label required.`,
+    meme: `It started with one post. Now "${song.title}" is everywhere, and ${artistName} didn\'t plan any of it.`,
+    // Room Service: gossip/tabloid cheeky
+    celebrity_cosign: `One celebrity post and ${artistName}\'s streams went sideways — in the best way possible. The stans are already in the comments.`,
+    // AirTime: upbeat, radio
+    playlist_feature: `Editorial placement means real ears, and "${song.title}" is proving it. ${artistName}\'s week just changed.`,
+    radio_play: `"${song.title}" is now in heavy rotation and ${artistName} is hitting listeners who\'ve never searched for them.`,
+    // Chartwell: dry, data
+    chart_surge: `"${song.title}" has recorded a statistically notable streaming increase. Chartwell is watching.`
   };
+  var viralContentMap = {
+    tiktok_trend: `"${song.title}" by ${artistName} has become the sound of the moment on Rookie, where user-generated content is driving streams at a rate that algorithms alone can\'t explain. The song has gained ${immediateStreams.toLocaleString()} streams this week, with a ${viral.streamWindowWeeks}-week boost window underway.\n\nThis is the kind of traction that defines a career pivot — not manufactured, not label-pushed. Just a song that hit right.`,
+    meme: `What started as a niche post has turned "${song.title}" into a genuine internet phenomenon. ${artistName} is now the soundtrack to a corner of the internet they probably didn\'t know existed. The song gained ${immediateStreams.toLocaleString()} streams this week. A ${viral.streamWindowWeeks}-week boost window is in effect.\n\nNo one planned this. That\'s the point.`,
+    celebrity_cosign: `A high-profile endorsement of ${artistName}\'s "${song.title}" has sent streams climbing sharply, with ${immediateStreams.toLocaleString()} additional plays logged this week. The co-sign effect is real and measurable.\n\nRoom Service has questions. Was this organic? Was it coordinated? Either way, the numbers don\'t lie.`,
+    playlist_feature: `"${song.title}" has secured placement on a major editorial playlist, triggering ${immediateStreams.toLocaleString()} additional streams this week and beginning a ${viral.streamWindowWeeks}-week elevated streaming window.\n\nPlaylist placement at this scale is the difference between a song people find and a song that finds them. ${artistName} is now on the right side of that equation.`,
+    radio_play: `${artistName}\'s "${song.title}" has entered regular rotation, exposing the track to listeners who hadn\'t been searching for it. Opening momentum: ${immediateStreams.toLocaleString()} streams this week, with a ${viral.streamWindowWeeks}-week boost window active.\n\nRadio reach still converts. ${artistName} just proved it.`,
+    chart_surge: `"${song.title}" by ${artistName} has recorded a significant single-week streaming increase of ${immediateStreams.toLocaleString()} streams, placing it among the sharper movers in the current chart period. A ${viral.streamWindowWeeks}-week elevated performance window has been recorded.\n\nChartwell notes this as statistically significant. Sustained performance will be tracked in subsequent weeks.`
+  };
+
   _pushArticle({
     id: viralArticleId,
     type: 'viral_moment',
@@ -5139,7 +5162,7 @@ function checkViralMoment(){
     player_id: GAME.playerId || null,
     headline: viralArticleHeadlines[viral.type] || `${artistName} Goes Viral`,
     preview: viralPreviewMap[viral.type] || viral.desc,
-    content: viral.desc + ' The song gained ' + immediateStreams.toLocaleString() + ' additional streams this week, with a ' + viral.streamWindowWeeks + '-week boost window beginning now.'
+    content: viralContentMap[viral.type] || (viral.desc + ' The song gained ' + immediateStreams.toLocaleString() + ' additional streams this week.')
   });
 
   // Big celebration popup!
@@ -5180,25 +5203,26 @@ function _recoverViralData(){
   var outletMap = {tiktok_trend:'undertone',meme:'undertone',celebrity_cosign:'room_service',playlist_feature:'airtime',radio_play:'airtime',chart_surge:'chartwell'};
   var outletDisplayMap = {undertone:'Undertone',room_service:'Room Service',airtime:'AirTime',chartwell:'Chartwell'};
 
+  // Headlines and previews written in each outlet's voice (per CLAUDE.md)
   var headlineMap = function(type, songTitle){
     var m = {
-      tiktok_trend: '"'+songTitle+'" Is Everywhere on Rookie Right Now',
-      meme: 'How "'+songTitle+'" Became the Meme Everyone Can\'t Escape',
-      celebrity_cosign: artistName+'\'s "'+songTitle+'" Gets a Major Co-Sign',
-      playlist_feature: '"'+songTitle+'" Lands on an Editorial Playlist — Streams Are Surging',
-      radio_play: artistName+' Breaks Through to Radio With "'+songTitle+'"',
-      chart_surge: 'Surprise: "'+songTitle+'" Is Climbing the Charts Fast'
+      tiktok_trend: '"'+songTitle+'" Is Having a Rookie Moment Nobody Saw Coming',       // Undertone: warm indie discovery
+      meme: 'The Internet Found "'+songTitle+'" and Now It Won\'t Let Go',               // Undertone: underground/discovery
+      celebrity_cosign: 'So Apparently '+artistName+'\'s "'+songTitle+'" Is Celebrity-Approved Now', // Room Service: cheeky tabloid
+      playlist_feature: '"'+songTitle+'" Just Hit a Major Playlist — And The Numbers Are Moving',     // AirTime: upbeat radio
+      radio_play: artistName+' Is Now In Rotation. "'+songTitle+'" Breaks Through.',     // AirTime: radio-DJ voice
+      chart_surge: '"'+songTitle+'" Registers Unexpected Chart Surge — Streams Up Sharply' // Chartwell: dry trade data
     };
     return m[type] || artistName+' Goes Viral';
   };
   var previewMap = function(type, songTitle){
     var m = {
-      tiktok_trend: 'The Rookie algorithm has its claws in "'+songTitle+'" and it\'s not letting go.',
-      meme: 'Nobody planned this, but "'+songTitle+'" is now the soundtrack to a thousand memes.',
-      celebrity_cosign: 'One post changed everything for '+artistName+'.',
-      playlist_feature: 'Landing on a playlist this size can change a career. '+artistName+'\'s streaming numbers say it already has.',
-      radio_play: 'Radio listeners are hearing "'+songTitle+'" for the first time — and they\'re responding.',
-      chart_surge: '"'+songTitle+'" wasn\'t supposed to be charting like this, but here we are.'
+      tiktok_trend: 'The Rookie algorithm picked up "'+songTitle+'" and the unsigned scene is taking notice. Real momentum, no label required.',
+      meme: 'It started with one post. Now "'+songTitle+'" is everywhere, and '+artistName+' didn\'t plan any of it.',
+      celebrity_cosign: 'One celebrity post and '+artistName+'\'s streams went sideways — in the best way possible. The stans are already in the comments.',
+      playlist_feature: 'Editorial placement means real ears, and "'+songTitle+'" is proving it. '+artistName+'\'s week just changed.',
+      radio_play: '"'+songTitle+'" is now in heavy rotation and '+artistName+' is hitting listeners who\'ve never searched for them.',
+      chart_surge: '"'+songTitle+'" has recorded a statistically notable streaming increase. Chartwell is watching.'
     };
     return m[type] || (songTitle+' went viral.');
   };
@@ -8083,6 +8107,10 @@ async function getAllChartsData(){
 
   // Generate press articles for other real players who just hit the top 10.
   // Fires once per song (guarded by GAME._otherChartArticles).
+  // Outlet assignment follows outlet voices from CLAUDE.md:
+  //   Velour (#1 only)  — prestige, cover story, elegant prose
+  //   AirTime (#2–5)    — radio-DJ, bright upbeat, heavy rotation voice
+  //   Chartwell (#6–10) — dry trade/data, charts & business
   if(GAME_MODE === 'multi' && typeof _pushArticle === 'function'){
     if(!GAME._otherChartArticles) GAME._otherChartArticles = {};
     allSongs.forEach(function(song){
@@ -8095,24 +8123,47 @@ async function getAllChartsData(){
       var aName = song.artist || 'An emerging artist';
       var sTitle = song.title || 'their latest release';
       var pos = song.position;
-      var outletChoices = {1:'velour',2:'velour',3:'airtime',4:'airtime',5:'airtime',6:'chartwell',7:'chartwell',8:'chartwell',9:'chartwell',10:'chartwell'};
-      var outlet = outletChoices[pos] || 'chartwell';
-      var outletDisplay = outlet === 'velour' ? 'Velour' : outlet === 'airtime' ? 'AirTime' : 'Chartwell';
-      var headlineTemplates = [
-        aName+' Storms the Charts at #'+pos,
-        '"'+sTitle+'" Debuts at #'+pos+' — '+aName+' Arrives',
-        aName+' Makes a Statement with #'+pos+' Chart Entry',
-        'Eyes on '+aName+': "'+sTitle+'" Debuts in the Top 10',
-        aName+'\'s "'+sTitle+'" Enters the Global Top 40 at #'+pos
-      ];
-      var headline = headlineTemplates[Math.floor(Math.random()*headlineTemplates.length)];
-      var previewTemplates = [
-        '"'+sTitle+'" is the biggest debut of the week.',
-        aName+' comes in strong with a #'+pos+' chart entry.',
-        'A new name joins the top 10 this week.',
-        'First week numbers put '+aName+' firmly on the map.'
-      ];
-      var preview = previewTemplates[Math.floor(Math.random()*previewTemplates.length)];
+
+      var outlet, outletDisplay, headline, preview, content;
+
+      if(pos === 1){
+        // Velour: prestige cover-story voice, elegant prose
+        outlet = 'velour'; outletDisplay = 'Velour';
+        var velourHeads = [
+          'The Arrival: '+aName+' Enters at #1',
+          aName+' Claims the Top Spot — Meet the Artist Rewriting the Rules',
+          '"'+sTitle+'" Debuts at #1. '+aName+' Is Not Here to Play.',
+          'A Career-Defining Moment: '+aName+' at Number One'
+        ];
+        headline = velourHeads[Math.floor(Math.random()*velourHeads.length)];
+        preview = '"'+sTitle+'" didn\'t just enter the charts — it claimed them. '+aName+' is the name everyone will be saying this week.';
+        content = 'There are chart entries, and then there are moments. "'+sTitle+'" by '+aName+' debuted at #1 on the Global Top 40 this week, a feat that is equal parts rare and earned.\n\nThe song\'s opening numbers speak for themselves. But more telling is the quality of the listening — not algorithmic drift, but genuine connection with an audience that chose it.\n\n"You can\'t manufacture a debut like this," one industry observer noted. "It has to already be something people needed before they knew to look for it."';
+      } else if(pos <= 5){
+        // AirTime: radio-DJ, bright, upbeat, heavy rotation voice
+        outlet = 'airtime'; outletDisplay = 'AirTime';
+        var airtimeHeads = [
+          aName+'\'s "'+sTitle+'" Is Your New #'+pos+' — And It\'s Earned',
+          'Heavy Rotation: "'+sTitle+'" Debuts at #'+pos+' This Week',
+          '#'+pos+' and Climbing: '+aName+' Is IN Heavy Rotation',
+          '"'+sTitle+'" Just Landed at #'+pos+' and We Are Playing It All Day'
+        ];
+        headline = airtimeHeads[Math.floor(Math.random()*airtimeHeads.length)];
+        preview = aName+' comes in at #'+pos+' with first-week numbers that demand attention. Put "'+sTitle+'" in your rotation now.';
+        content = 'This one hit different from the first spin. '+aName+'\'s "'+sTitle+'" opened at #'+pos+' on the Global Top 40, and if you haven\'t heard it yet — where have you been?\n\nBig opening-week streams, real listener engagement, the kind of song that makes you turn it up instead of skipping. "'+sTitle+'" is in heavy rotation for a reason. '+aName+' brought it this week, full stop.';
+      } else {
+        // Chartwell: dry trade publication voice, charts and business data
+        outlet = 'chartwell'; outletDisplay = 'Chartwell';
+        var chartwellHeads = [
+          '"'+sTitle+'" Enters the Global Top 40 at #'+pos,
+          aName+' Charts at #'+pos+' — Opening Week Numbers Analysed',
+          'New Entry: '+aName+'\'s "'+sTitle+'" Debuts at #'+pos,
+          'Chart Data: "'+sTitle+'" Opens at #'+pos+' on the Global Top 40'
+        ];
+        headline = chartwellHeads[Math.floor(Math.random()*chartwellHeads.length)];
+        preview = '"'+sTitle+'" by '+aName+' is a new entry at #'+pos+' on this week\'s Global Top 40.';
+        content = '"'+sTitle+'" by '+aName+' entered the Global Top 40 at #'+pos+' in its debut chart week.\n\nThe opening position places it among the higher-performing new entries of the current period. First-week performance at this range typically reflects a combination of release-day momentum and sustained mid-week streaming. Whether the track holds, climbs, or falls will depend on listener retention over the next two to three chart weeks.\n\nChartwell will track performance in subsequent weeks.';
+      }
+
       _pushArticle({
         id: 'chart-debut-'+key.replace(/[^a-zA-Z0-9]/g,'_'),
         type: 'chart_debut_other',
@@ -8123,7 +8174,7 @@ async function getAllChartsData(){
         artistName: aName,
         headline: headline,
         preview: preview,
-        content: '"'+sTitle+'" by '+aName+' debuted at #'+pos+' on the Global Top 40 this week, making it one of the strongest chart entries in recent memory.'
+        content: content
       });
     });
   }
