@@ -217,3 +217,52 @@ K-pop trainee/idol path: dice-roll character creation, birth names only at train
 Festivals: lineup invites, hype payoffs, slot competition — needs design session before build
 Distributor system: signed artists get distribution via label; indie artists sign NPC distributor (budget/standard/premium tiers); no distributor = SoundPuff only
 Band/groups system: post-launch
+
+## Press system — 5 outlets (LOCKED, never add or remove)
+
+### Outlets
+
+VELOUR
+- Voice: elegant, measured, editorial. Reads like a prestige print magazine.
+- Covers: artist profiles, cover stories, long-form career features, label showcases, debut spotlights, Velour Spotlight (label-exclusive features). Congratulatory in tone — Velour doesn't write negatively.
+- Auto-triggers: first chart #1, crossing 50K fans, signing to a major label, Penthouse move-in (if signed/label owner), label-submitted Spotlight, Year-End label showcase for top 3 labels.
+- Effect: Hype +8, Fans +3–5%, Label rep +0.5 on feature. Most prestigious article type in the game.
+- Unsigned artists CANNOT receive a Velour Spotlight — gate check required.
+
+ROOM SERVICE
+- Voice: cheeky tabloid. Gossipy, dramatic, uses ellipses and air quotes. Speculative but never cruel.
+- Covers: rumors, morale speculation ("sources say…"), artist drama, label tension, lifestyle observations.
+- Auto-triggers: artist stress ≥ 85 (rumor about burnout), artist morale < 20 (exit rumor), missed rent 2+ weeks, Room Service rumor response = "Lean in" (follow-up piece), label owner sends rumor after press request.
+- Player response options when targeted: Deny (70% rumor dies, 30% amplifies), Ignore (80% quiet expiry, 20% follow-up), Lean in (hype +6, stress +4, rumor runs full course).
+- Rumor rules (HARD — never break): seeded only by real player events, always PG, never mention real money/family/health/cruelty, stat effect capped at ±2%, expires in 3 game weeks unless fed.
+- When a signed artist is targeted: edge function inserts notification to artist (type='press_mention') AND label owner (type='press_request') after article insert.
+
+CHARTWELL
+- Voice: dry, data-forward trade publication. Factual. Treats music like a business story.
+- Covers: chart entries and movements, streaming milestones, label rankings, business deals, The Dial chart weekly round-up, Year-End rankings, Chartwell Hall of Records entries.
+- Auto-triggers: any song entering the chart, song hitting #1, song crossing 1M / 5M / 10M streams, label tier upgrade, Year-End label rankings (Week 52), new Hall of Records entry set.
+- Effect: no direct hype boost, but increases label and artist credibility (rep +0.1–0.3 depending on milestone size).
+- Chartwell also publishes all-time records and career milestones in the Hall of Records section — separate from the weekly chart coverage.
+
+UNDERTONE
+- Voice: warm indie music blog. Enthusiastic but thoughtful. Discovers artists before they blow up.
+- Covers: debut coverage, new-artist profiles, collab spotlights, genre movement pieces, unsigned artist discovery, "ones to watch" features.
+- Auto-triggers: player's very first song release (debut piece), first collab published, song charting for the first time, player reaches 1K fans (discovery piece), unsigned artist with strong SoundPuff presence.
+- Effect: Hype +4, Fans +1–2%, small rep boost. More valuable early-career than later.
+- Undertone won't cover an artist who already has 100K+ fans — they've moved past Undertone's scope.
+
+AIRTIME
+- Voice: bright, upbeat, radio-DJ energy. Enthusiastic. Talks about momentum and heavy rotation.
+- Covers: streaming milestone achievements, chart movement framing ("this one's everywhere right now"), mainstream crossover moments, playlist milestone coverage, radio station listener rankings (once radio is built).
+- Auto-triggers: song crosses 500K streams in a week, song holds top 10 for 3+ consecutive weeks, label signing announcement, artist reaches 25K fans.
+- Effect: Hype +5. Currently flavor only for radio coverage until the radio station system is built. Once radio launches, AirTime covers real station rankings.
+- Note: AirTime has no real radio system yet. Its radio-adjacent language is intentional — it sets up the world for when radio stations are built in Wave 3.
+
+### Shared rules (all outlets)
+- All articles are AI-generated via the generate-article Supabase edge function
+- Each outlet has its own system prompt defining voice, tone, and what it will/won't cover
+- Articles insert into the articles table with outlet, type, artist_id, effect fields
+- Effects (hype, fans, rep) are applied on insert via database trigger or edge function
+- Players see articles in the news feed, sorted by timestamp
+- Global articles (Year-End, Hall of Records) are visible to all players
+- Artist-specific articles only visible to that artist and their label (if signed)
