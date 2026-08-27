@@ -5160,6 +5160,89 @@ THIS IS YOUR MOMENT! 🚀`;
   autoSave();
 }
 
+// ── ONE-TIME RECOVERY: generate articles for viral moments that pre-date the
+//    article-generation code, and reconcile their revenue into financeHistory.
+//    Runs once per save-file (guarded by GAME._dataRecoveredV1).
+function _recoverViralData(){
+  if(GAME._dataRecoveredV1) return;
+  GAME._dataRecoveredV1 = true;
+
+  var moments = GAME.viralMoments || [];
+  if(moments.length === 0) return;
+
+  if(!GAME.newsArticles) GAME.newsArticles = [];
+  if(!GAME.financeHistory) GAME.financeHistory = [];
+
+  var artistName = GAME.sn || GAME.artistName || 'Artist';
+  var playerId = GAME.playerId || 'local';
+
+  var outletMap = {tiktok_trend:'undertone',meme:'undertone',celebrity_cosign:'room_service',playlist_feature:'airtime',radio_play:'airtime',chart_surge:'chartwell'};
+  var outletDisplayMap = {undertone:'Undertone',room_service:'Room Service',airtime:'AirTime',chartwell:'Chartwell'};
+
+  var headlineMap = function(type, songTitle){
+    var m = {
+      tiktok_trend: '"'+songTitle+'" Is Everywhere on Rookie Right Now',
+      meme: 'How "'+songTitle+'" Became the Meme Everyone Can\'t Escape',
+      celebrity_cosign: artistName+'\'s "'+songTitle+'" Gets a Major Co-Sign',
+      playlist_feature: '"'+songTitle+'" Lands on an Editorial Playlist — Streams Are Surging',
+      radio_play: artistName+' Breaks Through to Radio With "'+songTitle+'"',
+      chart_surge: 'Surprise: "'+songTitle+'" Is Climbing the Charts Fast'
+    };
+    return m[type] || artistName+' Goes Viral';
+  };
+  var previewMap = function(type, songTitle){
+    var m = {
+      tiktok_trend: 'The Rookie algorithm has its claws in "'+songTitle+'" and it\'s not letting go.',
+      meme: 'Nobody planned this, but "'+songTitle+'" is now the soundtrack to a thousand memes.',
+      celebrity_cosign: 'One post changed everything for '+artistName+'.',
+      playlist_feature: 'Landing on a playlist this size can change a career. '+artistName+'\'s streaming numbers say it already has.',
+      radio_play: 'Radio listeners are hearing "'+songTitle+'" for the first time — and they\'re responding.',
+      chart_surge: '"'+songTitle+'" wasn\'t supposed to be charting like this, but here we are.'
+    };
+    return m[type] || (songTitle+' went viral.');
+  };
+
+  moments.forEach(function(v){
+    var articleId = 'viral_'+v.type+'_'+playerId+'_w'+(v.week||1);
+    var alreadyHasArticle = GAME.newsArticles.some(function(a){ return a.id === articleId; });
+
+    // If no article yet, create one retroactively
+    if(!alreadyHasArticle){
+      var outlet = outletMap[v.type] || 'undertone';
+      var outletDisplay = outletDisplayMap[outlet] || 'Undertone';
+      var songTitle = v.song || 'your song';
+      _pushArticle({
+        id: articleId,
+        type: 'viral_moment',
+        source: outlet,
+        outlet: outletDisplay,
+        week: v.week || 1,
+        timestamp: Date.now() - ((GAME.week - (v.week||1)) * 14 * 24 * 3600 * 1000),
+        artistName: artistName,
+        player_id: GAME.playerId || null,
+        headline: headlineMap(v.type, songTitle),
+        preview: previewMap(v.type, songTitle),
+        content: (v.description||songTitle+' went viral.')+' The song gained '+(v.streams||0).toLocaleString()+' additional streams.'
+      });
+    }
+
+    // If revenue > 0 and no article existed before recovery, the old code added
+    // money to GAME.money without going through financeHistory — reconcile now.
+    if(!alreadyHasArticle && v.revenue > 0){
+      var week = v.week || 1;
+      var fh = GAME.financeHistory.find(function(h){ return h.week === week; });
+      if(!fh){
+        fh = {week:week,streamingRevenue:0,jobPay:0,gigPay:0,tipsPay:0,minigamePay:0,managerFees:0,rent:0,promo:0};
+        GAME.financeHistory.push(fh);
+      }
+      fh.streamingRevenue = (fh.streamingRevenue||0) + v.revenue;
+    }
+  });
+
+  // Auto-save so recovery persists
+  if(typeof autoSave === 'function') autoSave();
+}
+
 function checkAchievements(){
   // Safety check: make sure GAME and achievements exist
   if(!GAME || !GAME.achievements) return;
@@ -22401,6 +22484,7 @@ function loadGame(){
       initStories(); // Clean up expired stories
       cleanupTours(); // Clean up completed/corrupted tours
       recalculateAllStreams(); // Fix stream count desync
+      _recoverViralData(); // One-time: retroactive articles + finance reconciliation for pre-fix viral moments
       updateStats();
       updateMusicStats();
       updateToursList(); // Display active tours
