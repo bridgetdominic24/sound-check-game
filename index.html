@@ -7840,12 +7840,19 @@ async function getAllChartsData(){
   
   // Combine and sort by current streams (highest first)
   const allSongs = [...playerSongs, ...competitors].sort((a, b) => b.streams - a.streams);
-  
+  const totalOnChart = allSongs.length;
+
+  // Load last-week global snapshot — this is the single source of truth for movement arrows.
+  // Using per-player lastChartPosition leads to impossible jumps (e.g. ▲47 with 7 songs)
+  // because each player tracks positions in their own local context, not the global ranking.
+  if(!GAME._globalChartSnapshot) GAME._globalChartSnapshot = {};
+  const prevSnapshot = Object.assign({}, GAME._globalChartSnapshot);
+
   // Assign current positions and track last position
   // ALSO ensure title and artist fields exist (extract from name if missing)
   allSongs.forEach((song, idx) => {
     song.position = idx + 1;
-    
+
     // DEFENSIVE: Ensure title and artist are set
     if(!song.title || !song.artist){
       if(song.name && song.name.includes(' - ')){
@@ -7854,27 +7861,35 @@ async function getAllChartsData(){
         if(!song.artist) song.artist = parts[1].trim();
       }
     }
-    
-    // If no lastChartPosition set yet, check chart history
-    if(!song.lastChartPosition && GAME.chartHistory && GAME.chartHistory[GAME.week - 1]){
+
+    // Use global snapshot for consistent movement — cap at total songs to prevent impossible jumps
+    const snapshotKey = song.name || (song.title + ' - ' + song.artist);
+    if(prevSnapshot[snapshotKey]){
+      song.lastChartPosition = prevSnapshot[snapshotKey];
+    } else if(GAME.chartHistory && GAME.chartHistory[GAME.week - 1]){
+      // Fallback: single-player chart history
       const lastWeekSong = GAME.chartHistory[GAME.week - 1].find(s => s.name === song.name);
       if(lastWeekSong){
         song.lastChartPosition = lastWeekSong.position || lastWeekSong.chartPosition;
+      } else {
+        song.lastChartPosition = null; // genuinely new to the chart
       }
+    } else {
+      song.lastChartPosition = null; // first time seeing any chart
     }
-    
+
     // CHART MOVEMENT NOTIFICATIONS — write the live position back onto the real song
-    // object and notify on entries, climbs, and #1s. This is what was missing entirely.
+    // object and notify on entries, climbs, and #1s.
     if(song.isPlayer && song.songId){
       const realSong = GAME.songs.find(s => s.id === song.songId);
       if(realSong){
-        const prevPosition = realSong.chartPosition || null;
+        const prevPosition = song.lastChartPosition || null;
         realSong.chartPosition = song.position;
         realSong.lastChartPosition = prevPosition;
-        
+
         if(!GAME._notifiedChartPositions) GAME._notifiedChartPositions = {};
         const notifKey = realSong.id + '-' + song.position;
-        
+
         if(!GAME._notifiedChartPositions[notifKey]){
           if(prevPosition === null && song.position <= 40){
             addNotification('📈 New on the charts!', `"${realSong.title}" entered the Global Top 40 at #${song.position}`, 'chart');
@@ -7891,22 +7906,30 @@ async function getAllChartsData(){
       }
     }
   });
-  
-  // NOW store this week's chart data (AFTER positions are assigned!)
+
+  // Save new global snapshot (keyed by song name) for next chart open
+  GAME._globalChartSnapshot = {};
+  allSongs.forEach(song => {
+    const snapshotKey = song.name || (song.title + ' - ' + song.artist);
+    GAME._globalChartSnapshot[snapshotKey] = song.position;
+  });
+
+  // NOW store this week's chart data (AFTER positions are assigned!) — single player only
   if(GAME_MODE === 'single'){
+    if(!GAME.chartHistory) GAME.chartHistory = {};
     GAME.chartHistory[GAME.week] = JSON.parse(JSON.stringify(allSongs));
-    
+
     // Clean up old chart history (keep last 8 weeks)
     Object.keys(GAME.chartHistory).forEach(week => {
       if(parseInt(week) < GAME.week - 8){
         delete GAME.chartHistory[week];
       }
     });
-    
+
     markDirty();
   }
-  
-  console.log(`📊 Total charting songs: ${allSongs.length}`);
+
+  console.log(`📊 Total charting songs: ${totalOnChart}`);
   
   return allSongs;
 }
@@ -7967,22 +7990,25 @@ function buildChartHTML(title,subtitle,songs,startPos,bgColor){
       }
       
       // Calculate rank change with arrows!
+      // Cap movement at (totalSongs - 1) to prevent impossible jumps from stale data.
       let rankChange = '';
-      if(song.lastChartPosition && song.lastChartPosition !== position){
-        const change = song.lastChartPosition - position;
-        
+      if(!song.lastChartPosition){
+        // Never seen on chart before → NEW
+        rankChange = `<span style="color:#FFD700;font-size:13px;font-weight:700">NEW</span>`;
+      } else if(song.lastChartPosition !== position){
+        const rawChange = song.lastChartPosition - position;
+        const change = Math.sign(rawChange) * Math.min(Math.abs(rawChange), songs.length);
         if(change > 0){
-          // Moving UP the chart (lower number = higher position)
+          // Moving UP (lower number = higher position)
           rankChange = `<span style="color:#10D876;font-size:14px;font-weight:700">▲ ${change}</span>`;
         } else if(change < 0){
-          // Moving DOWN the chart
+          // Moving DOWN
           rankChange = `<span style="color:#f44336;font-size:14px;font-weight:700">▼ ${Math.abs(change)}</span>`;
+        } else {
+          rankChange = `<span style="color:var(--mut);font-size:14px">➖</span>`;
         }
-      } else if(song.weeksOnChart === 1){
-        // NEW entry
-        rankChange = `<span style="color:#FFD700;font-size:13px;font-weight:700">NEW</span>`;
       } else {
-        // No change
+        // Same position as last time
         rankChange = `<span style="color:var(--mut);font-size:14px">➖</span>`;
       }
       
@@ -10640,8 +10666,8 @@ function showHousing(){
   var PERKS = [
     [{cls:'p-bad',txt:'−10 energy/day'},{cls:'p-bad',txt:'−10 creativity/day'}],
     [{cls:'p-bad',txt:'−5 energy/day'}, {cls:'p-bad',txt:'−8 creativity/day'}],
-    [{cls:'p-cr', txt:'Energy neutral'},{cls:'p-bad',txt:'−5 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'}],
-    [{cls:'p-en', txt:'⚡ +2 energy/day'},{cls:'p-bad',txt:'−2 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'},{cls:'p-st',txt:'🧘 Stress −3/day'},{cls:'p-cr',txt:'Collab speed +10%'}],
+    [{cls:'p-cr', txt:'Energy neutral'},{cls:'p-bad',txt:'−5 creativity/day'}],
+    [{cls:'p-en', txt:'⚡ +2 energy/day'},{cls:'p-bad',txt:'−2 creativity/day'},{cls:'p-st',txt:'🧘 Stress −3/day'},{cls:'p-cr',txt:'Collab speed +10%'}],
     [{cls:'p-en', txt:'⚡ +5 energy/day'},{cls:'p-cr',txt:'No creativity loss'},{cls:'p-cr',txt:'🏆 Studio-quality home'},{cls:'p-st',txt:'👑 Rep +0.2/wk'},{cls:'p-st',txt:'📰 Velour-worthy address'}]
   ];
 
@@ -10678,7 +10704,7 @@ function showHousing(){
     var extras = [
       'This unit is a shared living space. Tenant acknowledges limited privacy and shared common areas.',
       'This unit is a shared apartment. Tenant shares space with up to 2 roommates. Common areas maintained jointly.',
-      'This unit is a self-contained studio. Tenant has full private occupancy. Home recording permitted within noise ordinance hours.',
+      'This unit is a self-contained studio. Tenant has full private occupancy. Quiet hours apply between 10 PM and 8 AM.',
       'This unit is a private one-bedroom apartment. Full occupancy with dedicated bedroom. Recording and creative work permitted.',
       'This unit is a luxury penthouse suite. Tenant receives concierge access, priority maintenance, and full building amenities. Velour magazine has been known to reference this address.'
     ];
@@ -10838,7 +10864,7 @@ function _hsgLeaseDoc(i, region){
   var en = ENERGY_BONUS[i];
   var cr = CREATIVITY_CHANGE[i];
   var fmt = function(n){ return '$' + Math.round(n).toLocaleString(); };
-  var extras=['This unit is a shared living space. Tenant acknowledges limited privacy and shared common areas.','This unit is a shared apartment. Tenant shares space with up to 2 roommates. Common areas maintained jointly.','This unit is a self-contained studio. Tenant has full private occupancy. Home recording permitted within noise ordinance hours.','This unit is a private one-bedroom apartment. Full occupancy with dedicated bedroom. Recording and creative work permitted.','This unit is a luxury penthouse suite. Tenant receives concierge access, priority maintenance, and full building amenities. Velour magazine has been known to reference this address.'];
+  var extras=['This unit is a shared living space. Tenant acknowledges limited privacy and shared common areas.','This unit is a shared apartment. Tenant shares space with up to 2 roommates. Common areas maintained jointly.','This unit is a self-contained studio. Tenant has full private occupancy. Quiet hours apply between 10 PM and 8 AM.','This unit is a private one-bedroom apartment. Full occupancy with dedicated bedroom. Collab sessions eligible for 10% speed bonus.','This unit is a luxury penthouse suite. Tenant receives concierge access, priority maintenance, and full building amenities. Velour magazine has been known to reference this address.'];
   var crTxt = cr < 0
     ? '<span style="background:#fde8e8;color:#8b1a1a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">' + cr + ' creativity / day</span>'
     : '<span style="background:#d4f5e5;color:#1a5c3a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">No creativity penalty</span>';
@@ -10914,7 +10940,7 @@ function hsgDoMove(i){
   var CREATIVITY_CHANGE=[-10,-8,-5,-2,0];
   var COLLAB_SPEED=[0,0,0,0.1,0];
   var STRESS_REDUCE=[0,0,0,3,6];
-  var HOME_RECORDING=[false,false,true,true,true];
+  var HOME_RECORDING=[false,false,false,false,false];
   var HOUSING_REGIONS = {
     'North America':{mult:1,tiers:[{name:'Shared Room',hood:'4C Broad St, Downtown LA'},{name:'Shared Apartment',hood:'2B Maple Ave, Silver Lake'},{name:'Studio Apartment',hood:'Studio 7, 221 Arts District Way'},{name:'1BR Apartment',hood:'Apt 12A, 555 Midtown Blvd'},{name:'Penthouse',hood:'Penthouse, 1 Skyline Tower'}]},
     'Europe':{mult:1.4,tiers:[{name:'Shared Room',hood:'Flat 3, 14 Brixton Rd, Brixton'},{name:'Shared Apartment',hood:'Flat B, 88 Hackney Rd, Hackney'},{name:'Studio Apartment',hood:'Studio 4, 33 Shoreditch High St'},{name:'1BR Apartment',hood:'Flat 6, 12 Camden High St'},{name:'Penthouse',hood:'Penthouse, 1 The Shard'}]},
@@ -11004,8 +11030,8 @@ function hsgSetRegion(r){
   var PERKS=[
     [{cls:'p-bad',txt:'−10 energy/day'},{cls:'p-bad',txt:'−10 creativity/day'}],
     [{cls:'p-bad',txt:'−5 energy/day'},{cls:'p-bad',txt:'−8 creativity/day'}],
-    [{cls:'p-cr',txt:'Energy neutral'},{cls:'p-bad',txt:'−5 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'}],
-    [{cls:'p-en',txt:'⚡ +2 energy/day'},{cls:'p-bad',txt:'−2 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'},{cls:'p-st',txt:'🧘 Stress −3/day'},{cls:'p-cr',txt:'Collab speed +10%'}],
+    [{cls:'p-cr',txt:'Energy neutral'},{cls:'p-bad',txt:'−5 creativity/day'}],
+    [{cls:'p-en',txt:'⚡ +2 energy/day'},{cls:'p-bad',txt:'−2 creativity/day'},{cls:'p-st',txt:'🧘 Stress −3/day'},{cls:'p-cr',txt:'Collab speed +10%'}],
     [{cls:'p-en',txt:'⚡ +5 energy/day'},{cls:'p-cr',txt:'No creativity loss'},{cls:'p-cr',txt:'🏆 Studio-quality home'},{cls:'p-st',txt:'👑 Rep +0.2/wk'},{cls:'p-st',txt:'📰 Velour-worthy address'}]
   ];
   var rd = HOUSING_REGIONS[r] || HOUSING_REGIONS['North America'];
@@ -19418,7 +19444,10 @@ async function respondCollab(requestId,action){
       GAME.messages.push({type:'collab_accepted',from:req.to_artist_name,to:req.from_artist_name,message:'Accepted a '+req.collab_type+' collab on "'+(req.song_title||'New Track')+'". Time to get creative!',time:new Date(),subType:'collab'});
       
       // Create in-progress song with time tracking - FOR BOTH PLAYERS
-      const durationMs=COLLAB_DURATIONS_MS[req.collab_type][GAME_MODE]||30*60*1000;
+      let durationMs=COLLAB_DURATIONS_MS[req.collab_type][GAME_MODE]||30*60*1000;
+      // Apply 1BR housing collab speed bonus (10% faster)
+      const _collabSpeedBonusA = (GAME.housing && GAME.housing.collabSpeedBonus) || 0;
+      if(_collabSpeedBonusA > 0) durationMs = Math.round(durationMs * (1 - _collabSpeedBonusA));
       const startTime=Date.now();
       
       const stableId = req.song_id || ('collab_'+req.id);
@@ -30358,7 +30387,9 @@ async function syncAcceptedCollabs(){
       }
     } else if(req.song_title){
       // Create the track on my side too
-      const durationMs=COLLAB_DURATIONS_MS[req.collab_type][GAME_MODE]||30*60*1000;
+      let durationMs=COLLAB_DURATIONS_MS[req.collab_type][GAME_MODE]||30*60*1000;
+      const _collabSpeedBonusB = (GAME.housing && GAME.housing.collabSpeedBonus) || 0;
+      if(_collabSpeedBonusB > 0) durationMs = Math.round(durationMs * (1 - _collabSpeedBonusB));
       const newTrack={
         id:req.song_id||Math.random(),
         title:req.song_title,
@@ -30430,7 +30461,9 @@ async function syncAcceptedCollabs(){
         }
       } else if(req.song_id && req.song_title){
         // Create the track on receiver's side
-        const durationMs = COLLAB_DURATIONS_MS[req.collab_type][GAME_MODE] || 30*60*1000;
+        let durationMs = COLLAB_DURATIONS_MS[req.collab_type][GAME_MODE] || 30*60*1000;
+        const _collabSpeedBonusC = (GAME.housing && GAME.housing.collabSpeedBonus) || 0;
+        if(_collabSpeedBonusC > 0) durationMs = Math.round(durationMs * (1 - _collabSpeedBonusC));
         const newTrack = {
           id: req.song_id || ('collab_'+req.id),
           title: req.song_title,
@@ -37008,9 +37041,31 @@ function checkDailyEconomy(){
   }
   if(typeof processSkillDecay==='function') processSkillDecay();
   
-  // CHART MAINTENANCE — runs every day so weeksOnChart/chartPosition reflect total streams,
-  // not just one week's growth delta. This is what fixes "10 weeks at #4 showing as new."
+  // CHART MAINTENANCE — weekly. Update weeksOnChart and fire article triggers.
+  // First, compute this player's chart positions from stream rank among their own songs
+  // (a rough local rank; the true global rank is assigned by getAllChartsData() when
+  // the chart screen opens, but we need something here so debut articles fire even if
+  // the player never opens the chart screen that week).
   if(info.dow === 0 && GAME.songs){
+    var _allReleasedSorted = GAME.songs.filter(function(s){ return s.released && (s.streams||0) >= 100000; });
+    _allReleasedSorted.sort(function(a,b){ return (b.streams||0)-(a.streams||0); });
+    _allReleasedSorted.forEach(function(s,idx){
+      if(!s.chartPosition){
+        // Only set chartPosition for the first time — getAllChartsData() owns the global rank
+        s.chartPosition = idx + 1;
+        s.lastChartPosition = null; // genuine new entry
+      }
+      // Update peakPosition
+      if(!s.peakPosition || s.chartPosition < s.peakPosition) s.peakPosition = s.chartPosition;
+    });
+    // Songs below 100K streams fall off the chart
+    GAME.songs.forEach(function(s){
+      if(s.released && s.chartPosition && (s.streams||0) < 100000){
+        s.lastChartPosition = s.chartPosition;
+        s.chartPosition = null;
+      }
+    });
+
     GAME.songs.forEach(function(song){
       if(!song.released) return;
       const weeklyStreams = song.weeklyStreams || 0;
@@ -37209,20 +37264,68 @@ function checkDailyEconomy(){
       }
     });
   }
-  // Recompute chart positions daily (not just weekly) and write back to GAME.songs
-  if(GAME.songs){
-    // Sort released songs by streams to assign positions
-    const releasedSongs = GAME.songs.filter(function(s){ return s.released; });
-    releasedSongs.sort(function(a,b){ return (b.streams||0)-(a.streams||0); });
-    releasedSongs.forEach(function(song, idx){
-      const newPos = idx + 1;
-      if(song.chartPosition && song.chartPosition !== newPos){
-        song.lastChartPosition = song.chartPosition;
+  // Chart positions are managed exclusively by getAllChartsData() (global ranking).
+  // Do NOT recompute local-only positions here — that would conflict with the global
+  // ranking and produce impossible movement numbers (e.g. ▲47 when only 7 songs exist).
+
+  // ── Weekly Chartwell summary: list all of the player's charting songs ──────
+  // Fires once per game week when at least one song is on the chart.
+  if(info.dow === 0 && GAME.songs){
+    var _chartingSongsThisWeek = GAME.songs.filter(function(s){ return s.released && s.chartPosition; });
+    if(_chartingSongsThisWeek.length > 0){
+      if(!GAME._chartSummaryFired) GAME._chartSummaryFired = {};
+      var _cswKey = 'chart_summary_w'+(GAME.week||1);
+      if(!GAME._chartSummaryFired[_cswKey]){
+        GAME._chartSummaryFired[_cswKey] = true;
+        var _cswArtist = GAME.artistName || GAME.sn || 'Artist';
+        // Build a sorted list (by position)
+        var _cswList = _chartingSongsThisWeek.slice().sort(function(a,b){ return (a.chartPosition||99)-(b.chartPosition||99); });
+        var _cswFacts = _cswList.map(function(s){
+          return {
+            title:    s.title || 'Untitled',
+            position: s.chartPosition,
+            streams:  s.streams >= 1000000 ? (s.streams/1000000).toFixed(1)+'M'
+                      : s.streams >= 1000 ? Math.round(s.streams/1000)+'K'
+                      : String(s.streams||0),
+            weeks:    s.weeksOnChart || 1,
+            genre:    s.genre || 'Pop',
+            released: s.releaseWeek ? 'Week '+s.releaseWeek : 'recently'
+          };
+        });
+        var _cswFallbackLines = _cswList.map(function(s){
+          var st = s.streams>=1000000?(s.streams/1000000).toFixed(1)+'M':s.streams>=1000?Math.round(s.streams/1000)+'K':String(s.streams||0);
+          return '#'+s.chartPosition+' — "'+s.title+'" · '+st+' streams · '+(s.weeksOnChart||1)+' wk'+(s.weeksOnChart>1?'s':'');
+        }).join('\n');
+        _fireArticleTrigger({
+          triggerType: 'weekly_chart_summary',
+          triggerKey:  _cswKey,
+          outlet:      'Chartwell',
+          facts: {
+            artist:    _cswArtist,
+            songs:     _cswFacts,
+            game_week: GAME.week || 1,
+            player_id: (currentUser && currentUser.id) || null
+          },
+          fallback: {
+            headline: _cswArtist+' — Chart Update, Week '+(GAME.week||1),
+            content:  'Here\'s where '+_cswArtist+'\'s catalogue sits on this week\'s chart:\n\n'+_cswFallbackLines+'\n\nStreams continue to move. Watch closely — chart positions update weekly.'
+          },
+          onSuccess: function(art){
+            _addLocalArticle({
+              source:     'chartwell',
+              outlet:     'Chartwell',
+              week:       GAME.week,
+              timestamp:  Date.now(),
+              type:       'weekly_chart_summary',
+              artistName: _cswArtist,
+              headline:   art.headline,
+              content:    art.content
+            });
+            markDirty();
+          }
+        });
       }
-      if((song.streams||0) > 0){
-        song.chartPosition = newPos;
-      }
-    });
+    }
   }
 
   // Daily streams — use the real algorithm (fans, hype, quality, promo, trends, virality)
