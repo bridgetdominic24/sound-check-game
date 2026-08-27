@@ -13717,8 +13717,24 @@ function showLabelOwnerDashboard(startTab){
   // TAB BAR
   html += '<div id="odTabs" style="display:flex;background:var(--surf);border-bottom:1px solid var(--bord);overflow-x:auto;flex:none">'+tabHtml+'</div>';
 
+  // RECRUITING CONTROL (always visible between tabs and panes)
+  var recruitingOn=!ol.hasRosterFull;
+  var advSlots2=ol.advertisedSlots!==undefined?Math.min(ol.advertisedSlots,Math.max(0,tierDef.maxRoster-roster.length)):Math.max(0,tierDef.maxRoster-roster.length);
+  html+='<div style="background:var(--surf);border-bottom:1px solid var(--bord);padding:10px 16px;display:flex;align-items:center;gap:10px;flex:none">';
+  html+='<div style="flex:1;font-size:12.5px;font-weight:700">Recruiting</div>';
+  html+='<div style="display:flex;align-items:center;gap:8px">';
+  html+='<span style="font-size:11px;color:var(--mut)">Slots:</span>';
+  html+='<div style="display:flex;gap:4px">';
+  html+='<button onclick="odChangeSlots(-1)" style="width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--fb)">−</button>';
+  html+='<div id="od-slot-count" style="width:36px;height:30px;border-radius:8px;background:var(--acc-bg);border:1px solid var(--acc);color:var(--acc);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center">'+advSlots2+'</div>';
+  html+='<button onclick="odChangeSlots(1)" style="width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--fb)">+</button>';
+  html+='</div>';
+  html+='<div onclick="odToggleRecruiting(this)" data-is-on="'+(recruitingOn?'1':'')+'" style="width:36px;height:20px;border-radius:99px;background:'+(recruitingOn?'var(--green)':'var(--surf)')+';border:1px solid var(--bord);position:relative;cursor:pointer;transition:background .2s;flex:none">';
+  html+='<div style="position:absolute;top:2.5px;left:'+(recruitingOn?'19px':'2.5px')+';width:14px;height:14px;border-radius:50%;background:'+(recruitingOn?'#fff':'var(--mut)')+';transition:all .2s"></div></div>';
+  html+='</div></div>';
+
   // BODY
-  html += '<div id="odBody" style="padding:14px 16px;padding-bottom:100px"></div>';
+  html += '<div id="odBody" style="flex:1;overflow-y:auto;padding:14px 16px;padding-bottom:100px"></div>';
   html += '</div>';
 
   _insertOverlay(html);
@@ -13845,23 +13861,7 @@ function _odRoster(){
   var roster=ol.roster||[];
   var tierDef=LABEL_TIERS[ol.tier]||LABEL_TIERS.indie;
   var openSlots=Math.max(0,tierDef.maxRoster-roster.length);
-  var isRecruiting=!ol.hasRosterFull;
-  var advSlots=ol.advertisedSlots!==undefined?Math.min(ol.advertisedSlots,openSlots):openSlots;
   var out='';
-  // Recruiting control (moved into roster tab)
-  out+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:11px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">';
-  out+='<div style="flex:1"><div style="font-size:12.5px;font-weight:700;color:var(--txt)">Recruiting</div>';
-  out+='<div style="font-size:10.5px;color:var(--mut);margin-top:2px">'+openSlots+' open slot'+(openSlots!==1?'s':'')+' · '+tierDef.name+' cap '+tierDef.maxRoster+'</div></div>';
-  out+='<div style="display:flex;align-items:center;gap:8px">';
-  out+='<span style="font-size:11px;color:var(--mut)">Slots:</span>';
-  out+='<div style="display:flex;gap:4px;align-items:center">';
-  out+='<button onclick="odChangeSlots(-1)" style="width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--fb)">−</button>';
-  out+='<div id="od-slot-count" style="width:36px;height:30px;border-radius:8px;background:var(--acc-bg);border:1px solid var(--acc);color:var(--acc);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center">'+advSlots+'</div>';
-  out+='<button onclick="odChangeSlots(1)" style="width:30px;height:30px;border-radius:8px;background:var(--card);border:1px solid var(--bord);color:var(--txt);font-weight:800;font-size:14px;cursor:pointer;font-family:var(--fb)">+</button>';
-  out+='</div>';
-  out+='<div onclick="odToggleRecruiting(this)" data-is-on="'+(isRecruiting?'1':'')+'" style="width:36px;height:20px;border-radius:99px;background:'+(isRecruiting?'var(--green)':'var(--surf)')+';border:1px solid var(--bord);position:relative;cursor:pointer;transition:background .2s;flex:none">';
-  out+='<div style="position:absolute;top:2.5px;'+(isRecruiting?'left:19px':'left:2.5px')+';width:14px;height:14px;border-radius:50%;background:'+(isRecruiting?'#fff':'var(--mut)')+';transition:all .2s"></div></div>';
-  out+='</div></div>';
   // Roster header
   out+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
   out+='<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut)">SIGNED ARTISTS ('+roster.length+'/'+tierDef.maxRoster+' slots)</div>';
@@ -20095,7 +20095,6 @@ async function showLabelPublicPage(labelId, labelName){
     return;
   }
 
-  // GUARD: Validate UUID format before querying
   if(!isValidUUID(labelId)){
     console.error('❌ Invalid label ID format:', labelId);
     showEvent('⚠️','Invalid Label','This label ID is in an invalid format. Please try again.',['OK']);
@@ -20103,117 +20102,207 @@ async function showLabelPublicPage(labelId, labelName){
   }
 
   try {
-    // Fetch label data from Supabase
     console.log('🔍 Fetching label:', labelId);
     const {data: label, error} = await supabase.from('labels').select('*').eq('id', labelId).single();
-    if(error){
-      console.error('❌ Label fetch error:', error);
-      console.error('Error details:', JSON.stringify(error));
-      throw new Error(error.message || 'Could not load label details');
+    if(error){ console.error('❌ Label fetch error:', error); throw new Error(error.message || 'Could not load label details'); }
+    if(!label){ throw new Error('Label not found in database'); }
+    console.log('✅ Label loaded:', {id: label.id, name: label.name});
+
+    var roster = label.roster || [];
+    var isRecruiting = !label.has_roster_full;
+    var advertisedSlots = label.advertised_slots !== undefined ? label.advertised_slots : (roster.length > 0 ? 2 : 0);
+    var recruitText = isRecruiting ? '🟢 Recruiting · '+(advertisedSlots||'?')+' slot'+(advertisedSlots!==1?'s':'')+' open' : '🔴 Not recruiting';
+
+    // Compute stats
+    var totalStreams = roster.reduce(function(s,a){ return s+(a.totalStreams||a.streams||0); }, 0);
+    var combinedFans = roster.reduce(function(s,a){ return s+(a.fans||a.fanCount||0); }, 0);
+    var chartHits = (label.chart_hits || (label.activity||[]).filter(function(a){ return a.text && a.text.indexOf('chart')!==-1; }).length || 0);
+
+    // Tier badge colors
+    var tierKey = (label.tier||'indie').toLowerCase().replace(/[^a-z]/g,'');
+    var tierBgColor = {indie:'#3a2f22',mid:'#2c313d',major:'var(--acc-bg)',global:'rgba(35,20,5,1)'}[tierKey]||'#3a2f22';
+    var tierTxtColor = {indie:'#c9905a',mid:'#aab4c8',major:'var(--acc)',global:'#f59e0b'}[tierKey]||'#c9905a';
+    var tierName = {indie:'INDIE',mid:'MID-INDIE',major:'MAJOR BOUTIQUE',global:'GLOBAL MAJOR'}[tierKey]||(label.tier||'INDIE').toUpperCase();
+
+    var logoHtml = label.logo_image
+      ? '<img src="'+label.logo_image+'" style="width:100%;height:100%;object-fit:cover">'
+      : '<span style="font-size:46px">'+(label.logo_emoji||'🏢')+'</span>';
+
+    var genres = (label.genre_focus||[]);
+    var genrePills = genres.length ? genres.map(function(g){ return '<span style="font-size:10.5px;font-weight:700;border:1px solid var(--bord);border-radius:99px;padding:5px 12px;color:var(--mut)">'+g+'</span>'; }).join('') : '';
+
+    // Upcoming releases: scheduled songs across roster
+    var upcoming = [];
+    roster.forEach(function(a){
+      (a.pendingReleases||[]).filter(function(r){ return r.status==='scheduled'; }).forEach(function(r){
+        upcoming.push({title:r.title||'Untitled',artist:a.artistName,week:r.scheduledWeek||r.releaseWeek||'?',emoji:r.coverEmoji||'🎵',gradient:r.coverGradient||'linear-gradient(135deg,#2a3a4a,#1a2a3a)'});
+      });
+    });
+
+    // Featured artist (first spotlighted, or first in roster)
+    var featuredArtist = roster.find(function(a){ return a.spotlight; }) || roster[0] || null;
+
+    // Recent press about this label
+    var labelArticles = (GAME.localArticles||[]).filter(function(art){
+      return art.labelId===labelId || (art.body||'').toLowerCase().indexOf((label.name||'').toLowerCase())!==-1;
+    }).slice(0,3);
+
+    // Can apply?
+    var isOwner = GAME.ownedLabel && GAME.ownedLabel.id === labelId;
+    var alreadySigned = GAME.signedLabel && GAME.signedLabel.labelId === labelId;
+    var canApply = !isOwner && !alreadySigned && isRecruiting && GAME_MODE==='multi';
+
+    var outletStyles = {
+      velour: {bg:'#1a1a1a',txt:'#e8d9b0',name:'VELOUR'},
+      chartwell: {bg:'#1e2a3e',txt:'var(--blue)',name:'CHARTWELL'},
+      airtime: {bg:'#1e3a1e',txt:'var(--green)',name:'AIRTIME'},
+      'room service': {bg:'#3a1e2a',txt:'var(--pink)',name:'ROOM SERVICE'},
+      undertone: {bg:'#2a1e3a',txt:'var(--purple)',name:'UNDERTONE'}
+    };
+    function getOutletStyle(outlet){ var k=(outlet||'').toLowerCase(); for(var n in outletStyles){ if(k.indexOf(n)!==-1) return outletStyles[n]; } return {bg:'var(--surf)',txt:'var(--mut)',name:(outlet||'').toUpperCase()}; }
+    function fmtStreams(n){ return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?Math.round(n/1000)+'K':String(n||0); }
+    function fmtFans(n){ return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?Math.round(n/1000)+'K':String(n||0); }
+
+    var html = '<div style="display:flex;flex-direction:column;min-height:100%;background:var(--bg)">';
+
+    // ── HERO ──
+    html += '<div style="position:relative;overflow:hidden;min-height:220px;background:#05050a;flex:none">';
+    html += '<div style="position:absolute;inset:0;font-size:220px;display:flex;align-items:center;justify-content:center;opacity:.2;transform:scale(1.2);filter:blur(8px)">'+(label.logo_emoji||'🏢')+'</div>';
+    html += '<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,5,10,.2) 0%,rgba(5,5,10,.75) 65%,var(--bg) 100%)"></div>';
+    html += '<div style="position:relative;z-index:2;padding:14px 16px 0">';
+    // top nav
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">';
+    html += '<span style="font-size:11px;color:rgba(255,255,255,.45);font-weight:600">sound-check.app/labels</span>';
+    html += '<div style="display:flex;gap:8px">';
+    html += '<button style="font-size:11px;font-weight:700;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:99px;padding:5px 12px;cursor:pointer;font-family:var(--fb)" onclick="try{navigator.clipboard.writeText(location.href)}catch(e){}showToast(\'Link copied!\',\'green\')">⤴ Share</button>';
+    html += '<button onclick="_closeOverlay(this)" style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--fb)">✕</button>';
+    html += '</div></div>';
+    // centered brand
+    html += '<div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding-bottom:18px">';
+    html += '<div style="width:88px;height:88px;border-radius:22px;background:var(--surf);border:3px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(0,0,0,.5);overflow:hidden">'+logoHtml+'</div>';
+    html += '<h2 style="font-size:27px;font-weight:900;color:#fff;margin-top:12px;line-height:1.1">'+label.name+'</h2>';
+    html += '<div style="display:flex;gap:8px;margin-top:8px;justify-content:center;align-items:center;flex-wrap:wrap">';
+    html += '<span style="font-size:9.5px;font-weight:800;letter-spacing:.8px;padding:3px 9px;border-radius:4px;background:'+tierBgColor+';color:'+tierTxtColor+'">'+tierName+'</span>';
+    html += '<span style="font-size:11px;color:rgba(255,255,255,.5)">'+(label.region||'Global')+'</span>';
+    html += '</div>';
+    if(label.created_week || label.founded_week){ html += '<div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:4px">Founded Week '+(label.created_week||label.founded_week)+'</div>'; }
+    html += '</div></div></div>';
+
+    // ── STICKY APPLY BAR ──
+    html += '<div style="position:sticky;top:0;z-index:10;background:rgba(13,15,20,.95);border-bottom:1px solid var(--bord);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(8px)">';
+    html += '<div><div style="font-weight:700;font-size:13px">'+label.name+'</div><div style="color:var(--mut);font-size:10.5px;font-weight:600;margin-top:1px">'+recruitText+'</div></div>';
+    if(canApply){
+      html += '<button onclick="showApplyToLabel(\''+labelId+'\',\''+label.name.replace(/'/g,"\\'")+'\')" style="background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-weight:800;font-size:13px;padding:9px 18px;cursor:pointer;font-family:var(--fb)">Apply →</button>';
     }
-    if(!label) {
-      console.error('❌ Label not found in database');
-      throw new Error('Label not found in database');
-    }
-    console.log('✅ Label loaded:', {id: label.id, name: label.name, ownerId: label.owner_id});
+    html += '</div>';
 
-    // Get tier color
-    const tierColors = { Indie: '#3b82f6', 'Mid-Tier': '#f97316', Major: '#22c55e', Global: '#06b6d4' };
-    const tierColor = tierColors[label.tier] || '#3b82f6';
+    // ── STATS STRIP ──
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--bord)">';
+    html += '<div style="text-align:center;padding:12px 4px;border-right:1px solid var(--bord)"><b style="display:block;font-size:17px;font-weight:900;color:var(--acc)">'+fmtStreams(totalStreams)+'</b><span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin-top:2px;display:block">Total Streams</span></div>';
+    html += '<div style="text-align:center;padding:12px 4px;border-right:1px solid var(--bord)"><b style="display:block;font-size:17px;font-weight:900">'+fmtFans(combinedFans)+'</b><span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin-top:2px;display:block">Combined Fans</span></div>';
+    html += '<div style="text-align:center;padding:12px 4px"><b style="display:block;font-size:17px;font-weight:900">'+roster.length+'</b><span style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin-top:2px;display:block">Artists</span></div>';
+    html += '</div>';
 
-    let html = `<div style="padding-bottom:80px">`;
-
-    // Hero section
-    html += `<div style="background:linear-gradient(135deg,${tierColor}22 0%,${tierColor}11 100%);border-bottom:1px solid var(--bord);padding:20px 16px">
-      <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:16px">
-        <div style="width:80px;height:80px;border-radius:12px;background:var(--bg);border:2px solid ${tierColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
-          ${label.logo_image?'<img src="'+label.logo_image+'" style="width:100%;height:100%;object-fit:cover">':'<span style="font-size:42px">'+(label.logo_emoji||'🏢')+'</span>'}
-        </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:24px;font-weight:900;color:var(--txt);margin-bottom:6px">${label.name}</div>
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-            <span style="background:${tierColor};color:white;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${label.tier}</span>
-            <span style="font-size:11px;color:var(--mut)">${label.region||'—'}</span>
-          </div>
-          <div style="font-size:11px;color:var(--mut)">${(label.genre_focus||[]).join(', ')||'Mixed genres'}</div>
-        </div>
-      </div>
-      ${!label.has_roster_full?'<div style="background:#dcfce7;color:#166534;font-size:11px;font-weight:700;padding:8px 12px;border-radius:8px;text-align:center;width:100%">🟢 Currently Recruiting</div>':''}
-    </div>`;
-
-    // Bio section
+    // ── ABOUT ──
+    html += '<div style="padding:18px 16px 0">';
+    html += '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px"><h3 style="font-size:19px;font-weight:900">About</h3><div style="flex:1;height:1px;background:var(--bord)"></div></div>';
     if(label.bio){
-      html += `<div style="padding:16px;border-bottom:1px solid var(--bord)">
-        <div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">About</div>
-        <div style="font-size:13px;line-height:1.6;color:var(--txt)">${label.bio}</div>
-      </div>`;
+      html += '<div style="font-size:13.5px;line-height:1.75;color:var(--mut);background:var(--surf);border:1px solid var(--bord);border-top:3px solid var(--acc);border-radius:0 0 12px 12px;padding:13px 14px;margin-bottom:10px">';
+      html += label.bio.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += '</div>';
+    } else {
+      html += '<div style="font-size:13px;color:var(--mut);background:var(--surf);border:1px solid var(--bord);border-top:3px solid var(--acc);border-radius:0 0 12px 12px;padding:13px 14px;margin-bottom:10px;font-style:italic">No description yet.</div>';
+    }
+    if(genrePills){ html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+genrePills+'</div>'; }
+    html += '</div>';
+
+    // ── FEATURED ARTIST ──
+    if(featuredArtist){
+      var featFans = featuredArtist.fans || featuredArtist.fanCount || 0;
+      html += '<div style="padding:18px 16px 0">';
+      html += '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px"><h3 style="font-size:19px;font-weight:900">Featured Artist</h3><div style="flex:1;height:1px;background:var(--bord)"></div></div>';
+      html += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:16px;overflow:hidden;margin-bottom:12px">';
+      html += '<div style="height:110px;background:linear-gradient(135deg,#1a2a4e,#2a1a4e);display:flex;align-items:center;justify-content:center;font-size:54px;position:relative">';
+      html += featuredArtist.profilePic||'🎤';
+      html += '<div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(13,15,20,.85))"></div></div>';
+      html += '<div style="padding:12px 14px"><h4 style="font-size:16px;font-weight:800">'+featuredArtist.artistName+'</h4>';
+      html += '<div style="font-size:11px;color:var(--mut)">'+(featuredArtist.genre||'Pop')+'</div>';
+      html += '<div style="display:flex;gap:12px;margin-top:7px;font-size:10.5px;font-weight:700;color:var(--mut);flex-wrap:wrap">';
+      html += '<span>👥 <b style="color:var(--txt)">'+fmtFans(featFans)+'</b> fans</span>';
+      html += '</div></div></div>';
+      html += '</div>';
     }
 
-    // Featured artists section
-    if(label.featured_artists && label.featured_artists.length > 0){
-      html += `<div style="padding:16px;border-bottom:1px solid var(--bord)">
-        <div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">Featured Artists</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">`;
+    // ── UPCOMING ──
+    if(upcoming.length){
+      html += '<div style="padding:18px 16px 0"><div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px"><h3 style="font-size:19px;font-weight:900">Upcoming</h3><div style="flex:1;height:1px;background:var(--bord)"></div></div></div>';
+      upcoming.slice(0,4).forEach(function(u){
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--bord)">';
+        html += '<div style="width:38px;height:38px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font-size:17px;background:'+u.gradient+'">'+u.emoji+'</div>';
+        html += '<div style="flex:1"><b style="font-size:13px;display:block">'+u.title+'</b><span style="font-size:10.5px;color:var(--mut)">'+u.artist+' · Single</span></div>';
+        html += '<div style="font-size:10.5px;font-weight:700;color:var(--acc)">Wk '+u.week+'</div>';
+        html += '</div>';
+      });
+    }
 
-      for(let aId of (label.featured_artists || [])){
-        // Fetch artist data
-        const {data: artist} = await supabase.from('players').select('*').eq('id', aId).single();
-        if(artist){
-          const gd = artist.game_data || {};
-          const photo = gd.photo || null;
-          html += `<div style="text-align:center;cursor:pointer" onclick="showArtistHub('${artist.id}','${(artist.display_name||'').replace(/"/g,'')}')" title="${artist.display_name}">
-            <div style="width:100%;aspect-ratio:1;border-radius:10px;background:var(--surf);border:1.5px solid var(--bord);margin-bottom:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background-size:cover;background-image:url('${photo||''}')" style="${photo?'background-size:cover':''}">
-              ${!photo?'<span style="font-size:28px">🎤</span>':''}
-            </div>
-            <div style="font-size:11px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${artist.display_name}</div>
-          </div>`;
-        }
+    // ── ARTISTS / ROSTER ──
+    html += '<div style="padding:18px 16px 0;margin-top:6px"><div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px"><h3 style="font-size:19px;font-weight:900">Artists</h3><div style="flex:1;height:1px;background:var(--bord)"></div></div></div>';
+    if(!roster.length){
+      html += '<div style="text-align:center;padding:20px 16px;color:var(--mut);font-size:13px">No artists signed yet.</div>';
+    } else {
+      roster.forEach(function(a){
+        var af = a.fans||a.fanCount||0;
+        html += '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--bord)">';
+        html += '<div style="width:42px;height:42px;border-radius:50%;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none">'+(a.profilePic||'🎤')+'</div>';
+        html += '<div style="flex:1"><b style="font-size:14px;display:block">'+a.artistName+'</b><span style="font-size:10px;color:var(--mut);display:block;margin-top:1px">'+(a.genre||'Pop')+(a.spotlight?' · ⭐ Featured':'')+'</span></div>';
+        html += '<div style="text-align:right"><b style="display:block;font-size:13px">'+fmtFans(af)+'</b><span style="font-size:9.5px;color:var(--mut)">fans</span></div>';
+        html += '</div>';
+      });
+    }
+
+    // ── IN THE PRESS ──
+    if(labelArticles.length){
+      html += '<div style="padding:18px 16px 0;margin-top:6px"><div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px"><h3 style="font-size:19px;font-weight:900">In the Press</h3><div style="flex:1;height:1px;background:var(--bord)"></div></div></div>';
+      html += '<div style="padding:0 16px">';
+      labelArticles.forEach(function(art){
+        var os = getOutletStyle(art.outlet);
+        html += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:12px 14px;margin-bottom:8px">';
+        html += '<div style="font-size:9px;font-weight:800;letter-spacing:.8px;padding:2px 7px;border-radius:4px;display:inline-block;margin-bottom:5px;background:'+os.bg+';color:'+os.txt+'">'+os.name+'</div>';
+        html += '<h4 style="font-size:13px;font-weight:700;line-height:1.35">'+(art.headline||art.title||'Article')+'</h4>';
+        if(art.summary||art.excerpt){ html += '<p style="font-size:11px;color:var(--mut);margin-top:4px;line-height:1.45">'+(art.summary||art.excerpt||'')+'</p>'; }
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    // ── APPLY CTA ──
+    if(canApply){
+      html += '<div style="margin:18px 16px 0;background:linear-gradient(135deg,#2a1e3a,#1a1028);border:1px solid #3a2a55;border-radius:18px;padding:20px;text-align:center">';
+      if(isRecruiting){
+        html += '<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--green);border:1px solid var(--green);border-radius:99px;padding:3px 12px;display:inline-block;margin-bottom:12px">● RECRUITING · '+(advertisedSlots||'?')+' SLOT'+(advertisedSlots!==1?'S':'')+'</div>';
       }
-      html += `</div></div>`;
+      html += '<h4 style="font-size:18px;font-weight:900;margin-bottom:6px">Join '+label.name+'</h4>';
+      if(label.what_we_look_for){
+        html += '<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:11.5px;line-height:1.7;color:var(--mut);text-align:left">'+label.what_we_look_for+'</div>';
+      } else {
+        html += '<p style="font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:14px">Send in your application — your stats auto-attach.</p>';
+      }
+      html += '<button onclick="showApplyToLabel(\''+labelId+'\',\''+label.name.replace(/'/g,"\\'")+'\')" style="width:100%;background:var(--acc);color:var(--acc-txt);border:none;border-radius:12px;font-weight:800;font-size:14px;padding:14px;cursor:pointer;font-family:var(--fb)">Apply to This Label</button>';
+      html += '</div>';
     }
 
-    // Roster section
-    html += `<div style="padding:16px;border-bottom:1px solid var(--bord)">
-      <div style="font-size:12px;font-weight:700;color:var(--mut);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">Roster (${(label.roster||[]).length} artists)</div>
-      <div style="display:flex;flex-direction:column;gap:8px">`;
+    html += '<div style="height:40px"></div></div>';
 
-    for(let member of (label.roster || [])){
-      const contractJson = encodeURIComponent(JSON.stringify({cut: member.cut, dealType: member.dealType, publishing: member.publishing, masters: member.masters, length: member.length, signedWeek: member.signedWeek, artistName: member.artistName, userId: member.userId}));
-      html += `<div onclick="showContractDetails('${contractJson}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;cursor:pointer;transition:all 0.2s">
-        <div style="width:40px;height:40px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px">🎤</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;color:var(--txt)">${member.artistName}</div>
-          <div style="font-size:10px;color:var(--mut)">Since week ${member.signedWeek || '—'}</div>
-        </div>
-      </div>`;
-    }
+    _insertOverlay(html);
+    showToast(label.name+' loaded','green');
 
-    html += `</div></div>`;
-
-    // Apply button (for artists not signed to this label)
-    if(GAME.signedLabel && !GAME.signedLabel.isOwner && GAME.signedLabel.labelId !== labelId){
-      html += `<div style="padding:16px;text-align:center">
-        <button onclick="showApplyToLabel('${labelId}','${label.name}')" style="background:var(--acc);color:white;border:none;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:700;width:100%;cursor:pointer;font-family:var(--fb)">Apply to ${label.name}</button>
-      </div>`;
-    }
-
-    html += `</div>`;
-
-    _insertOverlay(`<div style="text-align:left;padding:0;border-radius:0;max-height:none">
-      <div style="background:var(--bg);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bord)">
-        <div style="font-size:14px;font-weight:800">🏷 ${label.name}</div>
-        <button onclick="document.querySelectorAll('[data-app-overlay]').forEach(el=>el.remove())" style="background:none;border:none;font-size:20px;cursor:pointer;padding:0">✕</button>
-      </div>
-      ${html}
-    </div>`);
-    showToast(label.name + ' loaded','green');
   } catch(err){
     console.error('❌ Label page error:', err);
-    console.error('Stack:', err.stack);
     const errorMsg = err.message || 'Unknown error';
-    showEvent('⚠️','Label Not Found','Could not load label details.\n\n'+errorMsg+'\n\nThis label may not exist yet or may have been deleted.',['OK']);
+    showEvent('⚠️','Label Not Found','Could not load label details.\n\n'+errorMsg,['OK']);
   }
 }
+
 
 async function showApplyToLabel(labelId, labelName){
   // Placeholder for application flow
