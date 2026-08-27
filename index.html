@@ -5084,6 +5084,11 @@ function checkViralMoment(){
   // Money from immediate viral streams ($0.004 per stream — same as daily rate)
   const viralRevenue = immediateStreams * 0.004;
   GAME.money = (GAME.money||0) + viralRevenue;
+  // Track in finance history so Finances tab shows it
+  if(!GAME.financeHistory) GAME.financeHistory = [];
+  var _vfw = GAME.financeHistory.find(function(h){ return h.week===(GAME.week||1); });
+  if(!_vfw){ _vfw={week:GAME.week||1,streamingRevenue:0,jobPay:0,gigPay:0,tipsPay:0,minigamePay:0,managerFees:0,rent:0,promo:0}; GAME.financeHistory.push(_vfw); }
+  _vfw.streamingRevenue = (_vfw.streamingRevenue||0) + viralRevenue;
 
   // Track viral moment
   if(!GAME.viralMoments)GAME.viralMoments=[];
@@ -20259,10 +20264,33 @@ async function showLabelPublicPage(labelId, labelName){
     // Featured artist (first spotlighted, or first in roster)
     var featuredArtist = roster.find(function(a){ return a.spotlight; }) || roster[0] || null;
 
-    // Recent press about this label
-    var labelArticles = (GAME.localArticles||[]).filter(function(art){
-      return art.labelId===labelId || (art.body||'').toLowerCase().indexOf((label.name||'').toLowerCase())!==-1;
-    }).slice(0,3);
+    // Recent press about this label and its roster artists (fetch from Supabase)
+    var labelArticles = [];
+    if(GAME_MODE==='multi' && typeof supabase!=='undefined'){
+      try {
+        // Collect all player_ids on the roster
+        var rosterUserIds = roster.map(function(a){ return a.userId; }).filter(Boolean);
+        var labelQ = supabase.from('industry_articles').select('id,source,outlet,week,timestamp,type,artist_name,headline,preview')
+          .order('timestamp',{ascending:false}).limit(8);
+        if(rosterUserIds.length){
+          labelQ = labelQ.in('player_id', rosterUserIds);
+        } else if(label.owner_id){
+          labelQ = labelQ.eq('player_id', label.owner_id);
+        }
+        var labelArtRes = await labelQ;
+        if(!labelArtRes.error && labelArtRes.data){
+          labelArticles = labelArtRes.data.map(function(a){
+            return { id:a.id, source:a.source||'music-wire', outlet:a.outlet||a.source||'', week:a.week, timestamp:a.timestamp, type:a.type, artistName:a.artist_name, headline:a.headline||'', preview:a.preview||'' };
+          });
+        }
+      } catch(e){ console.warn('[showLabelPublicPage] articles fetch failed:', e); }
+    }
+    // Fallback: local articles about this label
+    if(!labelArticles.length){
+      labelArticles = (GAME.localArticles||GAME.newsArticles||[]).filter(function(art){
+        return (art.labelId===labelId) || (art.artistName && roster.some(function(r){ return r.artistName===art.artistName; }));
+      }).slice(0,5);
+    }
 
     // Can apply?
     var isOwner = GAME.ownedLabel && GAME.ownedLabel.id === labelId;
@@ -35977,7 +36005,7 @@ async function _pushArticle(article){
   if(!article.id) article.id = 'art_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   if(!article.timestamp) article.timestamp = Date.now();
   // Avoid local duplicates
-  if(GAME.newsArticles.find(a=>a.id===article.id || (a.type && a.type===article.type))) return;
+  if(GAME.newsArticles.find(a=>a.id===article.id)) return; // deduplicate by ID only
   GAME.newsArticles.push(article);
   // In multiplayer, push to Supabase so ALL players see it
   if(GAME_MODE==='multi' && typeof supabase!=='undefined' && currentUser){
