@@ -14394,6 +14394,7 @@ async function confirmCreateLabel(){
   };
 
   // Add founder to their own roster
+  var _founderFans = Object.values(GAME.fansByRegion||{}).reduce(function(s,v){return s+(v||0);},0);
   label.roster.push({
     id: GAME.playerId || null,
     userId: currentUser?.id || null,
@@ -14405,6 +14406,7 @@ async function confirmCreateLabel(){
     weeklyAdvance: 0,
     weeklyEarnings: 0,
     totalStreams: getTotalStreams?.() || 0,
+    fans: _founderFans,
     signedWeek: GAME.week || 1,
     spotlight: false,
     quotaWarning: false,
@@ -14750,6 +14752,7 @@ async function acceptLabelOffer_v2(offerId){
         try { gd = typeof ownerRow.game_data === 'string' ? JSON.parse(ownerRow.game_data) : (ownerRow.game_data||{}); } catch(e){ gd = {}; }
         if(gd.ownedLabel){
           gd.ownedLabel.roster = (gd.ownedLabel.roster||[]).filter(a=>a.userId !== currentUser?.id);
+          var _signeeFans = Object.values(GAME.fansByRegion||{}).reduce(function(s,v){return s+(v||0);},0);
           gd.ownedLabel.roster.push({
             id: GAME.playerId || null,
             userId: currentUser?.id || null,
@@ -14761,6 +14764,7 @@ async function acceptLabelOffer_v2(offerId){
             weeklyAdvance: offer.terms.advance || 0,
             weeklyEarnings: 0,
             totalStreams: getTotalStreams(),
+            fans: _signeeFans,
             signedWeek: signedWeek,
             spotlight: false,
             quotaWarning: false,
@@ -20117,14 +20121,44 @@ async function showLabelPublicPage(labelId, labelName){
     if(!label){ throw new Error('Label not found in database'); }
     console.log('✅ Label loaded:', {id: label.id, name: label.name});
 
+    // Fetch live roster from owner's player data (labels table doesn't store roster reliably)
     var roster = label.roster || [];
-    var isRecruiting = !label.has_roster_full;
-    var advertisedSlots = label.advertised_slots !== undefined ? label.advertised_slots : (roster.length > 0 ? 2 : 0);
+    var labelOwnedData = null;
+    if(label.owner_id){
+      try {
+        var ownerResult = await supabase.from('players').select('game_data').eq('user_id', label.owner_id).single();
+        if(!ownerResult.error && ownerResult.data && ownerResult.data.game_data){
+          var gd = typeof ownerResult.data.game_data === 'string' ? JSON.parse(ownerResult.data.game_data) : ownerResult.data.game_data;
+          if(gd.ownedLabel && gd.ownedLabel.id === labelId){
+            labelOwnedData = gd.ownedLabel;
+            roster = gd.ownedLabel.roster || [];
+            console.log('[showLabelPublicPage] Live roster loaded:', roster.length, 'artists');
+          }
+        }
+      } catch(e){ console.error('[showLabelPublicPage] Could not fetch owner player data:', e); }
+    }
+    var isRecruiting = labelOwnedData ? !labelOwnedData.hasRosterFull : !label.has_roster_full;
+    var tierDefForSlots = LABEL_TIERS[(labelOwnedData ? labelOwnedData.tier : label.tier)||'indie'] || LABEL_TIERS.indie;
+    var openSlots = Math.max(0, tierDefForSlots.maxRoster - roster.length);
+    var advertisedSlots = labelOwnedData
+      ? (labelOwnedData.advertisedSlots !== undefined ? Math.min(labelOwnedData.advertisedSlots, openSlots) : openSlots)
+      : (label.advertised_slots !== undefined ? label.advertised_slots : openSlots);
     var recruitText = isRecruiting ? '🟢 Recruiting · '+(advertisedSlots||'?')+' slot'+(advertisedSlots!==1?'s':'')+' open' : '🔴 Not recruiting';
 
-    // Compute stats
+    // Compute stats — look up live fan counts from allPlayers if available
     var totalStreams = roster.reduce(function(s,a){ return s+(a.totalStreams||a.streams||0); }, 0);
-    var combinedFans = roster.reduce(function(s,a){ return s+(a.fans||a.fanCount||0); }, 0);
+    var combinedFans = roster.reduce(function(s,a){
+      // Try to look up current fan count from allPlayers data
+      var livePlayer = (window.allPlayers||[]).find(function(p){ return p.user_id === a.userId; });
+      if(livePlayer && livePlayer.game_data){
+        try{
+          var lgd = typeof livePlayer.game_data==='string'?JSON.parse(livePlayer.game_data):livePlayer.game_data;
+          var lf = Object.values(lgd.fansByRegion||{}).reduce(function(x,v){return x+(v||0);},0);
+          if(lf>0) return s+lf;
+        }catch(e){}
+      }
+      return s+(a.fans||a.fanCount||0);
+    }, 0);
     var chartHits = (label.chart_hits || (label.activity||[]).filter(function(a){ return a.text && a.text.indexOf('chart')!==-1; }).length || 0);
 
     // Tier badge colors
