@@ -13738,9 +13738,7 @@ function showLabelOwnerDashboard(startTab){
 }
 
 function odOpenSettings(){
-  var ov=document.querySelector('[data-overlay]');
-  if(ov) _closeOverlay(ov);
-  setTimeout(function(){ showLabelOwnerSettings(); },150);
+  showLabelOwnerSettings();
 }
 
 function odToggleRecruiting(el){
@@ -13829,12 +13827,9 @@ function _odActivity(){
   } else {
     out+='<div style="text-align:center;padding:40px 20px"><div style="font-size:32px;margin-bottom:12px">📊</div><div style="color:var(--mut);font-size:13px">No activity yet. Sign your first artist to get started.</div></div>';
   }
-  // Quick actions
-  out+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px">';
-  out+='<button onclick="showLabelLoans()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">🏦 Bank Loans</button>';
-  out+='<button onclick="showHireStaffFlow()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">👥 Hire Staff</button>';
-  out+='<button onclick="showLabelShowcase()" style="background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">🎪 Showcase</button>';
-  out+='<button onclick="showSignArtistFlow()" style="background:var(--acc);color:var(--acc-txt);border:none;border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">➕ Sign Artist</button>';
+  // Quick actions (Showcase only — Loans in Finances, Hire Staff in Press)
+  out+='<div style="margin-top:16px">';
+  out+='<button onclick="showLabelShowcase()" style="width:100%;background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">🎪 Showcase</button>';
   out+='</div>';
   return out;
 }
@@ -14029,6 +14024,11 @@ function _odPress(){
   } else {
     out+='<div style="text-align:center;padding:40px 20px"><div style="font-size:32px;margin-bottom:12px">📰</div><div style="color:var(--mut);font-size:13px">No press coverage yet.</div></div>';
   }
+  // Hire Staff action
+  out+='<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--bord)">';
+  out+='<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">PRESS STAFF</div>';
+  out+='<button onclick="showHireStaffFlow()" style="width:100%;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;padding:12px;font-weight:800;font-size:12px;color:var(--txt);cursor:pointer;font-family:var(--fb)">👥 Hire Staff (PR, Legal, A&R…)</button>';
+  out+='</div>';
   return out;
 }
 
@@ -15474,7 +15474,12 @@ function showLabelOwnerSettings(){
   </div>`;
 
   html += `</div>`;
-  openMenu('⚙️ Label Settings', html);
+  var header='<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surf);border-bottom:1px solid var(--bord);flex:none">'
+    +'<button onclick="_closeOverlay(this)" style="width:30px;height:30px;border-radius:50%;background:var(--bg);border:1px solid var(--bord);color:var(--txt);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--fb)">&#8249;</button>'
+    +'<span style="font-size:15px;font-weight:800;flex:1">Label Settings</span>'
+    +'</div>';
+  var wrapper='<div style="display:flex;flex-direction:column;height:100%;overflow:hidden">'+header+'<div style="flex:1;overflow-y:auto">'+html+'</div></div>';
+  _insertOverlay(wrapper);
 }
 
 function saveLabelSettings(){
@@ -19883,7 +19888,7 @@ async function submitCounter(requestId,currentRound){
 }
 // ──────────────────────────────────────────────────────────
 
-function showFindPlayersOnly(){
+function showFindPlayersOnly(startTab){
   var html='<div style="padding:0;display:flex;flex-direction:column;height:100%">'
     // Tabs
     +'<div style="display:flex;gap:0;padding:0;border-bottom:2px solid var(--bord);background:var(--surf);position:sticky;top:0;z-index:10">'
@@ -19904,6 +19909,10 @@ function showFindPlayersOnly(){
     +'</div>';
   openMenu('🎤 Find Artists',html);
   window._fpCurrentTab='artists';
+  // switch to requested tab after DOM is ready
+  if(startTab && startTab!=='artists'){
+    setTimeout(function(){ _switchFindTab(startTab); },50);
+  }
   if(GAME_MODE!=='multi'||!supabase||!currentUser){
     var el=document.getElementById('findPlayersList');
     if(el) el.innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Available in Live mode only.</div>';
@@ -38276,7 +38285,7 @@ function loadDiscoverContent(){
       </div>
       ${GAME_MODE==='multi'
         ? `<div onclick="showCollabArtists()" style="${ri}"><div style="${ric};background:var(--bord)">🎤</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-0.1px">Find artists to collaborate with</div><div style="font-size:11px;color:var(--mut);margin-top:1px;font-weight:500">Send collab requests, feature on tracks</div></div><div style="${ra}">Open →</div></div>
-        <div onclick="showFindPlayersOnly();setTimeout(function(){_switchFindTab('labels');},100)" style="${ri};border-bottom:none"><div style="${ric};background:var(--bord)">🏷️</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-0.1px">Browse record labels</div><div style="font-size:11px;color:var(--mut);margin-top:1px;font-weight:500">Find labels to sign with or scout artists</div></div><div style="${ra}">Open →</div></div>`
+        <div onclick="showFindPlayersOnly('labels')" style="${ri};border-bottom:none"><div style="${ric};background:var(--bord)">🏷️</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-0.1px">Browse record labels</div><div style="font-size:11px;color:var(--mut);margin-top:1px;font-weight:500">Find labels to sign with or scout artists</div></div><div style="${ra}">Open →</div></div>`
         : `<div onclick="showQikipedia()" style="${ri};border-bottom:none"><div style="${ric};background:var(--bord)">📚</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-0.1px">Browse artist database</div><div style="font-size:11px;color:var(--mut);margin-top:1px;font-weight:500">Profiles, bios and discographies</div></div><div style="${ra}">Open →</div></div>`
       }
     </div>
@@ -38348,7 +38357,16 @@ function loadDiscoverContent(){
 }
 
 // loadPlayers / renderPlayerList / filterPlayers / displayPlayers — removed, use showFindPlayersOnly
-async function loadPlayers(){ showFindPlayersOnly(); }
+async function loadPlayers(){
+  if(GAME_MODE!=='multi'||typeof supabase==='undefined'||!currentUser){ return; }
+  try{
+    var result=await supabase.from('players').select('*');
+    if(!result.error && result.data){
+      window.allPlayers=result.data;
+      console.log('[loadPlayers] loaded',result.data.length,'players');
+    }
+  } catch(e){ console.error('[loadPlayers] error:',e); }
+}
 function renderPlayerList(){ showFindPlayersOnly(); }
 function filterPlayers(){ }
 function displayPlayers(){ }
