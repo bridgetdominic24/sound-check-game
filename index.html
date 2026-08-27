@@ -10195,10 +10195,13 @@ function goToSleepInternal(){
   const hypeChange=-1; // Lose 1 hype per week
   let inspChange=Math.floor(Math.random()*10)+5; // 5-15 inspiration gain base
   
-  // Housing affects creativity!
-  if(GAME.housing && GAME.housing.type === 'Shared Room'){
-    inspChange -= 10; // Cramped living drains creativity
-    console.log('🏠 Shared Room penalty: -10 creativity');
+  // Housing affects creativity (daily penalty already applied in applyDailyRefresh;
+  // this weekly summary reflects it for display purposes only — no double-dip)
+  if(GAME.housing && typeof GAME.housing.creativityChange === 'number' && GAME.housing.creativityChange < 0){
+    console.log('🏠 Housing creativity change:', GAME.housing.creativityChange, '(', GAME.housing.type, ')');
+  } else if(GAME.housing && GAME.housing.type === 'Shared Room'){
+    // Legacy save without creativityChange stored
+    console.log('🏠 Shared Room legacy penalty: -10 creativity');
   }
   
   // Calculate THIS WEEK'S UPCOMING EARNINGS (before nextDay adds them)
@@ -10574,200 +10577,477 @@ function showBusiness(){
 }
 
 function showHousing(){
-  const rent=GAME.housing?.rent||300;
-  const type=GAME.housing?.type||'Shared Room';
-  const missed=GAME.housing?.missedPayments||0;
-  
-  const options=[
-    {type:'Shared Room',rent:300,deposit:150,desc:'Cheapest option, shared living space',energyBonus:0},
-    {type:'Shared Apartment',rent:600,deposit:600,desc:'Split rent with roommates',energyBonus:5},
-    {type:'Studio Apartment',rent:1200,deposit:1200,desc:'Your own private space',energyBonus:10},
-    {type:'1BR Apartment',rent:2000,deposit:2000,desc:'Spacious one bedroom apartment',energyBonus:15},
-    {type:'Penthouse',rent:4000,deposit:4000,desc:'Luxury living, maximum comfort',energyBonus:20}
+  // ── Regional config ──────────────────────────────────────────────────────────
+  var HOUSING_REGIONS = {
+    'North America':{mult:1,    city:'Los Angeles', flag:'🌎', tiers:[
+      {name:'Shared Room',     local:'Shared Room',           hood:'4C Broad St, Downtown LA'},
+      {name:'Shared Apartment',local:'Shared Apartment',      hood:'2B Maple Ave, Silver Lake'},
+      {name:'Studio Apartment',local:'Studio',                hood:'Studio 7, 221 Arts District Way'},
+      {name:'1BR Apartment',   local:'1-Bedroom',             hood:'Apt 12A, 555 Midtown Blvd'},
+      {name:'Penthouse',       local:'Penthouse',             hood:'Penthouse, 1 Skyline Tower'}
+    ]},
+    'Europe':{mult:1.4, city:'London', flag:'🌍', tiers:[
+      {name:'Shared Room',     local:'Bedsit',                hood:'Flat 3, 14 Brixton Rd, Brixton'},
+      {name:'Shared Apartment',local:'Houseshare',            hood:'Flat B, 88 Hackney Rd, Hackney'},
+      {name:'Studio Apartment',local:'Studio Flat',           hood:'Studio 4, 33 Shoreditch High St'},
+      {name:'1BR Apartment',   local:'One-Bed Flat',          hood:'Flat 6, 12 Camden High St'},
+      {name:'Penthouse',       local:'Penthouse Suite',       hood:'Penthouse, 1 The Shard'}
+    ]},
+    'Africa':{mult:0.45, city:'Lagos', flag:'🌍', tiers:[
+      {name:'Shared Room',     local:'Face-Me-I-Face-You',    hood:'No. 7 Ojuelegba Rd, Surulere'},
+      {name:'Shared Apartment',local:'Shared Flat',           hood:'Block C, 22 Yaba Close, Yaba'},
+      {name:'Studio Apartment',local:'Self-Contain',          hood:'Suite 5, 4 Allen Ave, Ikeja'},
+      {name:'1BR Apartment',   local:'Mini Flat',             hood:'Apt 8, 11 Lekki Phase 1'},
+      {name:'Penthouse',       local:'Penthouse',             hood:'Penthouse, Eko Atlantic City'}
+    ]},
+    'Asia':{mult:0.9, city:'Seoul', flag:'🌏', tiers:[
+      {name:'Shared Room',     local:'Gosiwon',               hood:'Gosi 7, 33 Sinchon-ro, Mapo-gu'},
+      {name:'Shared Apartment',local:'Sharedhouse',           hood:'3F, 18 Hongdae-ro, Mapo-gu'},
+      {name:'Studio Apartment',local:'Oneroom',               hood:'Suite 201, 44 Gangnam-daero'},
+      {name:'1BR Apartment',   local:'Officetel',             hood:'1104, Itaewon Heights, Yongsan-gu'},
+      {name:'Penthouse',       local:'Penthouse',             hood:'Penthouse, Lotte World Tower, Jamsil'}
+    ]},
+    'South America':{mult:0.6, city:'São Paulo', flag:'🌎', tiers:[
+      {name:'Shared Room',     local:'Quarto Compartilhado',  hood:'Rua Augusta 120, Centro'},
+      {name:'Shared Apartment',local:'República',             hood:'Ap. 3B, Rua Frei Caneca, Consolação'},
+      {name:'Studio Apartment',local:'Kitnet',                hood:'Studio 5, Rua Oscar Freire, Jardins'},
+      {name:'1BR Apartment',   local:'Apartamento',           hood:'Ap. 802, Av. Paulista, Bela Vista'},
+      {name:'Penthouse',       local:'Cobertura',             hood:'Cobertura, Edifício Infinity, Itaim'}
+    ]},
+    'Oceania':{mult:1.15, city:'Sydney', flag:'🌏', tiers:[
+      {name:'Shared Room',     local:'Shareroom',             hood:'Rm 3, 44 King St, Newtown'},
+      {name:'Shared Apartment',local:'Sharehouse',            hood:'Flat B, 88 Crown St, Surry Hills'},
+      {name:'Studio Apartment',local:'Studio',                hood:'Studio 6, 12 Oxford St, Darlinghurst'},
+      {name:'1BR Apartment',   local:'1 Bedder',              hood:'Apt 14, 8 Circular Quay West'},
+      {name:'Penthouse',       local:'Penthouse',             hood:'Penthouse, Barangaroo Tower'}
+    ]}
+  };
+
+  var BASE_RENTS  = [300,600,1200,2000,4000];
+  var BASE_DEPS   = [150,600,1200,2000,4000];
+  var ENERGY_BONUS     = [-10,-5,0,2,5];
+  var CREATIVITY_CHANGE= [-10,-8,-5,-2,0];
+
+  var TIER_EMOJIS = ['🛏️','🛋️','🏙️','🌆','🌃'];
+  var TIER_GRADS  = [
+    'linear-gradient(135deg,#2a2a3a,#1c1c2a)',
+    'linear-gradient(135deg,#1e3a2e,#121a18)',
+    'linear-gradient(135deg,#1e2a3e,#121824)',
+    'linear-gradient(135deg,#3a2a1e,#2a1a0e)',
+    'linear-gradient(135deg,#2a1e3a,#1a1028)'
   ];
-  
-  let optionsHTML='';
-  options.forEach(opt=>{
-    const isCurrent=opt.type===type;
-    const canAfford=GAME.money>=opt.deposit;
-    
-    optionsHTML+=`
-      <div style="padding:16px;border:2px solid ${isCurrent?'#4CAF50':'#e0e0e0'};border-radius:12px;margin-bottom:12px;background:${isCurrent?'#f1f8f4':'white'}">
-        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
-          <div style="flex:1">
-            <div style="font-size:16px;font-weight:700;color:#000;margin-bottom:4px">${opt.type}</div>
-            <div style="font-size:13px;color:#666;line-height:1.4">${opt.desc}</div>
-            ${opt.energyBonus > 0 ? `<div style="font-size:12px;color:#4CAF50;margin-top:4px">⚡ +${opt.energyBonus} energy regen bonus</div>` : ''}
-          </div>
-          <div style="text-align:right;margin-left:16px">
-            <div style="font-size:18px;font-weight:700;color:#000">$${opt.rent}/wk</div>
-            <div style="font-size:12px;color:#666">$${opt.deposit} deposit</div>
-          </div>
-        </div>
-        ${isCurrent?
-          `<div style="text-align:center;padding:12px;background:#4CAF50;color:white;border-radius:8px;font-weight:700;margin-top:8px">✓ Current Home</div>`
-          :
-          `<div style="display:flex;gap:8px;margin-top:8px">
-            <button onclick="viewLeaseContract('${opt.type}',${opt.rent},${opt.deposit})" 
-                    style="flex:1;background:var(--surf);color:var(--txt);border:2px solid var(--bord);padding:10px 12px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">
-              📄 View Lease
-            </button>
-            <button onclick="moveToNewPlace('${opt.type}',${opt.rent},${opt.deposit})" 
-                    style="flex:1;background:${canAfford?'linear-gradient(135deg,#667eea,#764ba2)':'#ccc'};color:white;border:none;padding:10px 12px;border-radius:8px;font-weight:700;cursor:${canAfford?'pointer':'not-allowed'};font-size:13px"
-                    ${canAfford?'':'disabled'}>
-              ${canAfford?'Move In':'Need $'+(opt.deposit-GAME.money).toLocaleString()+' More'}
-            </button>
-          </div>`
-        }
-      </div>
-    `;
-  });
-  
-  const html=`
-    <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:#f8f9fa;z-index:200000;overflow-y:auto">
-      <div style="max-width:600px;margin:0 auto;min-height:100vh;background:#f8f9fa">
-        <div style="background:linear-gradient(135deg,#4CAF50,#2196F3);padding:20px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.1)">
-          <div style="display:flex;align-items:center;gap:12px">
-            <button onclick="this.parentElement.parentElement.parentElement.parentElement.remove()" style="background:rgba(255,255,255,0.3);color:white;border:none;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer">←</button>
-            <h2 style="margin:0;font-size:22px;font-weight:700;flex:1;color:white">🏠 Housing</h2>
-          </div>
-        </div>
-        
-        <div style="padding:20px;padding-bottom:80px">
-          <!-- Current Housing Card -->
-          <div style="background:white;padding:24px;border-radius:16px;margin-bottom:20px;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-            <div style="font-size:13px;color:#999;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;font-weight:600">You Currently Live In</div>
-            <div style="font-size:32px;font-weight:700;color:#000;margin-bottom:4px">${type}</div>
-            <div style="font-size:20px;color:#666;font-weight:600;margin-bottom:16px">$${rent}/week</div>
-            ${missed>0?`<div style="background:#ffebee;border-left:4px solid #f44336;padding:12px;border-radius:8px;margin-top:12px">
-              <div style="font-weight:700;color:#c62828;margin-bottom:4px">⚠️ Missed ${missed} Payment${missed>1?'s':''}</div>
-              <div style="font-size:13px;color:#c62828">${missed>=2?'You will be evicted this week!':'Miss one more and you\'ll be kicked out!'}</div>
-            </div>`:''}
-          </div>
-          
-          <!-- Available Housing -->
-          <div style="background:white;padding:20px;border-radius:12px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-            <div style="font-size:16px;font-weight:700;margin-bottom:16px;color:#000">📦 Move to a New Place</div>
-            ${optionsHTML}
-          </div>
-          
-          <!-- Warning -->
-          <div style="background:#fff3cd;border-left:4px solid #ffc107;padding:16px;border-radius:8px">
-            <div style="font-weight:700;margin-bottom:8px;color:#856404;font-size:14px">⚠️ Important</div>
-            <div style="font-size:13px;line-height:1.6;color:#856404">Miss 2 rent payments and you'll be evicted to the streets! While homeless, you'll lose 5-15 inspiration randomly each week.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend',html);
+
+  var PERKS = [
+    [{cls:'p-bad',txt:'−10 energy/day'},{cls:'p-bad',txt:'−10 creativity/day'}],
+    [{cls:'p-bad',txt:'−5 energy/day'}, {cls:'p-bad',txt:'−8 creativity/day'}],
+    [{cls:'p-cr', txt:'Energy neutral'},{cls:'p-bad',txt:'−5 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'}],
+    [{cls:'p-en', txt:'⚡ +2 energy/day'},{cls:'p-bad',txt:'−2 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'},{cls:'p-st',txt:'🧘 Stress −3/day'},{cls:'p-cr',txt:'Collab speed +10%'}],
+    [{cls:'p-en', txt:'⚡ +5 energy/day'},{cls:'p-cr',txt:'No creativity loss'},{cls:'p-cr',txt:'🏆 Studio-quality home'},{cls:'p-st',txt:'👑 Rep +0.2/wk'},{cls:'p-st',txt:'📰 Velour-worthy address'}]
+  ];
+
+  var region = GAME.homeRegion || 'North America';
+  var rd = HOUSING_REGIONS[region] || HOUSING_REGIONS['North America'];
+  var curType  = GAME.housing ? (GAME.housing.type || 'Shared Room') : 'Shared Room';
+  var missed   = GAME.housing ? (GAME.housing.missedPayments || 0) : 0;
+  var curTierIdx = ['Shared Room','Shared Apartment','Studio Apartment','1BR Apartment','Penthouse'].indexOf(curType);
+  if(curTierIdx < 0) curTierIdx = 0;
+
+  function hRent(r, i){ return Math.round(BASE_RENTS[i] * (HOUSING_REGIONS[r]||rd).mult / 50) * 50; }
+  function hDep(r, i){  return Math.round(BASE_DEPS[i]  * (HOUSING_REGIONS[r]||rd).mult / 50) * 50; }
+  function fmt(n){ return '$' + Math.round(n).toLocaleString(); }
+
+  // Build the perk pill HTML
+  function perkPills(i){
+    return PERKS[i].map(function(p){
+      return '<span style="' + ({
+        'p-en':'background:#1a3a2a;color:var(--green,#4cc98a)',
+        'p-cr':'background:#1e2a3e;color:var(--blue,#5a9df3)',
+        'p-st':'background:#1e1a2e;color:var(--purple,#a97de8)',
+        'p-bad':'background:#2a1212;color:var(--red,#e06666)'
+      }[p.cls]||'') + ';font-size:9.5px;font-weight:700;border-radius:99px;padding:3px 9px;display:inline-block;margin:2px">' + p.txt + '</span>';
+    }).join('');
+  }
+
+  // Build lease document HTML (cream style)
+  function leaseDoc(i, r){
+    var t = (HOUSING_REGIONS[r]||rd).tiers[i];
+    var wrent = hRent(r,i);
+    var wdep  = hDep(r,i);
+    var en = ENERGY_BONUS[i];
+    var cr = CREATIVITY_CHANGE[i];
+    var extras = [
+      'This unit is a shared living space. Tenant acknowledges limited privacy and shared common areas.',
+      'This unit is a shared apartment. Tenant shares space with up to 2 roommates. Common areas maintained jointly.',
+      'This unit is a self-contained studio. Tenant has full private occupancy. Home recording permitted within noise ordinance hours.',
+      'This unit is a private one-bedroom apartment. Full occupancy with dedicated bedroom. Recording and creative work permitted.',
+      'This unit is a luxury penthouse suite. Tenant receives concierge access, priority maintenance, and full building amenities. Velour magazine has been known to reference this address.'
+    ];
+    var crTxt = cr < 0
+      ? '<span style="background:#fde8e8;color:#8b1a1a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">' + cr + ' creativity / day</span>'
+      : '<span style="background:#d4f5e5;color:#1a5c3a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">No creativity penalty</span>';
+    var enTxt = en > 0
+      ? '<span style="background:#d4f5e5;color:#1a5c3a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">+' + en + ' energy regen / day</span>'
+      : '<span style="background:#fde8e8;color:#8b1a1a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">No energy regen bonus</span>';
+    var artistName = GAME.artistName || GAME.sn || 'Artist';
+    return '<div style="font-family:Georgia,serif;color:#1a1410">'
+      + '<div style="text-align:center;border-bottom:2px solid #1a1410;padding-bottom:12px;margin-bottom:12px">'
+      + '<div style="font-size:10px;font-weight:800;letter-spacing:3px;color:#888;margin-bottom:4px">SOUND CHECK REALTY CO.</div>'
+      + '<h4 style="font-size:15px;letter-spacing:1px;text-transform:uppercase;margin:0">Residential Lease Agreement</h4>'
+      + '<div style="font-size:10px;color:#666;margin-top:3px;font-style:italic">' + t.name + ' · ' + t.hood + '</div>'
+      + '</div>'
+      + '<div style="font-size:10.5px;color:#4a3a2a;margin-bottom:10px;line-height:1.6;border-bottom:1px solid #d8cec0;padding-bottom:10px">'
+      + '<b>Landlord:</b> Sound Check Realty Co.<br><b>Tenant:</b> ' + artistName + '<br><b>Property:</b> ' + t.hood + '<br><b>Term:</b> Week-to-week tenancy'
+      + '</div>'
+      + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 1 — RENT</div>'
+      + '<p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Tenant shall pay <b>' + fmt(wrent) + ' per game week</b>, deducted automatically. A security deposit of <b>' + fmt(wdep) + '</b> is due upon signing, refundable on good standing exit.</p></div>'
+      + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 2 — PREMISES</div>'
+      + '<p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">' + extras[i] + ' ' + crTxt + ' ' + enTxt + '</p></div>'
+      + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 3 — MISSED PAYMENTS</div>'
+      + '<p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Three consecutive missed rent payments will result in automatic eviction to the lowest available tier. Deposit is forfeited upon eviction.</p></div>'
+      + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 4 — TERMINATION</div>'
+      + '<p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Either party may terminate at any time. Moving to a new property automatically terminates this agreement.</p></div>'
+      + '<div style="display:flex;gap:16px;margin-top:14px;border-top:1px solid #d8cec0;padding-top:12px">'
+      + '<div style="flex:1"><div style="border-bottom:1.5px solid #1a1410;height:28px;display:flex;align-items:flex-end;padding-bottom:2px;font-family:\'Brush Script MT\',cursive;font-size:17px;color:#1a3a6b">Sound Check Realty</div><div style="font-size:9px;color:#888;letter-spacing:.8px;text-transform:uppercase;margin-top:4px">Landlord</div></div>'
+      + '<div style="flex:1"><div style="border-bottom:1.5px solid #1a1410;height:28px;display:flex;align-items:flex-end;padding-bottom:2px;font-family:\'Brush Script MT\',cursive;font-size:17px;color:#1a3a6b" id="hsg-sig-' + i + '"></div><div style="font-size:9px;color:#888;letter-spacing:.8px;text-transform:uppercase;margin-top:4px">Tenant — sign on move-in</div></div>'
+      + '</div></div>';
+  }
+
+  // Build listing cards
+  var listingsHtml = '';
+  for(var i = 0; i < 5; i++){
+    var t = rd.tiers[i];
+    var wrent = hRent(region, i);
+    var wdep  = hDep(region, i);
+    var isCurrent = (curType === t.name);
+    var canAfford = (GAME.money || 0) >= wdep;
+    var actBtns = isCurrent
+      ? '<button style="flex:1;background:var(--green,#4cc98a);color:#071a0e;border:none;border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:default">✓ Current Home</button>'
+      : '<button id="hsg-lb-' + i + '" onclick="hsgToggleLease(' + i + ')" style="flex:0 0 38%;background:var(--surf);color:var(--txt);border:1px solid var(--bord);border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:pointer">View Lease</button>'
+        + '<button onclick="hsgConfirm(' + i + ')" style="flex:1;background:var(--acc,#e8b44c);color:var(--acc-txt,#0d0f14);border:1px solid var(--acc,#e8b44c);border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:pointer">Move In</button>';
+
+    listingsHtml += '<div style="margin:0 16px 12px;border-radius:18px;overflow:hidden;border:2px solid ' + (isCurrent ? 'var(--green,#4cc98a)' : 'var(--bord)') + '">'
+      + '<div style="height:80px;display:flex;align-items:center;justify-content:center;font-size:40px;position:relative;background:' + TIER_GRADS[i] + '">'
+      + TIER_EMOJIS[i]
+      + '<span style="position:absolute;top:8px;right:10px;font-size:9px;font-weight:800;letter-spacing:.8px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.5);color:rgba(255,255,255,.8)">Tier ' + (i+1) + '</span>'
+      + '</div>'
+      + '<div style="padding:12px 14px;background:var(--card)">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">'
+      + '<div><div style="font-size:15.5px;font-weight:800;color:var(--txt)">' + t.name + '</div>'
+      + (t.local !== t.name ? '<div style="font-size:10px;color:var(--mut);font-style:italic;margin-top:1px">"' + t.local + '"</div>' : '')
+      + '</div>'
+      + '<div style="text-align:right"><b style="font-size:16px;font-weight:900;display:block;color:var(--txt)">' + fmt(wrent) + '</b><span style="font-size:10px;color:var(--mut)">/week · ' + fmt(wdep) + ' dep.</span></div>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--mut);margin-bottom:8px">📍 ' + t.hood + '</div>'
+      + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">' + perkPills(i) + '</div>'
+      + '<div style="display:flex;gap:7px">' + actBtns + '</div>'
+      + '</div>'
+      + '<div id="hsg-lease-' + i + '" style="max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease;background:#f5f0e8;border-top:0 solid var(--bord)"></div>'
+      + '</div>';
+  }
+
+  // Current home stats
+  var curEn  = ENERGY_BONUS[curTierIdx];
+  var curCr  = CREATIVITY_CHANGE[curTierIdx];
+  var curRentAmt = hRent(region, curTierIdx);
+  var curHood = rd.tiers[curTierIdx].hood;
+  var curLocalName = rd.tiers[curTierIdx].name + (rd.tiers[curTierIdx].local !== rd.tiers[curTierIdx].name ? ' — ' + rd.tiers[curTierIdx].local : '');
+
+  var city = rd.city;
+
+  var html = '<div style="background:linear-gradient(160deg,#1a1230 0%,#1e2a3e 55%,#0d0f14 100%);padding:18px 16px 16px;position:relative;overflow:hidden;flex:none">'
+    + '<svg style="position:absolute;bottom:0;left:0;right:0;height:54px;opacity:.15;width:100%" viewBox="0 0 390 54" preserveAspectRatio="none">'
+    + '<rect x="8" y="18" width="16" height="36" fill="#fff"/><rect x="12" y="10" width="8" height="10" fill="#fff"/>'
+    + '<rect x="30" y="28" width="20" height="26" fill="#fff"/><rect x="57" y="12" width="12" height="42" fill="#fff"/>'
+    + '<rect x="76" y="22" width="24" height="32" fill="#fff"/><rect x="130" y="16" width="18" height="38" fill="#fff"/>'
+    + '<rect x="186" y="20" width="16" height="34" fill="#fff"/><rect x="236" y="14" width="14" height="40" fill="#fff"/>'
+    + '<rect x="286" y="18" width="16" height="36" fill="#fff"/><rect x="340" y="20" width="16" height="34" fill="#fff"/>'
+    + '</svg>'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;position:relative;z-index:2">'
+    + '<button onclick="document.querySelectorAll(\'body > div[data-app-overlay]\').forEach(function(el){el.remove()})" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:16px;cursor:pointer">‹</button>'
+    + '<span style="font-size:13px;font-weight:700;color:rgba(255,255,255,.65)">Housing</span>'
+    + '<select onchange="hsgSetRegion(this.value)" style="margin-left:auto;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;font-size:10px;font-weight:700;padding:5px 8px;cursor:pointer" id="hsg-region-sel">'
+    + '<option value="North America">🌎 North America</option>'
+    + '<option value="Europe">🌍 Europe</option>'
+    + '<option value="Africa">🌍 Africa</option>'
+    + '<option value="Asia">🌏 Asia</option>'
+    + '<option value="South America">🌎 South America</option>'
+    + '<option value="Oceania">🌏 Oceania</option>'
+    + '</select>'
+    + '</div>'
+    + '<div style="font-family:Georgia,serif;font-size:22px;color:#fff;position:relative;z-index:2" id="hsg-htitle">Your Place in ' + city + '</div>'
+    + '<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;position:relative;z-index:2" id="hsg-haddr">' + rd.flag + ' ' + city + ' · Week ' + (GAME.week || 1) + '</div>'
+    + '</div>'
+    // Current home card
+    + '<div style="margin:14px 16px 0;background:var(--card);border:1px solid var(--bord);border-radius:18px;overflow:hidden">'
+    + '<div style="padding:14px;background:linear-gradient(135deg,#1a2a3e,#141a2a)">'
+    + '<div style="font-size:9px;font-weight:800;letter-spacing:1.5px;color:var(--blue,#5a9df3);margin-bottom:4px">CURRENTLY LIVING IN</div>'
+    + '<div style="font-family:Georgia,serif;font-size:20px;color:#fff" id="hsg-cur-name">' + curLocalName + '</div>'
+    + '<div style="font-size:10.5px;color:var(--mut);margin-top:3px" id="hsg-cur-addr">' + curHood + '</div>'
+    + (missed > 0 ? '<div style="margin-top:8px;background:rgba(224,102,102,.15);border:1px solid var(--red,#e06666);border-radius:8px;padding:8px;font-size:11px;color:var(--red,#e06666);font-weight:700">⚠️ Missed ' + missed + ' payment' + (missed > 1 ? 's' : '') + (missed >= 2 ? ' — eviction imminent!' : '') + '</div>' : '')
+    + '</div>'
+    + '<div style="display:flex">'
+    + '<div style="flex:1;padding:10px;text-align:center;border-top:1px solid var(--bord);border-right:1px solid var(--bord)"><b style="display:block;font-size:15px;font-weight:900;color:var(--red,#e06666)" id="hsg-cur-rent">' + fmt(curRentAmt) + '</b><small style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin-top:1px;display:block">Per Week</small></div>'
+    + '<div style="flex:1;padding:10px;text-align:center;border-top:1px solid var(--bord);border-right:1px solid var(--bord)"><b style="display:block;font-size:15px;font-weight:900;color:' + (curEn > 0 ? 'var(--green,#4cc98a)' : curEn < 0 ? 'var(--red,#e06666)' : 'var(--mut)') + '">' + (curEn > 0 ? '+' : '') + curEn + '</b><small style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin-top:1px;display:block">Energy/Day</small></div>'
+    + '<div style="flex:1;padding:10px;text-align:center;border-top:1px solid var(--bord)"><b style="display:block;font-size:15px;font-weight:900;color:var(--red,#e06666)">' + (curCr < 0 ? curCr : '0') + '</b><small style="font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--mut);text-transform:uppercase;margin-top:1px;display:block">Creativity/Day</small></div>'
+    + '</div></div>'
+    // Listings
+    + '<div style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);padding:14px 16px 8px">Available Places</div>'
+    + '<div id="hsg-listings">' + listingsHtml + '</div>'
+    + '<div style="height:20px"></div>';
+
+  _insertOverlay(html);
+
+  // Set region select to current
+  var sel = document.getElementById('hsg-region-sel');
+  if(sel) sel.value = region;
 }
 
-// old viewLeaseContract removed
-
-function viewLeaseContract(type,rent,deposit){
-  var eb={'Shared Room':0,'Shared Apartment':5,'Studio Apartment':10,'1BR Apartment':15,'Penthouse':20};
-  var addr={'Shared Room':'43 Broad St, Apt 4C, Los Angeles','Shared Apartment':'118 Maple Ave, Apt 2B, Los Angeles','Studio Apartment':'221 Arts District Way, Studio 7, Los Angeles','1BR Apartment':'555 Midtown Blvd, Apt 12A, Los Angeles','Penthouse':'1 Skyline Tower, Penthouse, Los Angeles'};
-  var bonus=eb[type]||0;
-  var totalDue=rent+deposit;
-  var canAfford=(GAME.money||0)>=deposit;
-  var isCurrent=GAME.housing&&GAME.housing.type===type;
-  var artistName=GAME.artistName||GAME.sn||'Artist';
-  var signDate=typeof gameWeekToShortDate==='function'?gameWeekToShortDate(GAME.week||1,1):'Week '+(GAME.week||1);
-
-  var overlayId='lease-overlay-'+Date.now();
-  var phone=document.getElementById('phone')||document.querySelector('.phone');
-  var themeClass=phone?phone.className:'';
-  var html='<div id="'+overlayId+'" class="'+themeClass+'" style="position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:200000;overflow-y:auto">'  
-    +'<div style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--surf);border-bottom:1px solid var(--bord);position:sticky;top:0;z-index:10">'
-    +'<button onclick="document.getElementById(\''+overlayId+'\').remove()" style="background:var(--surf);border:1.5px solid var(--bord);color:var(--txt);border-radius:50%;width:38px;height:38px;font-size:18px;cursor:pointer;touch-action:manipulation">←</button>'
-    +'<div style="font-size:15px;font-weight:700;color:var(--txt)">📋 Lease Agreement</div>'
-    +'</div>'
-    +'<div style="max-width:520px;margin:0 auto;padding:20px;padding-bottom:60px">'
-    // Header
-    +'<div style="text-align:center;margin-bottom:24px;border-bottom:3px solid var(--txt);padding-bottom:20px">'
-    +'<div style="font-size:22px;font-weight:bold;color:var(--txt);letter-spacing:1px;font-family:Georgia,serif">📋 LEASE AGREEMENT</div>'
-    +'<div style="font-size:11px;color:var(--mut);margin-top:6px;letter-spacing:1px">OFFICIAL RESIDENTIAL LEASE CONTRACT</div>'
-    +'</div>'
-    // Property grid
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">'
-    +'<div><div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:4px">PROPERTY</div><div style="font-size:15px;font-weight:bold;color:var(--txt)">'+type+'</div></div>'
-    +'<div><div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:4px">ADDRESS</div><div style="font-size:12px;font-weight:bold;color:var(--txt)">'+addr[type]+'</div></div>'
-    +'</div>'
-    // Rent + deposit
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">'
-    +'<div><div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:4px">WEEKLY RENT</div><div style="font-size:20px;font-weight:bold;color:var(--acc)">$'+rent.toLocaleString()+'</div></div>'
-    +'<div><div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:4px">SECURITY DEPOSIT</div><div style="font-size:18px;font-weight:bold;color:#ff9800">$'+deposit.toLocaleString()+'</div><div style="font-size:11px;color:var(--mut)">(refundable)</div></div>'
-    +'</div>'
-    // Lease term card
-    +'<div style="background:var(--surf);border-left:4px solid var(--txt);padding:14px;border-radius:4px;margin-bottom:20px">'
-    +'<div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:6px">LEASE TERM</div>'
-    +'<div style="font-size:16px;font-weight:bold;color:var(--txt)">52 weeks (1 year)</div>'
-    +'<div style="font-size:12px;color:var(--mut);margin-top:4px">Rent deducted weekly automatically.</div>'
-    +(bonus>0?'<div style="font-size:12px;color:#2ed573;margin-top:4px;font-weight:700">⚡ +'+bonus+' Energy per day</div>':'')
-    +'</div>'
-    // Cost summary
-    +'<div style="background:var(--acc-bg);border:1px solid var(--acc);padding:14px;border-radius:8px;margin-bottom:20px">'
-    +'<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px;color:var(--txt)"><span>First Week Rent:</span><strong>$'+rent.toLocaleString()+'</strong></div>'
-    +'<div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bord);padding-bottom:8px;margin-bottom:8px;font-size:13px;color:var(--txt)"><span>Security Deposit:</span><strong>$'+deposit.toLocaleString()+'</strong></div>'
-    +'<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:bold;color:var(--txt)"><span>TOTAL DUE TODAY:</span><span style="color:var(--acc)">$'+totalDue.toLocaleString()+'</span></div>'
-    +'</div>'
-    // Terms
-    +'<div style="background:var(--surf);border-top:2px solid var(--txt);padding:14px;margin-bottom:20px">'
-    +'<div style="font-size:12px;font-weight:bold;color:var(--txt);margin-bottom:10px;letter-spacing:1px">TERMS & CONDITIONS</div>'
-    +'<ul style="margin:0;padding-left:18px;font-size:12px;color:var(--txt);line-height:1.9">'
-    +'<li>Rent deducted weekly from your earnings</li>'
-    +'<li>Miss 1 payment = formal warning</li>'
-    +'<li>Miss 2 payments = immediate eviction</li>'
-    +'<li>Breaking lease: forfeits deposit + $800 fee</li>'
-    +'<li>Security deposit refunded on good standing exit</li>'
-    +'</ul></div>'
-    // Signature
-    +'<div style="margin-top:28px;padding-top:20px;border-top:2px solid var(--bord)">'
-    +'<div style="font-size:10px;color:var(--mut);font-weight:bold;letter-spacing:1px;margin-bottom:14px">TENANT SIGNATURE</div>'
-    +'<div style="border-bottom:2px solid var(--txt);height:44px;margin-bottom:8px;display:flex;align-items:flex-end;padding-bottom:4px">'
-    +(isCurrent?'<div style="font-size:26px;color:var(--txt);font-style:italic;font-family:Georgia,serif">'+artistName+'</div>':'')
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;font-size:11px;color:var(--mut)">'
-    +'<div><strong style="display:block">Tenant Name (Print)</strong><span style="color:var(--txt)">'+artistName+'</span></div>'
-    +'<div><strong style="display:block">Date Signed</strong><span style="color:var(--txt)">'+(isCurrent?signDate:'—')+'</span></div>'
-    +'</div></div>'
-    // Agreement checkbox
-    +'<div style="margin-top:20px;padding:14px;background:var(--surf);border-left:4px solid #ffc107;border-radius:4px">'
-    +'<div style="display:flex;gap:10px;align-items:center">'
-    +'<input type="checkbox" id="leaseAgreeBox" style="width:20px;height:20px;cursor:pointer;accent-color:var(--acc)" '+(isCurrent?'checked disabled':'')+'>'
-    +'<div style="font-size:13px;color:var(--txt)"><strong>I agree to all terms and conditions above.</strong><br><span style="font-size:12px;color:var(--mut)">By signing, you legally bind yourself to this lease.</span></div>'
-    +'</div></div>'
-    // Buttons
-    +'<div style="display:flex;gap:10px;margin-top:20px">'
-    +(isCurrent
-      ?'<div style="flex:1;padding:14px;background:var(--acc-bg);color:var(--acc);border:2px solid var(--acc);border-radius:8px;font-weight:bold;text-align:center">✓ Currently Living Here</div>'
-      :(canAfford
-        ?'<button id="signLeaseBtn" data-oid="'+overlayId+'" data-type="'+type+'" data-rent="'+rent+'" data-deposit="'+deposit+'" onclick="(function(btn){var cb=document.getElementById(\'leaseAgreeBox\');if(!cb||!cb.checked){showToast(\'Please agree to the terms first\',\'red\');return;}var oid=btn.getAttribute(\'data-oid\');var t=btn.getAttribute(\'data-type\');var r=parseInt(btn.getAttribute(\'data-rent\'));var d=parseInt(btn.getAttribute(\'data-deposit\'));if(oid)document.getElementById(oid).remove();moveToNewPlace(t,r,d);})(this)" style="flex:1;padding:14px;background:#2ed573;color:white;border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:14px;touch-action:manipulation">✍️ Sign Lease & Move In</button>'
-        :'<div style="flex:1;padding:14px;background:var(--surf);border:2px solid var(--bord);color:var(--mut);border-radius:8px;font-weight:bold;text-align:center;font-size:13px">Need $'+(deposit-Math.floor(GAME.money||0)).toLocaleString()+' more</div>')
-    )
-    +'<button onclick="document.getElementById(\''+overlayId+'\').remove()" style="padding:14px 20px;background:var(--surf);border:2px solid var(--bord);color:var(--txt);border-radius:8px;font-weight:bold;cursor:pointer;touch-action:manipulation">Cancel</button>'
-    +'</div></div></div>';
-  document.body.insertAdjacentHTML('beforeend',html);
+// ── Housing helper: toggle lease inline ───────────────────────────────────────
+function hsgToggleLease(i){
+  var sheet = document.getElementById('hsg-lease-' + i);
+  var btn   = document.getElementById('hsg-lb-' + i);
+  if(!sheet) return;
+  var isOpen = sheet.style.maxHeight && sheet.style.maxHeight !== '0px' && sheet.style.maxHeight !== '0';
+  if(!isOpen){
+    // Lazy-build the doc
+    if(!sheet.dataset.built){
+      var region = GAME.homeRegion || 'North America';
+      sheet.innerHTML = '<div style="padding:16px">' + _hsgLeaseDoc(i, region) + '</div>';
+      sheet.dataset.built = '1';
+    }
+    sheet.style.maxHeight = '600px';
+    sheet.style.borderTopWidth = '1px';
+    sheet.style.padding = '0';
+    if(btn){ btn.textContent = '✕ Close'; btn.style.background = 'var(--acc-bg)'; btn.style.color = 'var(--acc)'; btn.style.borderColor = 'var(--acc)'; }
+  } else {
+    sheet.style.maxHeight = '0';
+    sheet.style.borderTopWidth = '0';
+    if(btn){ btn.textContent = 'View Lease'; btn.style.background = 'var(--surf)'; btn.style.color = 'var(--txt)'; btn.style.borderColor = 'var(--bord)'; }
+  }
 }
 
-function moveToNewPlace(type,rent,deposit){
-  if(GAME.money<deposit){
-    showEvent('💰','Not Enough Money',`You need $${deposit} for the deposit!`,['OK']);
+// ── Housing helper: build lease document (internal) ───────────────────────────
+function _hsgLeaseDoc(i, region){
+  var HOUSING_REGIONS = {
+    'North America':{mult:1,    tiers:[{name:'Shared Room',local:'Shared Room',hood:'4C Broad St, Downtown LA'},{name:'Shared Apartment',local:'Shared Apartment',hood:'2B Maple Ave, Silver Lake'},{name:'Studio Apartment',local:'Studio',hood:'Studio 7, 221 Arts District Way'},{name:'1BR Apartment',local:'1-Bedroom',hood:'Apt 12A, 555 Midtown Blvd'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, 1 Skyline Tower'}]},
+    'Europe':{mult:1.4,         tiers:[{name:'Shared Room',local:'Bedsit',hood:'Flat 3, 14 Brixton Rd, Brixton'},{name:'Shared Apartment',local:'Houseshare',hood:'Flat B, 88 Hackney Rd, Hackney'},{name:'Studio Apartment',local:'Studio Flat',hood:'Studio 4, 33 Shoreditch High St'},{name:'1BR Apartment',local:'One-Bed Flat',hood:'Flat 6, 12 Camden High St'},{name:'Penthouse',local:'Penthouse Suite',hood:'Penthouse, 1 The Shard'}]},
+    'Africa':{mult:0.45,        tiers:[{name:'Shared Room',local:'Face-Me-I-Face-You',hood:'No. 7 Ojuelegba Rd, Surulere'},{name:'Shared Apartment',local:'Shared Flat',hood:'Block C, 22 Yaba Close, Yaba'},{name:'Studio Apartment',local:'Self-Contain',hood:'Suite 5, 4 Allen Ave, Ikeja'},{name:'1BR Apartment',local:'Mini Flat',hood:'Apt 8, 11 Lekki Phase 1'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Eko Atlantic City'}]},
+    'Asia':{mult:0.9,           tiers:[{name:'Shared Room',local:'Gosiwon',hood:'Gosi 7, 33 Sinchon-ro, Mapo-gu'},{name:'Shared Apartment',local:'Sharedhouse',hood:'3F, 18 Hongdae-ro, Mapo-gu'},{name:'Studio Apartment',local:'Oneroom',hood:'Suite 201, 44 Gangnam-daero'},{name:'1BR Apartment',local:'Officetel',hood:'1104, Itaewon Heights, Yongsan-gu'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Lotte World Tower, Jamsil'}]},
+    'South America':{mult:0.6,  tiers:[{name:'Shared Room',local:'Quarto Compartilhado',hood:'Rua Augusta 120, Centro'},{name:'Shared Apartment',local:'República',hood:'Ap. 3B, Rua Frei Caneca, Consolação'},{name:'Studio Apartment',local:'Kitnet',hood:'Studio 5, Rua Oscar Freire, Jardins'},{name:'1BR Apartment',local:'Apartamento',hood:'Ap. 802, Av. Paulista, Bela Vista'},{name:'Penthouse',local:'Cobertura',hood:'Cobertura, Edifício Infinity, Itaim'}]},
+    'Oceania':{mult:1.15,       tiers:[{name:'Shared Room',local:'Shareroom',hood:'Rm 3, 44 King St, Newtown'},{name:'Shared Apartment',local:'Sharehouse',hood:'Flat B, 88 Crown St, Surry Hills'},{name:'Studio Apartment',local:'Studio',hood:'Studio 6, 12 Oxford St, Darlinghurst'},{name:'1BR Apartment',local:'1 Bedder',hood:'Apt 14, 8 Circular Quay West'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Barangaroo Tower'}]}
+  };
+  var BASE_RENTS=[300,600,1200,2000,4000];
+  var BASE_DEPS=[150,600,1200,2000,4000];
+  var ENERGY_BONUS=[-10,-5,0,2,5];
+  var CREATIVITY_CHANGE=[-10,-8,-5,-2,0];
+  var rd = HOUSING_REGIONS[region] || HOUSING_REGIONS['North America'];
+  var t = rd.tiers[i];
+  var mult = rd.mult;
+  var wrent = Math.round(BASE_RENTS[i]*mult/50)*50;
+  var wdep  = Math.round(BASE_DEPS[i]*mult/50)*50;
+  var en = ENERGY_BONUS[i];
+  var cr = CREATIVITY_CHANGE[i];
+  var fmt = function(n){ return '$' + Math.round(n).toLocaleString(); };
+  var extras=['This unit is a shared living space. Tenant acknowledges limited privacy and shared common areas.','This unit is a shared apartment. Tenant shares space with up to 2 roommates. Common areas maintained jointly.','This unit is a self-contained studio. Tenant has full private occupancy. Home recording permitted within noise ordinance hours.','This unit is a private one-bedroom apartment. Full occupancy with dedicated bedroom. Recording and creative work permitted.','This unit is a luxury penthouse suite. Tenant receives concierge access, priority maintenance, and full building amenities. Velour magazine has been known to reference this address.'];
+  var crTxt = cr < 0
+    ? '<span style="background:#fde8e8;color:#8b1a1a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">' + cr + ' creativity / day</span>'
+    : '<span style="background:#d4f5e5;color:#1a5c3a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">No creativity penalty</span>';
+  var enTxt = en > 0
+    ? '<span style="background:#d4f5e5;color:#1a5c3a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">+' + en + ' energy regen / day</span>'
+    : '<span style="background:#fde8e8;color:#8b1a1a;font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">No energy regen bonus</span>';
+  var artistName = GAME.artistName || GAME.sn || 'Artist';
+  return '<div style="font-family:Georgia,serif;color:#1a1410">'
+    + '<div style="text-align:center;border-bottom:2px solid #1a1410;padding-bottom:12px;margin-bottom:12px">'
+    + '<div style="font-size:10px;font-weight:800;letter-spacing:3px;color:#888;margin-bottom:4px">SOUND CHECK REALTY CO.</div>'
+    + '<h4 style="font-size:15px;letter-spacing:1px;text-transform:uppercase;margin:0">Residential Lease Agreement</h4>'
+    + '<div style="font-size:10px;color:#666;margin-top:3px;font-style:italic">' + t.name + ' · ' + t.hood + '</div>'
+    + '</div>'
+    + '<div style="font-size:10.5px;color:#4a3a2a;margin-bottom:10px;line-height:1.6;border-bottom:1px solid #d8cec0;padding-bottom:10px"><b>Landlord:</b> Sound Check Realty Co.<br><b>Tenant:</b> ' + artistName + '<br><b>Property:</b> ' + t.hood + '<br><b>Term:</b> Week-to-week tenancy</div>'
+    + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 1 — RENT</div><p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Tenant shall pay <b>' + fmt(wrent) + ' per game week</b>, deducted automatically. A security deposit of <b>' + fmt(wdep) + '</b> is due upon signing, refundable on good standing exit.</p></div>'
+    + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 2 — PREMISES</div><p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">' + extras[i] + ' ' + crTxt + ' ' + enTxt + '</p></div>'
+    + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 3 — MISSED PAYMENTS</div><p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Three consecutive missed payments result in automatic eviction. Deposit is forfeited upon eviction.</p></div>'
+    + '<div style="margin-bottom:8px"><div style="font-size:9px;font-weight:800;letter-spacing:1px;color:#888;margin-bottom:2px">ARTICLE 4 — TERMINATION</div><p style="font-size:10.5px;color:#2a1a10;line-height:1.6;margin:0">Either party may terminate at any time. Moving to a new property automatically terminates this agreement.</p></div>'
+    + '<div style="display:flex;gap:16px;margin-top:14px;border-top:1px solid #d8cec0;padding-top:12px">'
+    + '<div style="flex:1"><div style="border-bottom:1.5px solid #1a1410;height:28px;display:flex;align-items:flex-end;padding-bottom:2px;font-family:cursive;font-size:17px;color:#1a3a6b">Sound Check Realty</div><div style="font-size:9px;color:#888;letter-spacing:.8px;text-transform:uppercase;margin-top:4px">Landlord</div></div>'
+    + '<div style="flex:1"><div style="border-bottom:1.5px solid #1a1410;height:28px" id="hsg-sig-' + i + '"></div><div style="font-size:9px;color:#888;letter-spacing:.8px;text-transform:uppercase;margin-top:4px">Tenant — sign on move-in</div></div>'
+    + '</div></div>';
+}
+
+// ── Housing helper: show move-in confirm overlay ───────────────────────────────
+function hsgConfirm(i){
+  var HOUSING_REGIONS = {
+    'North America':{mult:1,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]},
+    'Europe':{mult:1.4,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]},
+    'Africa':{mult:0.45,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]},
+    'Asia':{mult:0.9,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]},
+    'South America':{mult:0.6,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]},
+    'Oceania':{mult:1.15,tiers:[{name:'Shared Room'},{name:'Shared Apartment'},{name:'Studio Apartment'},{name:'1BR Apartment'},{name:'Penthouse'}]}
+  };
+  var BASE_RENTS=[300,600,1200,2000,4000];
+  var BASE_DEPS=[150,600,1200,2000,4000];
+  var ENERGY_BONUS=[-10,-5,0,2,5];
+  var CREATIVITY_CHANGE=[-10,-8,-5,-2,0];
+  var region = GAME.homeRegion || 'North America';
+  var rd = HOUSING_REGIONS[region] || HOUSING_REGIONS['North America'];
+  var mult = rd.mult;
+  var wrent = Math.round(BASE_RENTS[i]*mult/50)*50;
+  var wdep  = Math.round(BASE_DEPS[i]*mult/50)*50;
+  var en = ENERGY_BONUS[i];
+  var cr = CREATIVITY_CHANGE[i];
+  var tname = ['Shared Room','Shared Apartment','Studio Apartment','1BR Apartment','Penthouse'][i];
+  var fmt = function(n){ return '$' + Math.round(n).toLocaleString(); };
+  var bal = (GAME.money||0) - wdep;
+
+  // Find the confirm overlay placeholder inside the current overlay
+  var confHtml = '<div style="position:fixed;bottom:0;left:0;right:0;background:rgba(7,8,12,.9);padding:20px;z-index:300000;animation:none" id="hsg-conf-panel">'
+    + '<div style="background:var(--card);border:1px solid var(--bord);border-radius:20px;padding:20px">'
+    + '<h3 style="font-family:Georgia,serif;font-size:18px;margin-bottom:5px;color:var(--txt)">Moving to: ' + tname + '</h3>'
+    + '<p style="font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:12px">Deposit is refundable when you leave — unless you\'ve missed payments.</p>'
+    + '<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:11px 13px;margin-bottom:14px">'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--bord)"><span>Weekly rent</span><b style="color:var(--red,#e06666)">' + fmt(wrent) + '/week</b></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--bord)"><span>One-time deposit</span><b style="color:var(--red,#e06666)">' + fmt(wdep) + '</b></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--bord)"><span>Energy regen</span><b style="color:var(--green,#4cc98a)">' + (en > 0 ? '+'+en : en < 0 ? en : '0 (neutral)') + ' per day</b></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--bord)"><span>Creativity change</span><b style="color:' + (cr < 0 ? 'var(--red,#e06666)' : 'var(--green,#4cc98a)') + '">' + (cr < 0 ? cr+' per day' : 'No penalty') + '</b></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0"><span>Balance after move</span><b style="color:var(--acc,#e8b44c)">' + fmt(bal) + '</b></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px">'
+    + '<button onclick="hsgDoMove(' + i + ')" style="flex:1;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:14px;background:var(--acc,#e8b44c);color:var(--acc-txt,#0d0f14);cursor:pointer">🏠 Move In</button>'
+    + '<button onclick="document.getElementById(\'hsg-conf-panel\').remove()" style="flex:1;border:1px solid var(--bord);border-radius:12px;padding:13px;font-weight:800;font-size:14px;background:var(--surf);color:var(--txt);cursor:pointer">Cancel</button>'
+    + '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', confHtml);
+}
+
+// ── Housing helper: do the actual move ────────────────────────────────────────
+function hsgDoMove(i){
+  var ENERGY_BONUS=[-10,-5,0,2,5];
+  var CREATIVITY_CHANGE=[-10,-8,-5,-2,0];
+  var COLLAB_SPEED=[0,0,0,0.1,0];
+  var STRESS_REDUCE=[0,0,0,3,6];
+  var HOME_RECORDING=[false,false,true,true,true];
+  var HOUSING_REGIONS = {
+    'North America':{mult:1,tiers:[{name:'Shared Room',hood:'4C Broad St, Downtown LA'},{name:'Shared Apartment',hood:'2B Maple Ave, Silver Lake'},{name:'Studio Apartment',hood:'Studio 7, 221 Arts District Way'},{name:'1BR Apartment',hood:'Apt 12A, 555 Midtown Blvd'},{name:'Penthouse',hood:'Penthouse, 1 Skyline Tower'}]},
+    'Europe':{mult:1.4,tiers:[{name:'Shared Room',hood:'Flat 3, 14 Brixton Rd, Brixton'},{name:'Shared Apartment',hood:'Flat B, 88 Hackney Rd, Hackney'},{name:'Studio Apartment',hood:'Studio 4, 33 Shoreditch High St'},{name:'1BR Apartment',hood:'Flat 6, 12 Camden High St'},{name:'Penthouse',hood:'Penthouse, 1 The Shard'}]},
+    'Africa':{mult:0.45,tiers:[{name:'Shared Room',hood:'No. 7 Ojuelegba Rd, Surulere'},{name:'Shared Apartment',hood:'Block C, 22 Yaba Close, Yaba'},{name:'Studio Apartment',hood:'Suite 5, 4 Allen Ave, Ikeja'},{name:'1BR Apartment',hood:'Apt 8, 11 Lekki Phase 1'},{name:'Penthouse',hood:'Penthouse, Eko Atlantic City'}]},
+    'Asia':{mult:0.9,tiers:[{name:'Shared Room',hood:'Gosi 7, 33 Sinchon-ro, Mapo-gu'},{name:'Shared Apartment',hood:'3F, 18 Hongdae-ro, Mapo-gu'},{name:'Studio Apartment',hood:'Suite 201, 44 Gangnam-daero'},{name:'1BR Apartment',hood:'1104, Itaewon Heights, Yongsan-gu'},{name:'Penthouse',hood:'Penthouse, Lotte World Tower, Jamsil'}]},
+    'South America':{mult:0.6,tiers:[{name:'Shared Room',hood:'Rua Augusta 120, Centro'},{name:'Shared Apartment',hood:'Ap. 3B, Rua Frei Caneca, Consolação'},{name:'Studio Apartment',hood:'Studio 5, Rua Oscar Freire, Jardins'},{name:'1BR Apartment',hood:'Ap. 802, Av. Paulista, Bela Vista'},{name:'Penthouse',hood:'Cobertura, Edifício Infinity, Itaim'}]},
+    'Oceania':{mult:1.15,tiers:[{name:'Shared Room',hood:'Rm 3, 44 King St, Newtown'},{name:'Shared Apartment',hood:'Flat B, 88 Crown St, Surry Hills'},{name:'Studio Apartment',hood:'Studio 6, 12 Oxford St, Darlinghurst'},{name:'1BR Apartment',hood:'Apt 14, 8 Circular Quay West'},{name:'Penthouse',hood:'Penthouse, Barangaroo Tower'}]}
+  };
+  var BASE_RENTS=[300,600,1200,2000,4000];
+  var BASE_DEPS=[150,600,1200,2000,4000];
+  var region = GAME.homeRegion || 'North America';
+  var rd = HOUSING_REGIONS[region] || HOUSING_REGIONS['North America'];
+  var mult = rd.mult;
+  var wrent = Math.round(BASE_RENTS[i]*mult/50)*50;
+  var wdep  = Math.round(BASE_DEPS[i]*mult/50)*50;
+  var tname = rd.tiers[i].name;
+  var thood = rd.tiers[i].hood;
+  var fmt = function(n){ return '$' + Math.round(n).toLocaleString(); };
+
+  if((GAME.money||0) < wdep){
+    var conf = document.getElementById('hsg-conf-panel');
+    if(conf) conf.remove();
+    showEvent('💰','Not Enough Money','You need ' + fmt(wdep) + ' for the deposit!',['OK']);
     return;
   }
-  
-  GAME.money-=deposit;
-  GAME.housing={type:type,rent:rent,missedPayments:0};
-  
-  // Close housing screen
-  const housingView=document.body.querySelector('[style*="position:fixed"][style*="z-index:9999"]');
-  if(housingView)housingView.remove();
-  
+
+  GAME.money = (GAME.money||0) - wdep;
+  GAME.housing = {
+    type:           tname,
+    rent:           wrent,
+    deposit:        wdep,
+    energyBonus:    ENERGY_BONUS[i],
+    creativityChange: CREATIVITY_CHANGE[i],
+    homeRecording:  HOME_RECORDING[i],
+    stressReduction: STRESS_REDUCE[i],
+    collabSpeedBonus: COLLAB_SPEED[i],
+    repBonusPerWeek: i === 4 ? 0.2 : 0,
+    address:        thood,
+    region:         region,
+    missedPayments: 0
+  };
+
+  // Close confirm panel and housing overlay
+  var conf = document.getElementById('hsg-conf-panel');
+  if(conf) conf.remove();
+  document.querySelectorAll('body > div[data-app-overlay]').forEach(function(el){ el.remove(); });
+
+  // Penthouse Velour press trigger (one-time only, only if has label)
+  if(i === 4 && !GAME.penthouseVelourFired && (GAME.signedLabel || GAME.ownedLabel)){
+    GAME.penthouseVelourFired = true;
+    var artistName = GAME.artistName || GAME.sn || 'The Artist';
+    _pushArticle({type:'mention', source:'velour', week:GAME.week||1, timestamp:Date.now(),
+      headline: artistName + ' Makes a Statement With New Penthouse Address',
+      preview: 'The industry is talking.',
+      content: 'Word has it ' + artistName + ' has just moved into one of the city\'s most coveted addresses. Velour can confirm the move — and so can the aesthetic.',
+      artistName: artistName, player_id: GAME.playerId||null});
+    addHype(3);
+  }
+
   updateStats();
-  showEvent('🏠','Moved!',`Welcome to your new ${type}!\n\n💰 Deposit paid: $${deposit}\n📅 New rent: $${rent}/week\n\nRemember to pay on time!`,['Love it!']);
+  saveGame();
+  showEvent('🏠','Moved In!','Welcome to your new ' + tname + '!\n\n💰 Deposit paid: ' + fmt(wdep) + '\n📅 Weekly rent: ' + fmt(wrent) + '/week\n\nYour daily energy and creativity will adjust tonight.',['Let\'s go!']);
 }
+
+// ── Housing helper: region switcher (rebuilds listings in the overlay) ─────────
+function hsgSetRegion(r){
+  // Just close and reopen with new region stored temporarily
+  // (region is cosmetic display only — GAME.homeRegion is the real value)
+  // For the demo switcher we rebuild in place
+  var listings = document.getElementById('hsg-listings');
+  if(!listings) return;
+  var htitle = document.getElementById('hsg-htitle');
+  var haddr  = document.getElementById('hsg-haddr');
+  var HOUSING_REGIONS = {
+    'North America':{mult:1,    city:'Los Angeles', flag:'🌎', tiers:[{name:'Shared Room',local:'Shared Room',hood:'4C Broad St, Downtown LA'},{name:'Shared Apartment',local:'Shared Apartment',hood:'2B Maple Ave, Silver Lake'},{name:'Studio Apartment',local:'Studio',hood:'Studio 7, 221 Arts District Way'},{name:'1BR Apartment',local:'1-Bedroom',hood:'Apt 12A, 555 Midtown Blvd'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, 1 Skyline Tower'}]},
+    'Europe':{mult:1.4,         city:'London', flag:'🌍', tiers:[{name:'Shared Room',local:'Bedsit',hood:'Flat 3, 14 Brixton Rd, Brixton'},{name:'Shared Apartment',local:'Houseshare',hood:'Flat B, 88 Hackney Rd, Hackney'},{name:'Studio Apartment',local:'Studio Flat',hood:'Studio 4, 33 Shoreditch High St'},{name:'1BR Apartment',local:'One-Bed Flat',hood:'Flat 6, 12 Camden High St'},{name:'Penthouse',local:'Penthouse Suite',hood:'Penthouse, 1 The Shard'}]},
+    'Africa':{mult:0.45,        city:'Lagos', flag:'🌍', tiers:[{name:'Shared Room',local:'Face-Me-I-Face-You',hood:'No. 7 Ojuelegba Rd, Surulere'},{name:'Shared Apartment',local:'Shared Flat',hood:'Block C, 22 Yaba Close, Yaba'},{name:'Studio Apartment',local:'Self-Contain',hood:'Suite 5, 4 Allen Ave, Ikeja'},{name:'1BR Apartment',local:'Mini Flat',hood:'Apt 8, 11 Lekki Phase 1'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Eko Atlantic City'}]},
+    'Asia':{mult:0.9,           city:'Seoul', flag:'🌏', tiers:[{name:'Shared Room',local:'Gosiwon',hood:'Gosi 7, 33 Sinchon-ro, Mapo-gu'},{name:'Shared Apartment',local:'Sharedhouse',hood:'3F, 18 Hongdae-ro, Mapo-gu'},{name:'Studio Apartment',local:'Oneroom',hood:'Suite 201, 44 Gangnam-daero'},{name:'1BR Apartment',local:'Officetel',hood:'1104, Itaewon Heights, Yongsan-gu'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Lotte World Tower, Jamsil'}]},
+    'South America':{mult:0.6,  city:'São Paulo', flag:'🌎', tiers:[{name:'Shared Room',local:'Quarto Compartilhado',hood:'Rua Augusta 120, Centro'},{name:'Shared Apartment',local:'República',hood:'Ap. 3B, Rua Frei Caneca, Consolação'},{name:'Studio Apartment',local:'Kitnet',hood:'Studio 5, Rua Oscar Freire, Jardins'},{name:'1BR Apartment',local:'Apartamento',hood:'Ap. 802, Av. Paulista, Bela Vista'},{name:'Penthouse',local:'Cobertura',hood:'Cobertura, Edifício Infinity, Itaim'}]},
+    'Oceania':{mult:1.15,       city:'Sydney', flag:'🌏', tiers:[{name:'Shared Room',local:'Shareroom',hood:'Rm 3, 44 King St, Newtown'},{name:'Shared Apartment',local:'Sharehouse',hood:'Flat B, 88 Crown St, Surry Hills'},{name:'Studio Apartment',local:'Studio',hood:'Studio 6, 12 Oxford St, Darlinghurst'},{name:'1BR Apartment',local:'1 Bedder',hood:'Apt 14, 8 Circular Quay West'},{name:'Penthouse',local:'Penthouse',hood:'Penthouse, Barangaroo Tower'}]}
+  };
+  var BASE_RENTS=[300,600,1200,2000,4000];
+  var BASE_DEPS=[150,600,1200,2000,4000];
+  var ENERGY_BONUS=[-10,-5,0,2,5];
+  var TIER_EMOJIS=['🛏️','🛋️','🏙️','🌆','🌃'];
+  var TIER_GRADS=['linear-gradient(135deg,#2a2a3a,#1c1c2a)','linear-gradient(135deg,#1e3a2e,#121a18)','linear-gradient(135deg,#1e2a3e,#121824)','linear-gradient(135deg,#3a2a1e,#2a1a0e)','linear-gradient(135deg,#2a1e3a,#1a1028)'];
+  var PERKS=[
+    [{cls:'p-bad',txt:'−10 energy/day'},{cls:'p-bad',txt:'−10 creativity/day'}],
+    [{cls:'p-bad',txt:'−5 energy/day'},{cls:'p-bad',txt:'−8 creativity/day'}],
+    [{cls:'p-cr',txt:'Energy neutral'},{cls:'p-bad',txt:'−5 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'}],
+    [{cls:'p-en',txt:'⚡ +2 energy/day'},{cls:'p-bad',txt:'−2 creativity/day'},{cls:'p-cr',txt:'🎵 Home recording'},{cls:'p-st',txt:'🧘 Stress −3/day'},{cls:'p-cr',txt:'Collab speed +10%'}],
+    [{cls:'p-en',txt:'⚡ +5 energy/day'},{cls:'p-cr',txt:'No creativity loss'},{cls:'p-cr',txt:'🏆 Studio-quality home'},{cls:'p-st',txt:'👑 Rep +0.2/wk'},{cls:'p-st',txt:'📰 Velour-worthy address'}]
+  ];
+  var rd = HOUSING_REGIONS[r] || HOUSING_REGIONS['North America'];
+  var curType = GAME.housing ? (GAME.housing.type||'Shared Room') : 'Shared Room';
+  function fmt(n){ return '$'+Math.round(n).toLocaleString(); }
+  function perkPills(idx){ return PERKS[idx].map(function(p){ return '<span style="'+({p_en:'background:#1a3a2a;color:var(--green,#4cc98a)',p_cr:'background:#1e2a3e;color:var(--blue,#5a9df3)',p_st:'background:#1e1a2e;color:var(--purple,#a97de8)',p_bad:'background:#2a1212;color:var(--red,#e06666)'}[p.cls.replace('-','_')]||'')+';font-size:9.5px;font-weight:700;border-radius:99px;padding:3px 9px;display:inline-block;margin:2px">'+p.txt+'</span>'; }).join(''); }
+  var html='';
+  for(var idx=0;idx<5;idx++){
+    var t=rd.tiers[idx];
+    var wrent=Math.round(BASE_RENTS[idx]*rd.mult/50)*50;
+    var wdep=Math.round(BASE_DEPS[idx]*rd.mult/50)*50;
+    var isCurrent=(curType===t.name);
+    var actBtns=isCurrent
+      ?'<button style="flex:1;background:var(--green,#4cc98a);color:#071a0e;border:none;border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:default">✓ Current Home</button>'
+      :'<button id="hsg-lb-'+idx+'" onclick="hsgToggleLease('+idx+')" style="flex:0 0 38%;background:var(--surf);color:var(--txt);border:1px solid var(--bord);border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:pointer">View Lease</button>'
+       +'<button onclick="hsgConfirm('+idx+')" style="flex:1;background:var(--acc,#e8b44c);color:var(--acc-txt,#0d0f14);border:1px solid var(--acc,#e8b44c);border-radius:10px;padding:10px 0;font-size:11.5px;font-weight:800;cursor:pointer">Move In</button>';
+    html+='<div style="margin:0 16px 12px;border-radius:18px;overflow:hidden;border:2px solid '+(isCurrent?'var(--green,#4cc98a)':'var(--bord)')+'">'
+      +'<div style="height:80px;display:flex;align-items:center;justify-content:center;font-size:40px;position:relative;background:'+TIER_GRADS[idx]+'">'+TIER_EMOJIS[idx]+'<span style="position:absolute;top:8px;right:10px;font-size:9px;font-weight:800;letter-spacing:.8px;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.5);color:rgba(255,255,255,.8)">Tier '+(idx+1)+'</span></div>'
+      +'<div style="padding:12px 14px;background:var(--card)">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px"><div><div style="font-size:15.5px;font-weight:800;color:var(--txt)">'+t.name+'</div>'+(t.local!==t.name?'<div style="font-size:10px;color:var(--mut);font-style:italic;margin-top:1px">"'+t.local+'"</div>':'')+'</div><div style="text-align:right"><b style="font-size:16px;font-weight:900;display:block;color:var(--txt)">'+fmt(wrent)+'</b><span style="font-size:10px;color:var(--mut)">/week · '+fmt(wdep)+' dep.</span></div></div>'
+      +'<div style="font-size:10px;color:var(--mut);margin-bottom:8px">📍 '+t.hood+'</div>'
+      +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">'+perkPills(idx)+'</div>'
+      +'<div style="display:flex;gap:7px">'+actBtns+'</div>'
+      +'</div>'
+      +'<div id="hsg-lease-'+idx+'" style="max-height:0;overflow:hidden;transition:max-height .4s ease;background:#f5f0e8;border-top:0 solid var(--bord)"></div>'
+      +'</div>';
+  }
+  listings.innerHTML=html;
+  if(htitle) htitle.textContent='Your Place in '+rd.city;
+  if(haddr) haddr.textContent=rd.flag+' '+rd.city+' · Week '+(GAME.week||1);
+}
+
 
 // WORLD SIMULATION: Initialize NPCs with realistic release schedules
 // ARTIST TIER ASSIGNMENT - Determines release frequency and starting streams
@@ -35682,15 +35962,27 @@ function _onDayAdvanced(newDay){
 
 function applyDailyRefresh(){
   if(!GAME) return;
-  // Restore energy each in-game day — base 120, reduced by stress, boosted by housing
+  // ── Energy: base 120, stress penalty, housing energy bonus (can be negative for lower tiers)
   const stressPenalty = Math.floor((GAME.stress||0) * 0.3);
-  const housingBonus = (GAME.housingType === 'apartment' || GAME.housing?.type === 'apartment') ? 10 : (GAME.housingType === 'house' || GAME.housing?.type === 'house') ? 20 : 0;
-  const newEnergy = Math.max(0, Math.min(120, 120 - stressPenalty + housingBonus));
+  // Use stored energyBonus from GAME.housing (set on move-in). Tiers: -10/-5/0/+2/+5
+  const housingEnergyBonus = (GAME.housing && typeof GAME.housing.energyBonus === 'number')
+    ? GAME.housing.energyBonus
+    : 0; // default 0 for legacy saves without energyBonus stored
+  const newEnergy = Math.max(0, Math.min(120, 120 - stressPenalty + housingEnergyBonus));
   GAME.energy = newEnergy;
 
-  // Restore creativity to 100 every in-game day, track which day it refreshed
-  GAME.creativity = 100;
+  // ── Creativity: restore to 100, then apply housing creativity change
+  // Tiers: -10/-8/-5/-2/0 per day. Penthouse has no penalty (0).
+  const housingCreativityChange = (GAME.housing && typeof GAME.housing.creativityChange === 'number')
+    ? GAME.housing.creativityChange
+    : (GAME.housing && GAME.housing.type === 'Shared Room' ? -10 : 0); // legacy fallback
+  GAME.creativity = Math.max(0, 100 + housingCreativityChange);
   GAME._creativityRefreshedDay = GAME.day || 1;
+
+  // ── Stress reduction from housing (Tier 4: -3/day, Tier 5: -6/day)
+  if(GAME.housing && GAME.housing.stressReduction > 0){
+    GAME.stress = Math.max(0, (GAME.stress||0) - GAME.housing.stressReduction);
+  }
 
   updateStats();
   markDirty();
@@ -35771,6 +36063,16 @@ function checkDailyEconomy(){
     GAME.money = Math.max(0, (GAME.money||0) - GAME.housing.rent);
     _fw.rent = (_fw.rent||0) + GAME.housing.rent;
     addNotification('🏠 Rent Due','$'+(GAME.housing.rent).toLocaleString()+' deducted for rent.','finance');
+  }
+
+  // ── PENTHOUSE REP BONUS (weekly) ──────────────────────────────
+  if(info.dow === 0 && GAME.housing && GAME.housing.repBonusPerWeek > 0){
+    if(typeof GAME.reputation === 'number'){
+      GAME.reputation = Math.min(5, GAME.reputation + GAME.housing.repBonusPerWeek);
+    } else if(typeof S !== 'undefined' && typeof S.rep === 'number'){
+      S.rep = Math.min(5, S.rep + GAME.housing.repBonusPerWeek);
+    }
+    console.log('🏠 Penthouse rep bonus: +'+GAME.housing.repBonusPerWeek);
   }
 
   // ── STAFF/MANAGER FEES (weekly) ───────────────────────────────
