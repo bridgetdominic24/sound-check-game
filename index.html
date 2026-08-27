@@ -8127,17 +8127,34 @@ async function getAllChartsData(){
       var outlet, outletDisplay, headline, preview, content;
 
       if(pos === 1){
-        // Velour: prestige cover-story voice, elegant prose
-        outlet = 'velour'; outletDisplay = 'Velour';
-        var velourHeads = [
-          'The Arrival: '+aName+' Enters at #1',
-          aName+' Claims the Top Spot — Meet the Artist Rewriting the Rules',
-          '"'+sTitle+'" Debuts at #1. '+aName+' Is Not Here to Play.',
-          'A Career-Defining Moment: '+aName+' at Number One'
-        ];
-        headline = velourHeads[Math.floor(Math.random()*velourHeads.length)];
-        preview = '"'+sTitle+'" didn\'t just enter the charts — it claimed them. '+aName+' is the name everyone will be saying this week.';
-        content = 'There are chart entries, and then there are moments. "'+sTitle+'" by '+aName+' debuted at #1 on the Global Top 40 this week, a feat that is equal parts rare and earned.\n\nThe song\'s opening numbers speak for themselves. But more telling is the quality of the listening — not algorithmic drift, but genuine connection with an audience that chose it.\n\n"You can\'t manufacture a debut like this," one industry observer noted. "It has to already be something people needed before they knew to look for it."';
+        // Velour ONLY covers signed artists — check if this player is signed to a label
+        var _otherPlayerData = (window.allPlayers||[]).find(function(p){ return p.id === song.playerId; });
+        var _otherIsSigned = _otherPlayerData && _otherPlayerData.game_data && (_otherPlayerData.game_data.signedLabel || _otherPlayerData.game_data.ownedLabel);
+        if(_otherIsSigned){
+          // Velour: prestige cover-story voice, elegant prose — label world only
+          outlet = 'velour'; outletDisplay = 'Velour';
+          var velourHeads = [
+            'The Arrival: '+aName+' Enters at #1',
+            aName+' Claims the Top Spot — Meet the Artist Rewriting the Rules',
+            '"'+sTitle+'" Debuts at #1. '+aName+' Is Not Here to Play.',
+            'A Career-Defining Moment: '+aName+' at Number One'
+          ];
+          headline = velourHeads[Math.floor(Math.random()*velourHeads.length)];
+          preview = '"'+sTitle+'" didn\'t just enter the charts — it claimed them. '+aName+' is the name everyone will be saying this week.';
+          content = 'There are chart entries, and then there are moments. "'+sTitle+'" by '+aName+' debuted at #1 on the Global Top 40 this week, a feat that is equal parts rare and earned.\n\nThe song\'s opening numbers speak for themselves. But more telling is the quality of the listening — not algorithmic drift, but genuine connection with an audience that chose it.\n\n"You can\'t manufacture a debut like this," one industry observer noted. "It has to already be something people needed before they knew to look for it."';
+        } else {
+          // Unsigned #1 → AirTime: radio-DJ, bright upbeat voice (Velour doesn't cover unsigned acts)
+          outlet = 'airtime'; outletDisplay = 'AirTime';
+          var airtimeNum1Heads = [
+            '"'+sTitle+'" Debuts at #1 — '+aName+' Is Your New Heavy Rotation',
+            aName+' Goes to NUMBER ONE With "'+sTitle+'" and We Are PLAYING IT',
+            '#1 and Everywhere: '+aName+'\'s "'+sTitle+'" Owns the Charts This Week',
+            '"'+sTitle+'" HITS NUMBER ONE. '+aName+' Is In Full Rotation Right Now.'
+          ];
+          headline = airtimeNum1Heads[Math.floor(Math.random()*airtimeNum1Heads.length)];
+          preview = aName+' opens at #1 with "'+sTitle+'" — the numbers are undeniable and so is the momentum. Full rotation starts now.';
+          content = 'Number one. Not #3, not a top-5 — NUMBER ONE. '+aName+'\'s "'+sTitle+'" opened at the very top of the Global Top 40 and we cannot stop playing it.\n\nThis is what heavy rotation sounds like. '+aName+' came in this week and owned it, full stop. If "'+sTitle+'" isn\'t already in your queue, fix that immediately.\n\nBig streams, bigger momentum — '+aName+' is the name of the week.';
+        }
       } else if(pos <= 5){
         // AirTime: radio-DJ, bright, upbeat, heavy rotation voice
         outlet = 'airtime'; outletDisplay = 'AirTime';
@@ -36628,21 +36645,41 @@ async function generateNewsArticles(){
       }
 
       if(song.streams >= 1000000 && song.streams < 1050000){
-        _milestoneFire('streams-1m-'+song.id, {
-          artistName: sA,
-          headline: `${sA}'s "${sT}" Goes PLATINUM with 1M Streams`,
-          preview: `The ${sG} sensation celebrates as "${sT}" officially joins the million-stream club.`,
-          content: `It's official: "${sT}" by ${sA} has crossed the coveted 1 million stream threshold.\n\nThe milestone represents months of grassroots promotion, fan dedication, and undeniable talent.\n\n"Most artists never see these numbers without label support," explains music business consultant Tanya Williams. "${sA} is proving you can build a real career on your own terms."\n\nThe song continues to gain momentum on playlists and social media, with no signs of slowing down.`
-        },{ outlet:'Velour', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'1M',genre:sG,game_week:GAME.week} });
+        // Velour only covers signed artists — unsigned acts go to Undertone (unsigned discovery)
+        if(GAME.signedLabel){
+          _milestoneFire('streams-1m-'+song.id, {
+            artistName: sA,
+            headline: `${sA}'s "${sT}" Crosses One Million Streams`,
+            preview: `A landmark moment — "${sT}" enters the million-stream tier as ${sA} continues to rise.`,
+            content: `There are artists, and then there are artists. "${sT}" by ${sA} has crossed one million streams — a milestone that separates the remarkable from the rest.\n\nFor a signed act, this kind of sustained listener loyalty signals something deeper than a viral moment. It is evidence of craft, of an audience that keeps coming back.\n\n"${sA} has earned this," said one label observer, noting the track's consistent performance since release. "The million mark is where careers cement themselves."`
+          },{ outlet:'Velour', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'1M',genre:sG,game_week:GAME.week} });
+        } else {
+          _milestoneFire('streams-1m-'+song.id, {
+            artistName: sA,
+            headline: `${sA}'s "${sT}" Just Hit 1 Million Streams — Independently`,
+            preview: `The ${sG} act crosses 1M streams with zero label backing. Undertone has been watching this one since day one.`,
+            content: `We called it early. "${sT}" by ${sA} has now surpassed 1 million streams — no label, no major-budget promo campaign, just the music and the people who found it.\n\nThis is what Undertone is here for. ${sA} built this fanbase the old-fashioned way: song by song, stream by stream, listener by listener.\n\n"The unsigned acts who hit a million are a different breed," one playlist curator told us. "They had to earn every single play." Exactly. Keep your eyes on ${sA}.`
+          },{ outlet:'Undertone', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'1M',genre:sG,game_week:GAME.week} });
+        }
       }
 
       if(song.streams >= 5000000 && song.streams < 5100000){
-        _milestoneFire('streams-5m-'+song.id, {
-          artistName: sA,
-          headline: `CHART DOMINATION: "${sT}" Hits 5 Million Streams`,
-          preview: `${sA}'s monster hit "${sT}" reaches 5M streams, solidifying artist as a major force in ${sG}.`,
-          content: `"${sT}" by ${sA} has officially entered the stratosphere with over 5 million streams.\n\nThe track's unprecedented success has industry insiders predicting major award nominations and lucrative partnership deals.\n\n"Five million streams means you're not just trending — you're a cultural phenomenon," says chart analyst David Park. "Labels will be fighting over ${sA} now."\n\nFans worldwide have embraced the song, with viral dance challenges and cover versions flooding social media.`
-        },{ outlet:'Velour', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'5M',genre:sG,game_week:GAME.week} });
+        // Velour only covers signed artists — unsigned acts go to AirTime (mainstream crossover)
+        if(GAME.signedLabel){
+          _milestoneFire('streams-5m-'+song.id, {
+            artistName: sA,
+            headline: `"${sT}" Reaches Five Million Streams — ${sA} Is a Confirmed Force`,
+            preview: `${sA}'s label-backed run continues as "${sT}" crosses 5M streams, cementing an exceptional release cycle.`,
+            content: `The numbers don't lie. "${sT}" by ${sA} has reached five million streams — a figure that places the track in a category very few releases ever occupy.\n\nFor a signed artist, this is a career confirmation moment. The label infrastructure, the promotional campaign, the timing — everything aligned. And ${sA} delivered.\n\n"Five million streams from a signed act with real promotional reach — that's the blueprint," noted one industry executive. "This is how albums get built."`
+          },{ outlet:'Velour', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'5M',genre:sG,game_week:GAME.week} });
+        } else {
+          _milestoneFire('streams-5m-'+song.id, {
+            artistName: sA,
+            headline: `${sA} Is Everywhere: "${sT}" Hits 5 Million Streams`,
+            preview: `${sA}'s "${sT}" reaches 5M streams and there's no escaping it — this one is in heavy rotation everywhere.`,
+            content: `Five million streams and climbing. ${sA}'s "${sT}" has officially entered the everywhere zone — you've heard it on playlists, in coffee shops, in videos you didn't ask to watch.\n\nThat's what 5 million streams sounds like: inescapable. ${sA} built this momentum without a major label machine, and the listeners showed up anyway.\n\nThis is a crossover moment. "${sT}" is not just charting — it is in the culture. AirTime has had it in rotation for weeks and the listener response stays strong. Well done.`
+          },{ outlet:'AirTime', triggerType:'stream_milestone', facts:{artist:sA,song:sT,streams:'5M',genre:sG,game_week:GAME.week} });
+        }
       }
 
       if(song.chartPosition && song.chartPosition <= 10 && (song.weeksOnChart || 0) === 1){
