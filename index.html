@@ -27380,86 +27380,96 @@ function createPentagramPost(){
   if(!GAME.joinedPlatforms || !GAME.joinedPlatforms.instagram){
     showToast('Join Pentagram first!','red'); return;
   }
-  
   var existing = document.getElementById('pentagramPostScreen');
   if(existing) existing.remove();
-  
+
+  // Inject spin keyframe once
+  if(!document.getElementById('sc-spin-css')){
+    var _ss=document.createElement('style'); _ss.id='sc-spin-css';
+    _ss.textContent='@keyframes igSpin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(_ss);
+  }
+
+  GAME.pendingPostImage=null; GAME.pendingPostGif=null; GAME.pendingPostIsGif=false;
+  GAME.pendingPostType_ig=null; delete GAME.pendingPostVibe_ig;
+
   var screen = document.createElement('div');
   screen.id = 'pentagramPostScreen';
-  screen.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:8500;background:#fff;overflow-y:auto;font-family:-apple-system,sans-serif';
-  
-  // Top bar - just like real Instagram new post
+  screen.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:8500;background:#FAFAFA;overflow-y:auto;font-family:-apple-system,sans-serif';
+
+  var _av = window.getArtistName ? getArtistName()[0] : 'A';
+
   screen.innerHTML =
-    '<div style="position:sticky;top:0;background:#fff;border-bottom:1px solid #dbdbdb;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;z-index:1">'
+    // Top bar
+    '<div style="position:sticky;top:0;background:#FAFAFA;border-bottom:1px solid #dbdbdb;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;z-index:1">'
     +'<button onclick="closePentagramPost()" style="background:none;border:none;cursor:pointer;font-size:14px;color:#000">Cancel</button>'
     +'<div style="font-size:16px;font-weight:700;color:#000">New Post</div>'
     +'<button onclick="publishPlatformPost_instagram()" style="background:none;border:none;cursor:pointer;font-size:15px;font-weight:700;color:#0095f6">Share</button>'
     +'</div>'
-    
-    // Photo area - tap to add
-    +'<div id="igPhotoArea" onclick="openIgFileInput()" style="width:100%;min-height:280px;background:#fafafa;border-bottom:1px solid #dbdbdb;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative">'
-    +'<div id="igPhotoPlaceholder" style="text-align:center">'
+
+    // Photo area
+    +'<div id="igPhotoArea" onclick="openIgFileInput()" style="width:100%;min-height:280px;background:#f0f0f0;border-bottom:1px solid #dbdbdb;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative">'
+    +'<div style="text-align:center">'
     +'<svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#dbdbdb" stroke-width="1.5" style="display:block;margin:0 auto 12px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
     +'<div style="font-size:16px;font-weight:600;color:#000">Tap to add photo or GIF</div>'
     +'<div style="font-size:13px;color:#8e8e8e;margin-top:4px">JPG, PNG or GIF</div>'
     +'</div></div>'
     +'<input type="file" id="igPostFile" accept="image/*,image/gif" style="display:none" onchange="igPreviewMedia(this)">'
-    
+
     // Caption
     +'<div style="padding:12px 16px;border-bottom:1px solid #efefef;display:flex;gap:10px">'
-    +'<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#f09433,#bc1888);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:15px">'
-    + ((window.getArtistName ? getArtistName()[0] : 'A'))
-    +'</div>'
+    +'<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#f09433,#bc1888);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:15px">'+_av+'</div>'
     +'<textarea id="igPostCaption" style="flex:1;border:none;outline:none;font-size:15px;font-family:-apple-system,sans-serif;resize:none;color:#000;min-height:80px;background:transparent" placeholder="Write a caption..." maxlength="2200"></textarea>'
     +'</div>'
     +'<div style="padding:8px 16px;text-align:right;font-size:12px;color:#8e8e8e;border-bottom:1px solid #efefef"><span id="igCaptionCount">0</span>/2200</div>'
-    
-    // Tag people
+
+    // Post Type selector
     +'<div style="padding:14px 16px;border-bottom:1px solid #efefef">'
-    +'<div style="font-size:15px;color:#000;margin-bottom:8px">👥 Tag People</div>'
-    +'<input id="igPeopleSearch" type="text" placeholder="Search for artists..." style="width:100%;padding:8px;border:1px solid #dbdbdb;border-radius:6px;font-size:14px;outline:none" oninput="filterPeople(this.value, \'ig\')">'
+    +'<div style="font-size:11px;font-weight:700;color:#8e8e8e;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Post Type</div>'
+    +'<div style="font-size:10px;color:#8e8e8e;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Career</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'
+    +[{v:'concept',l:'🎨 Concept Photos',h:3},{v:'music',l:'🎵 New Music',h:5},{v:'announce',l:'📣 Announcement',h:4},{v:'bts',l:'🎬 BTS',h:2},{v:'look',l:'💅 New Look',h:2},{v:'collab',l:'🤝 Collab Tease',h:3}]
+      .map(function(t){ return '<button onclick="selectPostType(this,\'ig\',\''+t.v+'\','+t.h+',true)" data-val="'+t.v+'" style="padding:6px 11px;border:1px solid #dbdbdb;border-radius:20px;background:#fff;font-size:12px;cursor:pointer;color:#262626">'+t.l+'</button>'; }).join('')
+    +'</div>'
+    +'<div style="font-size:10px;color:#8e8e8e;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Personal</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'
+    +[{v:'hyped',l:'🔥 Hyped'},{v:'reflective',l:'💭 Reflective'},{v:'funny',l:'😂 Funny'},{v:'throwback',l:'📷 Throwback'},{v:'realtalk',l:'💬 Real Talk'}]
+      .map(function(t){ return '<button onclick="selectPostType(this,\'ig\',\''+t.v+'\',0,false)" data-val="'+t.v+'" style="padding:6px 11px;border:1px solid #dbdbdb;border-radius:20px;background:#fff;font-size:12px;cursor:pointer;color:#262626">'+t.l+'</button>'; }).join('')
+    +'</div>'
+    +'<div id="igEffectsCard" style="display:none;background:rgba(0,149,246,.07);border:1px solid rgba(0,149,246,.25);border-radius:10px;padding:10px 14px">'
+    +'<div style="font-size:12px;font-weight:700;color:#0095f6;margin-bottom:4px">✨ Game effects on post</div>'
+    +'<div id="igEffectsText" style="font-size:12px;color:#555;line-height:1.5"></div>'
+    +'</div>'
+    +'</div>'
+
+    // Add Music row — opens picker sheet
+    +'<div onclick="openSongPickerSheet(\'ig\')" style="padding:14px 16px;border-bottom:1px solid #efefef;display:flex;align-items:center;gap:10px;cursor:pointer">'
+    +'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#262626" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
+    +'<div id="igMusicRow" style="flex:1;font-size:15px;color:#8e8e8e">Add Music</div>'
+    +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8e8e" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>'
+    +'<input type="hidden" id="igTagSong">'
+    +'</div>'
+
+    // Tag People
+    +'<div style="padding:14px 16px;border-bottom:1px solid #efefef">'
+    +'<div style="font-size:15px;color:#262626;margin-bottom:8px">👥 Tag People</div>'
+    +'<input id="igPeopleSearch" type="text" placeholder="Search for artists..." style="width:100%;padding:8px;border:1px solid #dbdbdb;border-radius:6px;font-size:14px;outline:none" oninput="filterPeople(this.value,\'ig\')">'
     +'<div id="igPeopleResults" style="max-height:200px;overflow-y:auto;margin-top:8px;display:none;border:1px solid #dbdbdb;border-radius:6px;background:#fff"></div>'
     +'<div id="igTaggedPeople" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px"></div>'
     +'</div>'
-    
-    // Tag song
-    +'<div style="padding:14px 16px;border-bottom:1px solid #efefef">'
-    +'<div style="font-size:15px;color:#000;margin-bottom:8px">🎵 Tag a Song</div>'
-    +'<input id="igSongSearch" type="text" placeholder="Search for a song..." style="width:100%;padding:8px;border:1px solid #dbdbdb;border-radius:6px;font-size:14px;outline:none" oninput="filterSongs(this.value, \'ig\')">'
-    +'<div id="igSongResults" style="max-height:200px;overflow-y:auto;margin-top:8px;display:none"></div>'
-    +'<input type="hidden" id="igTagSong">'
-    +'</div>'
-    
+
     // Location
     +'<div style="padding:14px 16px;border-bottom:1px solid #efefef;display:flex;justify-content:space-between;align-items:center">'
-    +'<div style="font-size:15px;color:#000">📍 Add Location</div>'
+    +'<div style="font-size:15px;color:#262626">📍 Add Location</div>'
     +'<input id="igLocation" style="border:none;outline:none;font-size:14px;color:#8e8e8e;text-align:right;max-width:180px;background:transparent" placeholder="Location">'
     +'</div>'
-    
-    // Vibe
-    +'<div style="padding:14px 16px;border-bottom:1px solid #efefef">'
-    +'<div style="font-size:15px;color:#000;margin-bottom:10px">Vibe</div>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:8px" id="igVibes">'
-    + getPostVibes().map(function(v){ return '<button onclick="selectVibe_ig(this)" data-val="'+v.val+'" style="padding:6px 12px;border:1px solid #dbdbdb;border-radius:20px;background:#fff;font-size:13px;cursor:pointer;color:#000">'+v.label+'</button>'; }).join('')
-    +'</div></div>'
-    
-    // Trending Sounds - NEW FEATURE
-    +'<div style="padding:14px 16px;border-bottom:1px solid #efefef">'
-    +'<div style="font-size:15px;font-weight:700;color:#000;margin-bottom:12px">🔥 Trending Sounds</div>'
-    +'<div id="igTrendingSounds" style="max-height:300px;overflow-y:auto"></div>'
-    +'<div id="igSelectedSound" style="margin-top:12px;display:none"></div>'
-    +'</div>'
-    
-    // Audience hint
+
     +'<div style="padding:14px 16px;background:#fafafa">'
-    +'<div style="font-size:13px;color:#8e8e8e">💡 Photos/GIFs required. Tag a song to boost streams!</div>'
+    +'<div style="font-size:13px;color:#8e8e8e">💡 Photo/GIF required. Career post types boost your hype!</div>'
     +'</div>';
-  
+
   document.getElementById('phone').appendChild(screen);
-  
-  // Load trending sounds
-  setTimeout(function(){ loadTrendingSounds('instagram'); }, 200);
-  
+
   // Character counter
   setTimeout(function(){
     var ta = document.getElementById('igPostCaption');
@@ -27520,22 +27530,30 @@ function createRookiePost(){
   if(!GAME.joinedPlatforms || !GAME.joinedPlatforms.tiktok){
     showToast('Join Rookie first!','red'); return;
   }
-  
   var existing = document.getElementById('rookiePostScreen');
   if(existing) existing.remove();
-  
+
+  if(!document.getElementById('sc-spin-css')){
+    var _ss=document.createElement('style'); _ss.id='sc-spin-css';
+    _ss.textContent='@keyframes igSpin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(_ss);
+  }
+
+  GAME.pendingPostImage=null; GAME.pendingPostGif=null; GAME.pendingPostIsGif=false;
+  GAME.pendingPostType_rk=null; delete GAME.pendingPostVibe_rk;
+
   var screen = document.createElement('div');
   screen.id = 'rookiePostScreen';
   screen.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:8500;background:#000;overflow-y:auto;overflow-x:hidden;font-family:-apple-system,sans-serif;color:#fff';
-  
+
   screen.innerHTML =
     '<div style="position:sticky;top:0;background:#000;border-bottom:1px solid #222;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;z-index:1">'
     +'<button onclick="closeRookiePost()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:14px">Discard</button>'
     +'<div style="font-size:16px;font-weight:700">New Post</div>'
     +'<button onclick="publishPlatformPost_tiktok()" style="background:#fe2c55;border:none;border-radius:8px;padding:8px 16px;color:#fff;font-weight:700;cursor:pointer;font-size:14px">Post</button>'
     +'</div>'
-    
-    // GIF / media area
+
+    // Media area
     +'<div id="rkMediaArea" onclick="openRkFileInput()" style="width:100%;min-height:260px;background:#111;border-bottom:1px solid #222;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative">'
     +'<div style="text-align:center">'
     +'<div style="font-size:48px;margin-bottom:8px">🎬</div>'
@@ -27543,62 +27561,59 @@ function createRookiePost(){
     +'<div style="font-size:13px;color:#888;margin-top:4px">Show your vibe</div>'
     +'</div></div>'
     +'<input type="file" id="rkPostFile" accept="image/*,image/gif" style="display:none" onchange="rkPreviewMedia(this)">'
-    
-    // Caption - short like TikTok
+
+    // Caption
     +'<div style="padding:16px;border-bottom:1px solid #222">'
     +'<textarea id="rkPostCaption" style="width:100%;background:transparent;border:none;outline:none;font-size:16px;font-family:-apple-system,sans-serif;resize:none;color:#fff;min-height:80px" placeholder="Describe your post... #hashtags" maxlength="150"></textarea>'
     +'<div style="text-align:right;font-size:12px;color:#555;margin-top:4px"><span id="rkCaptionCount">0</span>/150</div>'
     +'</div>'
-    
-    // Sound - attach a song
-    +'<div style="padding:14px 16px;border-bottom:1px solid #222">'
-    +'<div style="font-size:14px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px"><div style="width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#fe2c55,#ff0050);display:flex;align-items:center;justify-content:center;font-size:12px">🎵</div>Add Sound</div>'
-    +'<input id="rkSongSearch" type="text" placeholder="Search for a song..." style="width:100%;padding:8px;border:1px solid #333;border-radius:8px;background:#111;color:#fff;font-size:13px;outline:none" oninput="filterSongs(this.value, \'rk\')">'
-    +'<div id="rkSongResults" style="max-height:150px;overflow-y:auto;margin-top:6px;display:none;background:#1a1a1a;border-radius:6px"></div>'
+
+    // Sound row — tappable spinning disc → picker sheet
+    +'<div onclick="openSongPickerSheet(\'rk\')" style="padding:14px 16px;border-bottom:1px solid #222;display:flex;align-items:center;gap:12px;cursor:pointer">'
+    +'<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#fe2c55,#25f4ee);display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:igSpin 4s linear infinite">'
+    +'<div style="width:10px;height:10px;border-radius:50%;background:#000"></div>'
+    +'</div>'
+    +'<div id="rkSoundRow" style="flex:1;font-size:14px;color:#888">Add a sound</div>'
+    +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>'
     +'<input type="hidden" id="rkTagSong">'
     +'</div>'
-    
-    // Tag People - NEW!
+
+    // Post Type
+    +'<div style="padding:14px 16px;border-bottom:1px solid #222">'
+    +'<div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Post Type</div>'
+    +'<div style="font-size:10px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Career</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'
+    +[{v:'concept',l:'🎨 Concept Photos',h:3},{v:'music',l:'🎵 New Music',h:5},{v:'announce',l:'📣 Announcement',h:4},{v:'bts',l:'🎬 BTS',h:2},{v:'look',l:'💅 New Look',h:2},{v:'collab',l:'🤝 Collab Tease',h:3}]
+      .map(function(t){ return '<button onclick="selectPostType(this,\'rk\',\''+t.v+'\','+t.h+',true)" data-val="'+t.v+'" style="padding:6px 11px;border:1px solid #333;border-radius:20px;background:transparent;font-size:12px;cursor:pointer;color:#fff">'+t.l+'</button>'; }).join('')
+    +'</div>'
+    +'<div style="font-size:10px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Personal</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'
+    +[{v:'hyped',l:'🔥 Hyped'},{v:'reflective',l:'💭 Reflective'},{v:'funny',l:'😂 Funny'},{v:'throwback',l:'📷 Throwback'},{v:'realtalk',l:'💬 Real Talk'}]
+      .map(function(t){ return '<button onclick="selectPostType(this,\'rk\',\''+t.v+'\',0,false)" data-val="'+t.v+'" style="padding:6px 11px;border:1px solid #333;border-radius:20px;background:transparent;font-size:12px;cursor:pointer;color:#aaa">'+t.l+'</button>'; }).join('')
+    +'</div>'
+    +'<div id="rkEffectsCard" style="display:none;background:rgba(254,44,85,.1);border:1px solid rgba(254,44,85,.3);border-radius:10px;padding:10px 14px">'
+    +'<div style="font-size:12px;font-weight:700;color:#fe2c55;margin-bottom:4px">✨ Game effects on post</div>'
+    +'<div id="rkEffectsText" style="font-size:12px;color:#aaa;line-height:1.5"></div>'
+    +'</div>'
+    +'</div>'
+
+    // Tag People
     +'<div style="padding:14px 16px;border-bottom:1px solid #222">'
     +'<div style="font-size:14px;font-weight:600;margin-bottom:10px">Tag People</div>'
-    +'<input id="rkPeopleSearch" type="text" placeholder="Search artists..." style="width:100%;padding:8px;border:1px solid #333;border-radius:8px;background:#111;color:#fff;font-size:13px;outline:none" oninput="filterPeople(this.value, \'rk\')">'
+    +'<input id="rkPeopleSearch" type="text" placeholder="Search artists..." style="width:100%;padding:8px;border:1px solid #333;border-radius:8px;background:#111;color:#fff;font-size:13px;outline:none" oninput="filterPeople(this.value,\'rk\')">'
     +'<div id="rkPeopleResults" style="max-height:120px;overflow-y:auto;margin-top:6px;display:none;background:#1a1a1a;border-radius:6px"></div>'
     +'<div id="rkTaggedPeople" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>'
     +'</div>'
-    
-    // Topics / hashtags
-    +'<div style="padding:14px 16px;border-bottom:1px solid #222">'
-    +'<div style="font-size:14px;font-weight:600;margin-bottom:10px">Topics</div>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
-    + ['#NewMusic','#Artist','#BehindTheScenes','#fyp','#music','#viral','#trending','#original','#live','#studio'].map(function(tag){
-        return '<button onclick="toggleRkTag(this)" style="padding:5px 12px;border:1px solid #333;border-radius:20px;background:transparent;color:#fff;font-size:13px;cursor:pointer">'+tag+'</button>';
-      }).join('')
-    +'</div></div>'
-    
-    // Vibe
-    +'<div style="padding:14px 16px;border-bottom:1px solid #222">'
-    +'<div style="font-size:14px;font-weight:600;margin-bottom:10px">Vibe</div>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:8px">'
-    + getPostVibes().map(function(v){ return '<button onclick="selectVibe_rk(this)" data-val="'+v.val+'" style="padding:6px 12px;border:1px solid #333;border-radius:20px;background:transparent;font-size:13px;cursor:pointer;color:#fff">'+v.label+'</button>'; }).join('')
-    +'</div></div>'
-    
-    // Trending Sounds - NEW FEATURE
-    +'<div style="padding:14px 16px;border-bottom:1px solid #222">'
-    +'<div style="font-size:15px;font-weight:700;margin-bottom:12px">🔥 Trending Sounds</div>'
-    +'<div id="rkTrendingSounds" style="max-height:300px;overflow-y:auto"></div>'
-    +'<div id="rkSelectedSound" style="margin-top:12px;display:none"></div>'
-    +'</div>'
-    
+
     +'<div style="padding:14px 16px;background:#0a0a0a">'
     +'<div style="font-size:13px;color:#555">💡 GIFs/photos required. Tag your songs to drive streams!</div>'
     +'</div>';
-  
+
   document.getElementById('phone').appendChild(screen);
-  setTimeout(function(){ loadTrendingSounds('tiktok'); }, 200);
   setTimeout(function(){
     var ta = document.getElementById('rkPostCaption');
     if(ta) ta.addEventListener('input', function(){ document.getElementById('rkCaptionCount').textContent = ta.value.length; });
-  },100);
+  }, 100);
 }
 
 function rkPreviewMedia(input){
@@ -27646,65 +27661,95 @@ function createYPost(){
   if(!GAME.joinedPlatforms || !GAME.joinedPlatforms.twitter){
     showToast('Join Y first!','red'); return;
   }
-  
   var existing = document.getElementById('yPostScreen');
   if(existing) existing.remove();
-  
+
+  GAME.pendingPostType_y=null; delete GAME.pendingPostVibe_y;
+
   var screen = document.createElement('div');
   screen.id = 'yPostScreen';
   screen.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:8500;background:#000;overflow-y:auto;font-family:-apple-system,sans-serif;color:#fff';
-  
-  // Y is text-first - avatar + big text area
+
   var avLetter = getArtistName ? getArtistName()[0] : 'A';
-  
+  var CIRC = 94.25; // 2π × r(15)
+
   screen.innerHTML =
     '<div style="position:sticky;top:0;background:#000;border-bottom:1px solid #2f3336;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;z-index:1">'
     +'<button onclick="closeYPost()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:14px">Cancel</button>'
     +'<button onclick="publishPlatformPost_twitter()" style="background:#1d9bf0;border:none;border-radius:20px;padding:7px 16px;color:#fff;font-weight:700;cursor:pointer;font-size:14px">Post</button>'
     +'</div>'
-    
-    // Main compose area
+
+    // Compose area
     +'<div style="padding:16px;display:flex;gap:12px;border-bottom:1px solid #2f3336">'
     +'<div style="width:40px;height:40px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0">'+avLetter+'</div>'
     +'<div style="flex:1">'
-    +'<div style="font-size:15px;color:#71767b;margin-bottom:8px">Everyone can reply</div>'
-    +'<textarea id="yPostText" style="width:100%;background:transparent;border:none;outline:none;font-size:20px;font-family:-apple-system,sans-serif;resize:none;color:#fff;min-height:120px" placeholder="What is happening?!" maxlength="280"></textarea>'
+    +'<div style="font-size:14px;color:#71767b;margin-bottom:8px">Everyone can reply</div>'
+    +'<textarea id="yPostText" style="width:100%;background:transparent;border:none;outline:none;font-size:20px;font-family:-apple-system,sans-serif;resize:none;color:#E7E9EA;min-height:120px" placeholder="What is happening?!" maxlength="280"></textarea>'
     +'<div id="yMediaPreview"></div>'
     +'</div></div>'
-    
-    // Toolbar - photo, song tag, vibe
-    +'<div style="position:sticky;bottom:0;background:#000;border-top:1px solid #2f3336;padding:12px 16px">'
-    
-    // Media buttons
-    +'<div style="display:flex;align-items:center;gap:4px;margin-bottom:12px">'
-    +'<button onclick="openYFileInput()" style="background:none;border:none;color:#1d9bf0;cursor:pointer;padding:8px;border-radius:50%"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>'
-    +'<input type="file" id="yPostFile" accept="image/*,image/gif" style="display:none" onchange="yPreviewMedia(this)">'
-    +'<div style="flex:1"></div>'
-    +'<div id="yCharCount" style="font-size:15px;color:#1d9bf0">280</div>'
+
+    // Post Type chips
+    +'<div style="padding:12px 16px;border-bottom:1px solid #2f3336">'
+    +'<div style="font-size:10px;color:#71767b;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Post Type</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
+    +[{v:'concept',l:'🎨 Concept',h:3},{v:'music',l:'🎵 New Music',h:5},{v:'announce',l:'📣 Announce',h:4},{v:'bts',l:'🎬 BTS',h:2},{v:'look',l:'💅 New Look',h:2},{v:'collab',l:'🤝 Collab',h:3}]
+      .map(function(t){ return '<button onclick="selectPostType(this,\'y\',\''+t.v+'\','+t.h+',true)" data-val="'+t.v+'" style="padding:5px 10px;border:1px solid #2f3336;border-radius:20px;background:transparent;font-size:12px;cursor:pointer;color:#E7E9EA">'+t.l+'</button>'; }).join('')
+    +[{v:'hyped',l:'🔥 Hyped'},{v:'reflective',l:'💭 Reflective'},{v:'funny',l:'😂 Funny'},{v:'throwback',l:'📷 Throwback'},{v:'realtalk',l:'💬 Real Talk'}]
+      .map(function(t){ return '<button onclick="selectPostType(this,\'y\',\''+t.v+'\',0,false)" data-val="'+t.v+'" style="padding:5px 10px;border:1px solid #2f3336;border-radius:20px;background:transparent;font-size:12px;cursor:pointer;color:#71767b">'+t.l+'</button>'; }).join('')
     +'</div>'
-    
-    // Tag People - NEW!
-    +'<div style="margin-bottom:10px">'
-    +'<div style="font-size:13px;color:#71767b;margin-bottom:6px">🏷️ Tag people:</div>'
-    +'<input id="yPeopleSearch" type="text" placeholder="Search artists..." style="width:100%;padding:8px;border:1px solid #2f3336;border-radius:8px;background:#111;color:#fff;font-size:13px;outline:none" oninput="filterPeople(this.value, \'y\')">'
+    +'<div id="yEffectsCard" style="display:none;background:rgba(29,155,240,.1);border:1px solid rgba(29,155,240,.25);border-radius:10px;padding:8px 12px">'
+    +'<div style="font-size:12px;font-weight:700;color:#1d9bf0;margin-bottom:3px">✨ Game effects on post</div>'
+    +'<div id="yEffectsText" style="font-size:12px;color:#71767b;line-height:1.4"></div>'
+    +'</div>'
+    +'</div>'
+
+    // Tag People
+    +'<div style="padding:12px 16px;border-bottom:1px solid #2f3336">'
+    +'<div style="font-size:13px;color:#71767b;margin-bottom:6px">🏷️ Tag people</div>'
+    +'<input id="yPeopleSearch" type="text" placeholder="Search artists..." style="width:100%;padding:8px;border:1px solid #2f3336;border-radius:8px;background:#111;color:#fff;font-size:13px;outline:none" oninput="filterPeople(this.value,\'y\')">'
     +'<div id="yPeopleResults" style="max-height:120px;overflow-y:auto;margin-top:6px;display:none;background:#1a1a1a;border-radius:6px"></div>'
     +'<div id="yTaggedPeople" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>'
     +'</div>'
-    
-    // Vibe pills
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
-    + getPostVibes().slice(0,3).map(function(v){ return '<button onclick="selectVibe_y(this)" data-val="'+v.val+'" style="padding:5px 12px;border:1px solid #2f3336;border-radius:20px;background:transparent;color:#fff;font-size:12px;cursor:pointer">'+v.label+'</button>'; }).join('')
-    +'</div></div>';
-  
+
+    // Sticky toolbar: image, disabled music note, SVG ring counter
+    +'<div style="position:sticky;bottom:0;background:#000;border-top:1px solid #2f3336;padding:10px 16px;display:flex;align-items:center;gap:4px">'
+    +'<button onclick="openYFileInput()" style="background:none;border:none;color:#1d9bf0;cursor:pointer;padding:8px;border-radius:50%">'
+    +'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
+    +'</button>'
+    +'<input type="file" id="yPostFile" accept="image/*,image/gif" style="display:none" onchange="yPreviewMedia(this)">'
+    // Disabled music icon — not available on Y
+    +'<button onclick="showToast(\'Song tagging not available on Y\',\'red\')" style="background:none;border:none;color:#555;cursor:pointer;padding:8px;border-radius:50%;opacity:.45" title="Not available on Y">'
+    +'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
+    +'</button>'
+    +'<div style="flex:1"></div>'
+    // SVG ring character counter
+    +'<svg id="yCharRing" width="34" height="34" viewBox="0 0 34 34" style="transform:rotate(-90deg)">'
+    +'<circle cx="17" cy="17" r="14" fill="none" stroke="#2f3336" stroke-width="3"/>'
+    +'<circle id="yRingArc" cx="17" cy="17" r="14" fill="none" stroke="#1d9bf0" stroke-width="3" stroke-dasharray="'+CIRC+'" stroke-dashoffset="'+CIRC+'" stroke-linecap="round"/>'
+    +'</svg>'
+    +'<span id="yCharNum" style="font-size:13px;color:#71767b;margin-left:4px;min-width:20px;display:none"></span>'
+    +'</div>';
+
   document.getElementById('phone').appendChild(screen);
   setTimeout(function(){
     var ta = document.getElementById('yPostText');
+    var arc = document.getElementById('yRingArc');
+    var num = document.getElementById('yCharNum');
     if(ta) ta.addEventListener('input', function(){
-      var left = 280 - ta.value.length;
-      var el = document.getElementById('yCharCount');
-      if(el){ el.textContent = left; el.style.color = left < 20 ? '#f4212e' : '#1d9bf0'; }
+      var used = ta.value.length;
+      var left = 280 - used;
+      var pct = used / 280;
+      var C = 94.25;
+      if(arc){
+        arc.setAttribute('stroke-dashoffset', C * (1 - pct));
+        arc.setAttribute('stroke', left < 20 ? '#f4212e' : left < 50 ? '#ffd400' : '#1d9bf0');
+      }
+      if(num){
+        if(left < 50){ num.style.display='inline'; num.textContent=left; num.style.color=left<20?'#f4212e':'#71767b'; }
+        else { num.style.display='none'; }
+      }
     });
-  },100);
+  }, 100);
 }
 
 function yPreviewMedia(input){
@@ -27725,6 +27770,144 @@ function clearYMedia(){
   GAME.pendingPostImage=null; GAME.pendingPostGif=null; GAME.pendingPostIsGif=false;
   var prev = document.getElementById('yMediaPreview');
   if(prev) prev.innerHTML = '';
+}
+
+// =============================================
+// POST TYPE SYSTEM (shared across Pentagram, Rookie, Y)
+// =============================================
+var _POST_TYPE_EFFECTS = {
+  concept:  'Hype +3 • Era speculation seeds in your fandom',
+  music:    'Hype +5 • Stream goal thread starts • AirTime may cover',
+  announce: 'Hype +4 • Press outlets may pick up',
+  bts:      'Hype +2 • Fan appreciation posts seed',
+  look:     'Hype +2 • Fashion commentary floods your fandom',
+  collab:   'Hype +3 • Collab wishlist posts in both fandoms'
+};
+var _POST_TYPE_HYPE = {concept:3,music:5,announce:4,bts:2,look:2,collab:3};
+
+function selectPostType(btn, platform, val, hype, isCareer){
+  var screenId = platform==='ig'?'pentagramPostScreen':platform==='rk'?'rookiePostScreen':'yPostScreen';
+  var screen = document.getElementById(screenId);
+  if(screen){
+    screen.querySelectorAll('[data-val]').forEach(function(b){
+      if(platform==='ig'){ b.style.background='#fff'; b.style.color='#262626'; b.style.borderColor='#dbdbdb'; }
+      else if(platform==='rk'){
+        b.style.background='transparent';
+        b.style.color = _POST_TYPE_HYPE[b.dataset.val] ? '#fff' : '#aaa';
+        b.style.borderColor='#333';
+      } else {
+        b.style.background='transparent';
+        b.style.color = _POST_TYPE_HYPE[b.dataset.val] ? '#E7E9EA' : '#71767b';
+        b.style.borderColor='#2f3336';
+      }
+    });
+  }
+  // Highlight selected chip
+  if(platform==='ig'){ btn.style.background='#000'; btn.style.color='#fff'; btn.style.borderColor='#000'; }
+  else if(platform==='rk'){ btn.style.background='#fe2c55'; btn.style.color='#fff'; btn.style.borderColor='#fe2c55'; }
+  else { btn.style.background='#1d9bf0'; btn.style.color='#fff'; btn.style.borderColor='#1d9bf0'; }
+
+  GAME['pendingPostType_'+platform] = val;
+  GAME['pendingPostVibe_'+platform] = btn.textContent.trim(); // feed vibe display compat
+
+  var card = document.getElementById(platform+'EffectsCard');
+  var txt  = document.getElementById(platform+'EffectsText');
+  if(card && txt){
+    if(isCareer && hype > 0){
+      card.style.display='block';
+      txt.textContent = _POST_TYPE_EFFECTS[val] || ('Hype +'+hype);
+    } else {
+      card.style.display='none';
+    }
+  }
+}
+
+// Song/Sound picker sheet (shared for 'ig' and 'rk')
+function openSongPickerSheet(platform){
+  var isIg = platform==='ig';
+  var bg   = isIg ? '#fff' : '#111';
+  var txt  = isIg ? '#000' : '#fff';
+  var sub  = isIg ? '#8e8e8e' : '#888';
+  var bord = isIg ? '#efefef' : '#222';
+  var inputBg = isIg ? '#fafafa' : '#1a1a1a';
+
+  var html = '<div style="display:flex;flex-direction:column;height:100%;background:'+bg+'">'
+    +'<div style="padding:14px 16px;border-bottom:1px solid '+bord+';display:flex;align-items:center;flex-shrink:0">'
+    +'<button onclick="document.querySelector(\'[data-app-overlay]\').remove()" style="background:none;border:none;cursor:pointer;color:'+txt+';font-size:14px">Cancel</button>'
+    +'<div style="font-size:16px;font-weight:700;color:'+txt+';flex:1;text-align:center">Add Sound</div>'
+    +'<div style="width:60px"></div>'
+    +'</div>'
+    +'<div style="padding:12px 16px;flex-shrink:0">'
+    +'<input type="text" id="songPickerSearch" placeholder="Search songs…" oninput="renderSongPickerList(\''+platform+'\',this.value)" style="width:100%;padding:8px 12px;border:1px solid '+bord+';border-radius:8px;font-size:14px;outline:none;background:'+inputBg+';color:'+txt+'">'
+    +'</div>'
+    +'<div id="songPickerList" style="flex:1;overflow-y:auto;padding-bottom:20px"></div>'
+    +'</div>';
+
+  _insertOverlay(html);
+  setTimeout(function(){ renderSongPickerList(platform, ''); }, 60);
+}
+
+function renderSongPickerList(platform, query){
+  var list = document.getElementById('songPickerList');
+  if(!list) return;
+  var isIg = platform==='ig';
+  var txt  = isIg ? '#000' : '#fff';
+  var sub  = isIg ? '#8e8e8e' : '#888';
+  var bord = isIg ? '#efefef' : '#222';
+
+  var songs = getAllSongs();
+  if(query){
+    var q = query.toLowerCase();
+    songs = songs.filter(function(s){
+      return (s.title||'').toLowerCase().indexOf(q)>=0 || (s.artist||'').toLowerCase().indexOf(q)>=0;
+    });
+  }
+  songs.sort(function(a,b){ return (b.streams||0)-(a.streams||0); });
+
+  if(!songs.length){
+    list.innerHTML='<div style="text-align:center;padding:32px;color:'+sub+';font-size:14px">No released songs yet</div>';
+    return;
+  }
+
+  list.innerHTML = songs.slice(0,40).map(function(s){
+    var st = (s.title||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var sa = (s.artist||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var si = String(s.id||'').replace(/'/g,"\\'");
+    return '<div onclick="selectSongForPost(\''+si+'\',\''+st+'\',\''+sa+'\',\''+platform+'\')" '
+      +'style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-bottom:1px solid '+bord+'">'
+      +'<div style="width:40px;height:40px;border-radius:8px;background:linear-gradient(135deg,#1a2a3e,#2a1e4a);flex-shrink:0;display:flex;align-items:center;justify-content:center">'
+      +'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
+      +'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:14px;font-weight:600;color:'+txt+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s.title+'</div>'
+      +'<div style="font-size:12px;color:'+sub+'">'+s.artist+'</div>'
+      +'</div>'
+      +(s.streams?'<div style="font-size:11px;color:'+sub+';flex-shrink:0">'+formatSocial(s.streams)+' streams</div>':'')
+      +'</div>';
+  }).join('');
+}
+
+function selectSongForPost(id, title, artist, platform){
+  // Store on hidden input (existing publish path reads igTagSong / rkTagSong)
+  var hiddenInput = document.getElementById(platform+'TagSong');
+  if(hiddenInput) hiddenInput.value = id;
+
+  // Update UI row
+  if(platform==='ig'){
+    var row = document.getElementById('igMusicRow');
+    if(row) row.innerHTML = '<div style="display:flex;align-items:center;gap:6px">'
+      +'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#262626" stroke-width="2" style="animation:igSpin 3s linear infinite;flex-shrink:0"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
+      +'<span style="font-size:13px;color:#262626;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:200px">'+title+' • '+artist+'</span>'
+      +'</div>';
+  } else if(platform==='rk'){
+    var row = document.getElementById('rkSoundRow');
+    if(row) row.innerHTML = '<span style="font-size:14px;color:#fff;font-weight:600">'+title+'</span>'
+      +' <span style="font-size:12px;color:#888">• '+artist+'</span>';
+  }
+
+  // Close picker overlay
+  var ov = document.querySelector('[data-app-overlay]');
+  if(ov) ov.remove();
 }
 
 // =============================================
@@ -27979,7 +28162,18 @@ function finishPublishPost(platform, text, taggedSongId, vibe, location, uploade
   delete GAME['pendingPostVibe_ig'];
   delete GAME['pendingPostVibe_rk'];
   delete GAME['pendingPostVibe_y'];
-  
+
+  // Apply hype from career post type
+  var _ptKey = platform==='instagram'?'ig':platform==='tiktok'?'rk':'y';
+  var _ptVal = GAME['pendingPostType_'+_ptKey];
+  if(_ptVal && _POST_TYPE_HYPE && _POST_TYPE_HYPE[_ptVal]){
+    GAME.hype = Math.min(1000, (GAME.hype||0) + _POST_TYPE_HYPE[_ptVal]);
+    console.log('✨ Post type hype boost:', _ptVal, '+'+_POST_TYPE_HYPE[_ptVal], '→', GAME.hype);
+  }
+  delete GAME['pendingPostType_ig'];
+  delete GAME['pendingPostType_rk'];
+  delete GAME['pendingPostType_y'];
+
   updateStats();
   markDirty();
   
