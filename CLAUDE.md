@@ -7,15 +7,15 @@ Sound Check is a multiplayer music industry life simulation game. Solo developer
 - **Entire game is ONE file**: `index.html` (~30K lines). Vanilla HTML/CSS/JS. No frameworks, no build step.
 - **Backend**: Supabase (project `pvxrciebegirmrrrzkor`) — auth, database, storage, edge functions.
 - **Deploy**: push to main → Vercel auto-deploys to sound-check-game.vercel.app.
-- **AI edge functions** (Claude Haiku): `concept-analysis`, `lyric-generation`, `moderate-content`.
+- **AI edge functions** (Claude Haiku): `concept-analysis`, `lyric-generation`, `moderate-content`, `generate-article`, `generate-fandom-reactions`.
 
 ## Critical dev rules
 
-1. **Always run `node --check` on the JS** before considering an edit done (extract script or check syntax carefully — one syntax error kills the whole game).
+1. **Always run `node --check` on the JS** before considering an edit done.
 2. **Never bulk-remove console.logs.** They are intentional debugging.
 3. **All overlays must use `_insertOverlay()`** — z-index locked at 200000. Never create ad-hoc overlay divs.
 4. **All colors/fonts via CSS variables**: `var(--bg) --surf --card --bord --txt --mut --acc --acc-bg --acc-txt --fd --fb --tsp --ti`. NEVER hardcode colors in new UI.
-5. When editing, use small precise replacements with generous surrounding context — the file has many near-duplicate blocks.
+5. Use small precise replacements with generous surrounding context — the file has many near-duplicate blocks.
 6. Prefer small, testable changes. One feature per branch/PR.
 
 ## Supabase gotchas
@@ -31,17 +31,61 @@ Sound Check is a multiplayer music industry life simulation game. Solo developer
 - `DAY_MS` = 2 real hours per game day.
 - `_dayAdvancing` flag is set synchronously BEFORE any await (prevents re-entry corruption).
 - `gameWeekToDate`: Week 1 Day 1 = Jan 1, 2017.
-- Song timers, collab timers, and parallel-work slowdown multipliers are locked values — do not change without explicit instruction.
+- Song timers, collab timers, and parallel-work slowdown multipliers are locked — do not change without explicit instruction.
 
-## Themes (6 approved — no others)
+## Themes (7 approved — no others)
 
-Editorial (`ed`), Neon Underground (`neon`), Lo-Fi Warmth (`lofi`), Sketchbook (`sk`), Modern (`modern`), Pastel Dream (`pastel`).
+Editorial (`ed`), Neon Underground (`neon`), Lo-Fi Warmth (`lofi`), Sketchbook (`sk`), Modern (`modern`), Pastel Dream (`pastel`), Glass (`glass`).
 
 - Themes are `.t-{name}` classes on `#phone`, defined near the top of the CSS.
 - Theme cached in localStorage key `sc_theme_cache` to prevent flash on load.
 - `brutalist` was removed and redirects to `modern`.
-- **Cleanup task**: CSS blocks for removed themes (`t-glam`, `t-retro`, `t-modern-dark`, `t-brutality`, `t-archive`, `t-bubbly`) may still exist in the file — safe to delete when instructed.
-- **Goal**: each approved theme gets full per-theme component styling + micro-animations (buttons, cards, hover/press states), not just palette swaps.
+- **Cleanup task**: CSS blocks for removed themes (`t-glam`, `t-retro`, `t-modern-dark`, `t-brutality`, `t-archive`, `t-bubbly`) may still exist — safe to delete when instructed.
+- **Goal**: each approved theme gets full per-theme component styling + micro-animations, not just palette swaps.
+
+### Glass theme spec
+- Background: real photo (grass + sky) stored in Supabase Storage, referenced by URL.
+- Photo blurred via `body::before` pseudo-element: `filter: blur(3px); transform: scale(1.04)` — scale prevents blur edge bleed.
+- All panels: `backdrop-filter: blur(14px)` on `rgba(255,255,255,0.22)` backgrounds.
+- Glossy highlight on every card: `::after` with `linear-gradient(180deg, rgba(255,255,255,.4), transparent)`.
+- Text: dark navy (`#0d1a2a`). Accent: forest green (`#2d8a4e`).
+- Blueprint: `docs/glass_theme_light.html`.
+
+## Feature flags (staged release system)
+
+All Wave 2+ features ship in the file from day one but stay hidden behind flags. Flipping a flag in Supabase makes it live instantly for all players — no redeployment, no App Store resubmission.
+
+**One-time Supabase setup:**
+```sql
+create table config (key text primary key, value jsonb);
+insert into config values ('feature_flags', '{
+  "fandoms": false, "radio": false, "distributor": false,
+  "merch": false, "multi_saves": false, "tours": false,
+  "idol_path": false, "groups": false, "charts_v2": false
+}');
+```
+
+**Load at startup:**
+```javascript
+async function loadFeatureFlags() {
+  const { data } = await supabase.from('config').select('value').eq('key','feature_flags').single();
+  GAME.features = data?.value || {};
+}
+```
+
+**Wrap every new feature:** `if (GAME.features.fandoms) showFandomsButton();`
+
+## Release wave plan
+
+**Wave 1 — Launch:** Core music career: record/release/stream, all 6 streaming platforms, socials (Pentagram/Rookie/Y), press system, housing (6 regions), jobs, training, basic charts, player profiles. All flags off.
+
+**Wave 2 — Labels + Tours:** Full label experience (both sides), basic tours. Flip: `tours: true`, `charts_v2: true`.
+
+**Between Wave 2–3 — Multi-saves:** Up to 3 save slots per account. UI change only, no flag needed.
+
+**Wave 3 — The Scene:** Fandoms app, radio stations, distributors, merch. Flip: `fandoms: true`, `radio: true`, `distributor: true`.
+
+**Wave 4 — Groups & Idol Path:** Full idol experience, groups, K-idol path, group charts. Flip: `idol_path: true`, `groups: true`.
 
 ## Game systems (built & locked)
 
@@ -53,11 +97,40 @@ Editorial (`ed`), Neon Underground (`neon`), Lo-Fi Warmth (`lofi`), Sketchbook (
 - Finances tab (spreadsheet style), industry news (`_pushArticle()`), Artist Hub website builder.
 - Energy cap 120/day, stress decay 2/day, album limit 4/game year.
 - Housing tiers, ten approved jobs — locked values.
-- NPC world simulation runs in single-player ONLY. **No NPC artists in multiplayer** — only real players (staff NPCs for scouting/legal are fine).
+- NPC world simulation runs in single-player ONLY. No NPC artists in multiplayer — only real players.
+
+## Charts system (Wave 2 — flag: charts_v2)
+
+Four chart types. The in-game chart authority is **The Dial** (working name, not locked). Chartwell (the press outlet) *reports on* The Dial — Chartwell is not the chart publisher.
+
+### The Dial 50 — all-format combined
+Formula: Streams 45% + Sales 30% + Airplay 25% = score in points (not raw numbers).
+Each entry: rank, movement (▲▼ NEW =), 5-bar sparkline, points, weekly delta, status tags (Peak / Climbing / Falling / New).
+Tap any entry → slide-up detail with factor breakdown bars + week-by-week history.
+
+### Streams 100
+Raw plays across all 6 platforms. Weighted: Loopify 45%, Orange 25%, others 30%. Daily updates.
+
+### Sales 50
+Paid downloads, iMusic purchases, album bundles. One purchase = one unit. Completely separate from streams. Gold badge at 500K all-time units, Platinum at 1M.
+
+### Airplay 40
+Sources before Wave 3 radio launch:
+- Loopify algorithmic playlist add = 50 pts/week
+- Orange algorithmic add = 35 pts/week
+- Other platform adds = 20 pts/week each
+- AirTime article mention = 100 pts one-time
+- Promo spend feeds algorithmic discovery → playlist adds → airplay points
+
+Wave 3 adds: radio station spin = 10 pts, paid placement = 25 pts.
+
+### Chartwell Hall of Records
+All-time records (most streams single, fastest climb, most weeks at #1), historic firsts, career retrospectives. Year-end Song of the Year at Week 52. Getting a Chartwell Hall feature is prestigious — not a weekly thing.
+Blueprint: `docs/charts_v2.html`.
 
 ## Current focus: LABEL SYSTEM
 
-Blueprints live in `docs/labels_v2_blueprint.html` and `docs/labels_extra_blueprint.html`. **Implement to match those designs.** Existing partial label code in index.html (~lines 12600–14200) is being extended/replaced.
+Blueprints: `docs/labels_v2_blueprint.html` and `docs/labels_extra_blueprint.html`. Existing partial label code in index.html (~lines 12600–14200) is being extended/replaced.
 
 Build order:
 1. Founding flow upgrade (eligibility, startup fees, balance check)
@@ -69,200 +142,168 @@ Build order:
 
 Stub functions to replace: `showLabelLoans()`, `showLabelShowcase()`, `showLabelOwnerSettings()` (currently "Coming Soon" alerts).
 
-## Press article & rumor system
+## Press system — 5 outlets (LOCKED, never add or remove)
 
-- Edge function `generate-article` (Deno/TypeScript) generates AI press articles in outlet voice, runs them through `moderate-content`, inserts with service role key.
-- Outlets: Velour (prestige), Room Service (gossip), Chartwell (business/charts), Undertone (discovery), AirTime (mainstream pop).
-- Articles are in `industry_articles` table. Clients SELECT only (RLS). Service role inserts.
-- `trigger_key` unique index prevents duplicate articles.
-- **Rumor hard boundaries (NON-NEGOTIABLE — do not loosen)**:
-  - Rumors seed ONLY from real in-game actions (collab accepted, spending event, same-week releases, declined collabs). Never invent from nothing.
-  - Never involve real money, romantic partners/cheating, family, health, or anything cruel or targeting a real person.
-  - Stat effects are ±1–2% range only (e.g. ±hype/fans, never income or skill).
-  - Stored with `type='rumor'`, `target_player_id`, `is_rumor=TRUE`, `expires_week = current_week + 3`.
-  - Expired rumors stop showing effects immediately (check `expires_week > GAME.week`).
-- **Rumor response mechanic**: targeted player gets a notification, one choice allowed:
-  - Deny → 70% expires immediately, 30% one follow-up + effect doubles then expires.
-  - Ignore → 80% quiet expiry, 20% one follow-up article.
-  - Lean in → +hype now, +stress, rumor runs full course.
-  - Choice logged in `response` column on the article row.
-- Weekly server-wide cap: 10 generated articles (rumors count toward cap). Past cap, triggers no-op.
+**VELOUR** — Voice: elegant, measured, prestige print magazine. Congratulatory only — never writes negatively.
+Covers: profiles, cover stories, label showcases, Velour Spotlight (label-exclusive).
+Auto-triggers: first #1, 50K fans, major label signing, Penthouse move-in (if signed/owner), label Spotlight submission, Year-End showcase.
+Effect: Hype +8, Fans +3–5%, Label rep +0.5. Unsigned artists CANNOT receive Velour Spotlight — gate check required.
+
+**ROOM SERVICE** — Voice: cheeky tabloid. Gossipy, dramatic, ellipses and air quotes. Speculative but never cruel.
+Covers: rumors, morale speculation, artist drama, label tension.
+Auto-triggers: stress ≥ 85, morale < 20, missed rent 2+ weeks, "Lean in" response, label owner press request.
+Player response options: Deny (70% dies, 30% amplifies) / Ignore (80% quiet, 20% follow-up) / Lean in (hype +6, stress +4, runs full course).
+When a signed artist is targeted: insert notification to artist (type='press_mention') AND label owner (type='press_request') after article insert.
+
+**CHARTWELL** — Voice: dry, data-forward trade publication. Factual.
+Covers: chart entries/movements, streaming milestones, label rankings, The Dial weekly round-up, Year-End rankings, Hall of Records.
+Auto-triggers: chart entry, #1, 1M/5M/10M streams, label tier upgrade, Week 52.
+Effect: rep +0.1–0.3. Also publishes all-time records in Hall of Records — separate from weekly coverage.
+
+**UNDERTONE** — Voice: warm indie blog. Enthusiastic, discovers artists early.
+Covers: debuts, new-artist profiles, collab spotlights, genre movement, unsigned discovery.
+Auto-triggers: first release, first collab, first chart entry, 1K fans.
+Effect: Hype +4, Fans +1–2%. Won't cover artists with 100K+ fans.
+
+**AIRTIME** — Voice: bright radio-DJ energy. Talks about momentum and heavy rotation.
+Covers: streaming milestones, chart momentum, mainstream crossover, playlist coverage. Radio rankings once radio is built (Wave 3).
+Auto-triggers: 500K streams/week, top 10 for 3+ weeks, label signing, 25K fans.
+Effect: Hype +5. Flavor only until radio stations built.
+
+### Shared press rules
+- All articles generated via `generate-article` edge function. Each outlet has its own system prompt.
+- Articles insert into `articles` table with outlet, type, artist_id, effect fields. Effects applied on insert.
+- Global articles (Year-End, Hall of Records) visible to all players. Artist-specific visible to artist + their label only.
+- Weekly server-wide cap: 10 generated articles (rumors count). Past cap → no-op.
+
+### Rumor hard limits (NON-NEGOTIABLE — never loosen)
+- Seeded ONLY from real in-game player events. Never invented.
+- Always PG. Never involve real money, partners, family, health, cruelty.
+- Stat effects capped at ±2%.
+- Expire after 3 game weeks unless fed by player response.
+- Stored with `type='rumor'`, `is_rumor=TRUE`, `expires_week = current_week + 3`.
+
+## AI rate limiting
+
+Every edge function that calls the AI checks usage first.
+
+```sql
+create table ai_usage (
+  player_id text, date date,
+  articles_generated int default 0,
+  fandom_posts_generated int default 0,
+  primary key (player_id, date)
+);
+```
+
+Check before every AI call, upsert after. Daily caps: **5 articles/player, 10 fandom posts/player**. Rows auto-expire by date.
+
+## Fandoms app (Wave 3 — flag: fandoms)
+
+Separate in-game platform. Bot-generated fan community seeded from real game events.
+
+### Edge function: `generate-fandom-reactions`
+Fires on `post_create` Supabase trigger. Calls Claude Haiku → generates 3–5 realistic fan posts → inserts into `fandom_posts` table with artist_id, trigger_post_id, generated fan name/handle, content, post_type, created_at.
+
+Trigger → reaction type:
+- Outfit/concept post → fashion commentary + era speculation
+- New song release → hype + stream goal post
+- Chart entry → celebration + milestone tracker
+- Chart #1 → celebration avalanche + rival fan visit
+- Room Service rumor → defense posts + drama threads
+- Collab announcement → wishlist + excitement
+- Tour booking → setlist speculation
+
+### Post types in fandom feed
+Naming vote (live tallies), stream goal tracker (progress bar), artist reply (player responds — purple inset card), era analysis thread, song ranking poll (visual bars), fan art with attachment, birthday event from mods, beef post from rival fan, collab wishlist, rumor defense, label appreciation, fashion/aesthetic era thread, setlist speculation, "what song made you a fan" weekly prompt, fan project call, discography ranking mega-thread.
+
+### Fandom naming milestone
+Before 25K fans: bot fans speculate and vote (displayed as "name pending…"). At 25K: player names it officially or lets fans vote.
+
+Blueprint: `docs/fandom_v2.html`.
+
+## Release flow redesign
+
+Three screens replacing the current release flow. Reference: `docs/release_flow.html` — study before coding.
+
+**Screen 1 — Cover Art:**
+Remove the emoji grid entirely. Default cover is a CSS vinyl disc graphic (conic-gradient rainbow disc, silver centre, hole) on a gradient using `--acc-bg` and `--bg`. Five colour theme chips change the default gradient. Upload is single-file only (`multiple` NOT set). On upload: image fills the cover square, upload zone hidden, small "Replace" button appears overlaid.
+
+**Screen 2 — Release Concept (optional):**
+Player uploads up to 3 concept photos. One `<input type="file" accept="image/*" multiple>` — if >3 selected, take first 3 and toast "Only the first 3 photos were used." Each filled slot shows a real thumbnail preview. Label as "Fan reactions · preview" — do NOT use the word "AI" or robot emoji anywhere on this screen. Use 🎨 palette emoji. Both skip options go to Screen 3.
+
+**Screen 3 — Review & Release:**
+Blurred cover art hero (~260px tall, `filter: blur(20px)`, `transform: scale(1.08)` to prevent edge bleed, gradient fade into `--bg`). Cover square centred on hero. Song title in Georgia serif. Release type + track count in small uppercase. Concept status banner (green if added, muted if skipped). Track list with quality score. Tappable release timing card that expands a Mon–Sun day-picker. Buttons: "🚀 Release Now" (primary) and "📅 Schedule Release" (outlined).
+
+All colours via CSS variables — flow adapts to active theme automatically. Use `_insertOverlay()`, z-index: 200000. Do not touch underlying release logic.
+
+## Game Hub (standalone arcade — Wave 1)
+
+Separate section. Games are self-contained, not embedded in career actions. Players earn coins.
+Blueprint: `docs/game_hub.html`.
+
+### Coin economy
+- Coins are **entirely in-game currency**. Never represent real money.
+- Suggested conversion: **10 coins = $1,000 in-game** (TBD).
+- Tipping: players send coins to other artists → converts to in-game cash.
+- **Coins buy**: Lyric Snap boost slot (feature your song in daily rotation), game hub tournament entry, minor profile decoration (temporary badges — NOT themes or major cosmetics).
+- **Coins do NOT buy**: themes, profile borders, avatar frames, premium backgrounds — those are real money only.
+
+### Games
+**Rhythm Rush** — 3-lane note tapper, score attack, combo multiplier. Requires audio file in Supabase Storage to function properly — do not build without audio. Up to 120 coins/game.
+
+**Lyric Snap — Player Lyrics Daily Drop:** Each real-life day at a set time, pulls 10 player songs from the database, blanks one word per lyric, players guess. Correct = coins for guesser + small hype bump for the featured artist. Artists spend coins to boost their song into the daily rotation.
+*Real artist mode: NOT BEING BUILT. Copyrighted lyrics require a license.*
+
+**Rap Beef** — card-based bar battle vs bot. 4 cards per hand (Fire/Slick/Shade/Truth, each with atk/def stats). HP bars. Win = 100 coins.
+
+**DJ Spin** — two spinning platters, tap STOP to land needle in groove zone. Both must land for full points. 8 rounds. Up to 80 coins/game.
+
+**Word Mix** — 7 letters in a circle, tap to build words. Required word slots at top. Bonus words earn extra. 3-minute timer. Pangram (7-letter, all letters used) = 100 coins. Daily challenge pangram = 500 coins (one per player per day). All puzzles themed around music industry vocabulary.
+Blueprint: `docs/word_mix.html`.
+
+## Label decision screens (per docs/label_decisions_blueprint.html)
+
+**PRESS STATEMENT:** Triggered from Daily Inbox. Editor with tone chips (Professional/Warm/Firm/Dismissive), preset openers, editable headline + body, article preview in paper/cream style. Draft pre-fills via generate-article edge function (trigger='label_statement', outlet='label_official'). Inserts as type='statement', verified:true. Effect: rep ±1, rumor expiry chance boost.
+
+**SONG REVIEW:** Shows song cover + quality score bar (writing/production/vocals/concept/studio bonus), featured artist card, projections, week selector. Approve (morale +12) / Schedule (morale +4) / Send Back (morale −10) / Shelve (morale −5, resubmittable).
+
+**COLLAB COMPARE:** Side-by-side artist cards, compatibility score (genre overlap + fan overlap + chart form + workload + history + morale), active collab warning, last 3 songs each, proposed song info. Approve (roster_bonus:true, +15% first-week streams, morale +5 each) / Block (morale −6 each) / Suggest Different (nominates two other roster artists).
+
+## Label tier requirements (LOCKED)
+
+- Indie → Mid-Indie: 500K total roster streams + min 3 artists.
+- Mid-Indie → Major Boutique: 5M total roster streams + min 5 artists.
+- Major Boutique → Global Major: 50M total roster streams + min 10 artists.
+- Auto-upgrades, Activity Feed notification. Velour quotas: Indie=1/mo, Mid=2/mo, Boutique=3/mo, Global=5/mo + Label Showcase unlock.
+
+## Label Life systems (per docs/label_life_blueprint.html)
+
+**Artist Morale** — 0–100, recalculated each game day.
+Factors: release approved (+12), rejected (−15), promo spent (+8), advance recouped (+10), advance high (−6), label contact (+6), no contact 3+ weeks (−8), roster collab this month (+5), no collab 4+ weeks (−4), studio time given (+7), auto-approve on (+3/day).
+Below 40: moody social post. Below 20: Room Service rumor + exit request. At 0: formal release request.
+Owner actions: Send Gift (−$800, +8 morale), Give Studio Time (quality bonus), Check In (+6), Spotlight, Auto-Approve toggle.
+
+**Daily Inbox** — max 5 decisions/game day: release approvals, advance requests, scout applications, roster collab requests, press comment requests. All logged in activity feed.
+
+**Label Studio** — Home (free) → Project ($20K) → Pro ($80K) → Elite ($250K). Equipment categories: Recording, Production, Mixing, Mastering, Vibe. Session slots: 1/2/3/4. Morale +3 per roster artist on tier upgrade.
+
+**Roster Collabs** — +15% first-week streams (roster_bonus:true), +5 morale each on approval, −6 each if blocked.
+
+**Velour Spotlight (label-exclusive)** — Gate check: must have signedLabel isOwner OR be signed. Requirements: Established+ tier, 50K+ fans, chart entry in last 8 weeks, rep 4.0+. One submission per label per month. On acceptance: hype +8, fans +3–5%, label rep +0.5. Rejection includes specific feedback.
+
+**Year-End Label Rankings** — Week 52, auto. Scoring: chart entries (weighted by peak) + combined roster streams + label rep + fan growth. Fires: Chartwell ranked article, Velour "Labels to Watch" top 3, "Year in Review" tab for 4 game weeks, 🏆 badge for #1 label.
+
+## Housing (LOCKED values)
+
+Energy per tier: [−10, −5, 0, +2, +5].
+Creativity per tier: [−10, −8, −5, −2, 0].
+Regional multipliers: NA×1.0, Europe×1.4, Africa×0.45, Asia×0.9, SA×0.6, Oceania×1.15.
+Penthouse Velour trigger: if signedLabel or ownedLabel exists on move-in, fire `_pushArticle` with `GAME.penthouseVelourFired` guard flag.
 
 ## Planned later (do not build unless asked)
 
-K-pop Trainee/Idol path (dice-roll stat creation, birth names only for trainees, training + evaluations, comeback cycles), Fandoms app (bot-generated fan community), Visual stat, three-tier charts, band/groups system, monetization (speed tokens, theme shop), year-end taxes.
-
-## Testing
-
-- Test account: `iriswaeris@gmail.com`, player Bootswidafur.
-- Admin reset password: `soundcheck_reset_2024`.
-- After merge, Vercel auto-deploys — test on mobile.
-
-- ## Label decision screens (all per docs/label_decisions_blueprint.html)
-
-PRESS STATEMENT:
-- Triggered from Daily Inbox "Room Service press request" or any label news event
-- Opens editor with: label logo/name header, 4 tone chips (Professional/Warm/Firm/Dismissive), 4 preset openers, editable headline + body textarea, article preview rendering in paper/cream style
-- AI draft pre-fills on open (call generate-article edge function with trigger='label_statement', outlet='label_official') — player edits from there
-- Publish inserts into articles table as type='statement', outlet='[Label Name] Official', with verified:true flag; RLS allows label owners to insert their own statements
-- Effect: rep modifier ±1 depending on tone, rumor expire chance boost
-
-SONG REVIEW (approval queue):
-- Shows: song cover gradient + title/artist/genre, quality score bar with breakdown (writing/production/vocals/concept/studio bonus), featured artist card (their fans + roster bonus if applicable), projections grid, week selector, 4 action buttons
-- Approve: sets pendingReleases[i].status='approved', triggers processRelease, morale +12
-- Schedule: sets status='scheduled', stores chosen week, morale +4
-- Send Back: sets status='returned', stores note, morale -10
-- Shelve: sets status='shelved', stores to label.shelvedTracks[], morale -5 (can resubmit)
-
-COLLAB COMPARE (collab approval):
-- Shows: side-by-side artist cards, compatibility score (genre match + fan overlap + chart form + workload + history + morale), active collab warning if either has concurrent, last 3 songs each with streams, proposed song info, roster bonus call-out
-- Approve: fires existing collab flow with roster_bonus:true flag → +15% first week streams, morale +5 each
-- Block: morale -6 each, logged in activity feed
-- Suggest Different: owner nominates two other roster artists, both get notification
-
-LABEL TIER REQUIREMENTS (for tutorial):
-- Indie → Mid-Indie: 500K total roster streams + min 3 artists (auto-upgrades, appears in Activity Feed)
-- Mid-Indie → Major Boutique: 5M total roster streams + min 5 artists
-- Major Boutique → Global Major: 50M total roster streams + min 10 artists
-- Tier perks per upgrade: bigger advance range, more staff slots, higher Velour submission quota (Indie=1/mo, Mid=2/mo, Boutique=3/mo, Global=5/mo + Label Showcase unlock)
-- 
-Five outlets (locked names — never change):
-Velour — prestige features, cover stories, long-form artist profiles. Elegant prose.
-Room Service — gossip, rumors, concern pieces. Cheeky tabloid voice.
-Chartwell — charts, business, data. Dry trade publication voice.
-Undertone — new music discovery, unsigned scene, collab culture. Warm indie voice.
-AirTime — mainstream radio flavor, heavy rotation coverage. Bright upbeat voice. No real radio system exists yet — AirTime covers big streaming weeks in radio-DJ voice (pure flavor until radio stations are built).
-Press rumor rules (HARD LIMITS — never violate):
-Rumors seeded ONLY by real in-game player events, never invented
-Always PG, never involve real money / partners / family / health / cruelty
-Stat effects capped at ±2% per rumor
-Rumors expire after 3 game weeks unless fed by player response
-Player response options: Deny (70% dies, 30% amplifies) / Ignore (80% quiet, 20% follow-up) / Lean in (+hype, +stress, runs full course)
-Room Service → label notification chain:
-When a rumor targets a signed artist, edge function inserts TWO notifications after article insert:
-Artist: type='press_mention', "Room Service wrote about you"
-Label owner: type='press_request', "Room Service is asking about [artist] — issue a statement?"
-Both reference the same article_id. No new tables needed.
-Press statement (label-owner feature):
-Label owner can publish official statements from Daily Inbox press requests
-Editor: tone chips (Professional/Warm/Firm/Dismissive), preset openers, editable headline + body
-AI pre-drafts via generate-article edge function with trigger='label_statement', outlet='label_official'
-Inserts into articles table as type='statement', outlet='[Label Name] Official', verified:true
-Effect: rep modifier ±1, rumor expiry chance boost
-Label Life systems (all per docs/label_life_blueprint.html)
-Artist Morale
-Score 0–100 per signed artist, recalculated each game day
-Factors: release approved (+12), rejected (−15), promo spent on them (+8), advance recouped (+10), advance high (−6), label contact (+6), no contact 3+ weeks (−8), roster collab this month (+5), no collab 4+ weeks (−4), studio time given (+7), auto-approve on (+3/day)
-Below 40: occasional moody social post
-Below 20: Room Service rumor fires + exit request notification to label owner
-At 0: artist formally requests release (owner can deny, artist goes silent)
-Owner actions: Send Gift (−$800 label funds, +8 morale), Give Studio Time (allocates session slot, next recording gets quality bonus), Check In (+6 morale, may surface contract concerns), Spotlight (featured on label page), Auto-Approve toggle
-Daily Inbox
-Surfaces pending decisions each game day, max 5 per day
-Types: release approvals, advance requests, scout applications, roster collab requests, press comment requests
-Each shows full context (song info, money amounts, artist stats) before decision
-All decisions logged in label activity feed with timestamp
-Label Studio
-Tiers: Home (free, minimal bonus) → Project ($20K) → Pro ($80K) → Elite ($250K)
-Equipment catalog (categories: Recording, Production, Mixing, Mastering, Vibe)
-Equipment purchases persist in label data, apply quality bonus to all roster recordings that week
-Session slots: Home=1, Project=2, Pro=3, Elite=4 per week
-Morale bonus: roster artists get +3 morale each when studio tier upgrades
-Equipment budget follows label finances (not player funds)
-Roster Collabs
-Artists on same label get +15% first-week streams bonus (roster_bonus:true flag)
-+5 morale each on approval, −6 morale each if blocked
-Owner can Approve / Block / Suggest (suggest sends notification to two artists, they decide; morale +3 each from the ask alone)
-Collab compare screen shows: side-by-side fan counts/genres, compatibility score (6 factors), active collab warning, last 3 songs each with streams, proposed song info
-Velour Spotlight (label-exclusive)
-Unsigned artists CANNOT access — gate check: player must have signedLabel with isOwner OR be signed to a label
-Requirements: label tier Established+, artist 50K+ fans, chart entry in last 8 weeks, label rep 4.0+
-Submission quota by tier: Indie=1/month, Mid-Indie=2/month, Boutique Major=3/month, Global Major=5/month
-Global Major unlocks Label Showcase (full label profile article, not just one artist)
-AI-generated article on acceptance (Velour voice), triggers hype +8 + fans +3–5% + label rep +0.5
-Rejection includes feedback message ("not enough chart presence" / "label too new") so player knows what to fix
-One submission per label per month (not per artist)
-Year-End Label Rankings
-Runs automatically at game Week 52 each game year
-Scoring: chart entries (weighted by peak position) + combined roster streams + label rep + artist fan growth
-Triggers four things:
-Chartwell publishes AI-generated ranked article (visible all players in news feed)
-Velour does "Labels to Watch" for top 3 rising indie labels
-"Year in Review" tab in news feed for 4 game weeks
-#1 label gets permanent 🏆 badge on their public label page
-Ties broken by rep score
-Song Review screen (per docs/label_decisions_blueprint.html)
-Triggered when roster artist submits release for approval
-Shows: song cover + title/genre/format, quality score bar (0–100) with breakdown (writing/production/vocals/concept/studio bonus), featured artist card (their fans + roster bonus if applicable), projections (hype/fan growth/proposed week), week selector
-Approve: pendingReleases[i].status='approved', triggers processRelease, morale +12
-Schedule: status='scheduled', stores chosen week, morale +4
-Send Back: status='returned', stores note field, morale −10
-Shelve: status='shelved', stored in label.shelvedTracks[], morale −5, can be resubmitted later
-Collab Compare screen (per docs/label_decisions_blueprint.html)
-Compatibility score: genre overlap + fan audience overlap + chart form + workload + previous collab history + morale (each weighted)
-Active collab warning: if either artist has a concurrent active collab, show orange warning (quality split risk)
-Approve fires existing collab flow with roster_bonus:true
-Block: morale −6 each, logged in activity feed
-Suggest Different: owner nominates two other roster artists, both get notification
-Label tier requirements (for tutorial — LOCKED values from code)
-Indie → Mid-Indie: 500K total roster streams + minimum 3 artists on roster
-Mid-Indie → Major (Boutique): 5M total roster streams + minimum 5 artists
-Major (Boutique) → Global Major: 50M total roster streams + minimum 10 artists
-Upgrades are automatic — fires when thresholds hit, appears in Activity Feed
-Perks per tier: bigger advance range, more staff slots, higher Velour submission quota (see above)
-Planned builds (do not build unless asked)
-Radio stations: players create their own radio stations, choose song rotations, compete on listener rankings, sell NPC ad slots, other players pay for playlist placement; chart position affects ad pricing. AirTime outlet will cover real station rankings once built.
-Fandoms app: bot-generated fan community, separates sim-fans from real players, covers artists/groups/labels
-K-pop trainee/idol path: dice-roll character creation, birth names only at trainee stage, company-scheduled training grid, monthly evaluations, debut system, comeback cycles
-Festivals: lineup invites, hype payoffs, slot competition — needs design session before build
-Distributor system: signed artists get distribution via label; indie artists sign NPC distributor (budget/standard/premium tiers); no distributor = SoundPuff only
-Band/groups system: post-launch
-
-## Press system — 5 outlets (LOCKED, never add or remove)
-
-### Outlets
-
-VELOUR
-- Voice: elegant, measured, editorial. Reads like a prestige print magazine.
-- Covers: artist profiles, cover stories, long-form career features, label showcases, debut spotlights, Velour Spotlight (label-exclusive features). Congratulatory in tone — Velour doesn't write negatively.
-- Auto-triggers: first chart #1, crossing 50K fans, signing to a major label, Penthouse move-in (if signed/label owner), label-submitted Spotlight, Year-End label showcase for top 3 labels.
-- Effect: Hype +8, Fans +3–5%, Label rep +0.5 on feature. Most prestigious article type in the game.
-- Unsigned artists CANNOT receive a Velour Spotlight — gate check required.
-
-ROOM SERVICE
-- Voice: cheeky tabloid. Gossipy, dramatic, uses ellipses and air quotes. Speculative but never cruel.
-- Covers: rumors, morale speculation ("sources say…"), artist drama, label tension, lifestyle observations.
-- Auto-triggers: artist stress ≥ 85 (rumor about burnout), artist morale < 20 (exit rumor), missed rent 2+ weeks, Room Service rumor response = "Lean in" (follow-up piece), label owner sends rumor after press request.
-- Player response options when targeted: Deny (70% rumor dies, 30% amplifies), Ignore (80% quiet expiry, 20% follow-up), Lean in (hype +6, stress +4, rumor runs full course).
-- Rumor rules (HARD — never break): seeded only by real player events, always PG, never mention real money/family/health/cruelty, stat effect capped at ±2%, expires in 3 game weeks unless fed.
-- When a signed artist is targeted: edge function inserts notification to artist (type='press_mention') AND label owner (type='press_request') after article insert.
-
-CHARTWELL
-- Voice: dry, data-forward trade publication. Factual. Treats music like a business story.
-- Covers: chart entries and movements, streaming milestones, label rankings, business deals, The Dial chart weekly round-up, Year-End rankings, Chartwell Hall of Records entries.
-- Auto-triggers: any song entering the chart, song hitting #1, song crossing 1M / 5M / 10M streams, label tier upgrade, Year-End label rankings (Week 52), new Hall of Records entry set.
-- Effect: no direct hype boost, but increases label and artist credibility (rep +0.1–0.3 depending on milestone size).
-- Chartwell also publishes all-time records and career milestones in the Hall of Records section — separate from the weekly chart coverage.
-
-UNDERTONE
-- Voice: warm indie music blog. Enthusiastic but thoughtful. Discovers artists before they blow up.
-- Covers: debut coverage, new-artist profiles, collab spotlights, genre movement pieces, unsigned artist discovery, "ones to watch" features.
-- Auto-triggers: player's very first song release (debut piece), first collab published, song charting for the first time, player reaches 1K fans (discovery piece), unsigned artist with strong SoundPuff presence.
-- Effect: Hype +4, Fans +1–2%, small rep boost. More valuable early-career than later.
-- Undertone won't cover an artist who already has 100K+ fans — they've moved past Undertone's scope.
-
-AIRTIME
-- Voice: bright, upbeat, radio-DJ energy. Enthusiastic. Talks about momentum and heavy rotation.
-- Covers: streaming milestone achievements, chart movement framing ("this one's everywhere right now"), mainstream crossover moments, playlist milestone coverage, radio station listener rankings (once radio is built).
-- Auto-triggers: song crosses 500K streams in a week, song holds top 10 for 3+ consecutive weeks, label signing announcement, artist reaches 25K fans.
-- Effect: Hype +5. Currently flavor only for radio coverage until the radio station system is built. Once radio launches, AirTime covers real station rankings.
-- Note: AirTime has no real radio system yet. Its radio-adjacent language is intentional — it sets up the world for when radio stations are built in Wave 3.
-
-### Shared rules (all outlets)
-- All articles are AI-generated via the generate-article Supabase edge function
-- Each outlet has its own system prompt defining voice, tone, and what it will/won't cover
-- Articles insert into the articles table with outlet, type, artist_id, effect fields
-- Effects (hype, fans, rep) are applied on insert via database trigger or edge function
-- Players see articles in the news feed, sorted by timestamp
-- Global articles (Year-End, Hall of Records) are visible to all players
-- Artist-specific articles only visible to that artist and their label (if signed)
+- K-pop Trainee/Idol path (dice-roll stat creation, birth names only, training + evaluations, comeback cycles, group system).
+- Radio stations: players create stations, choose rotations, compete on listeners, sell NPC ad slots.
+- Festivals: lineup invites, hype payoffs, slot competition.
+- Distributor system: signed via labe
