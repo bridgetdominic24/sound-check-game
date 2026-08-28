@@ -1,8 +1,5 @@
 # Claude Code Prompt — Social Platforms Redesign
 
-## Reference
-Study `docs/socials_v3.html` for the full visual design of all three platforms before writing any code.
-
 ## Overview
 Rebuild the create post / social post system across Pentagram, Rookie, and Y. Each platform has its own create screen and feed. The key new element across all platforms is a **Post Type selector** that determines what game systems fire after posting.
 
