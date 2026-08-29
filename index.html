@@ -3255,6 +3255,17 @@ async function checkAndLoadSave(){
       GAME = JSON.parse(JSON.stringify(data.game_data));
       _sanitizeGameState(GAME);
 
+      // Backfill artist name from Supabase artist_name column if GAME.sn/artistName missing (old saves)
+      if(data.artist_name && !GAME.sn){ GAME.sn = data.artist_name; }
+      if(data.artist_name && !GAME.artistName){ GAME.artistName = data.artist_name; }
+      // Also backfill from character_data if available
+      if(data.character_data){
+        var _cd = data.character_data;
+        var _cdName = (_cd.artistName||_cd.sn||(_cd.fn&&_cd.ln?(_cd.fn+' '+_cd.ln).trim():'')||_cd.fn||'');
+        if(_cdName && !GAME.sn){ GAME.sn = _cdName; }
+        if(_cdName && !GAME.artistName){ GAME.artistName = _cdName; }
+      }
+
       // SELF-HEALING MIGRATION: Fix labels with invalid IDs
       if(GAME.ownedLabel && !isValidUUID(GAME.ownedLabel.id)){
         console.log('🔧 Detected legacy label ID format, attempting self-heal:', GAME.ownedLabel.id);
@@ -3570,11 +3581,18 @@ async function saveToCloud(force){
     const totalStreams = GAME.releases?.reduce((sum, r) => {
       return sum + (r.songs?.reduce((s, song) => s + (song.streams || 0), 0) || 0);
     }, 0) || 0;
-    
+
+    // Ensure artist name is always stored in GAME so articles generate correctly
+    var _saveArtistName = S.artistName || S.sn || (S.fn && S.ln ? (S.fn+' '+S.ln).trim() : '') || S.fn || '';
+    if(_saveArtistName){
+      cleanGAME.sn = _saveArtistName;
+      cleanGAME.artistName = _saveArtistName;
+    }
+
     const playerData = {
       user_id: currentUser.id,
       email: currentUser.email,
-      artist_name: S.artistName || 'Unknown Artist',
+      artist_name: S.artistName || S.sn || 'Unknown Artist',
       game_data: cleanGAME,
       character_data: cleanS,
       online: true,
@@ -5110,7 +5128,7 @@ function checkViralMoment(){
   //   Room Service — cheeky tabloid gossip     → celebrity co-sign (gossip/drama angle)
   //   AirTime    — bright radio-DJ upbeat      → playlist feature, radio play (heavy rotation)
   //   Chartwell  — dry trade/data voice        → chart surge (data-driven analysis)
-  var artistName = GAME.sn || GAME.artistName || 'Artist';
+  var artistName = getArtistName();
   var viralArticleId = 'viral_'+viral.type+'_'+(GAME.playerId||'local')+'_w'+thisWeek;
   var outletMap = {tiktok_trend:'undertone', meme:'undertone', celebrity_cosign:'room_service', playlist_feature:'airtime', radio_play:'airtime', chart_surge:'chartwell'};
   var articleOutlet = outletMap[viral.type] || 'undertone';
@@ -5197,7 +5215,7 @@ function _recoverViralData(){
   if(!GAME.newsArticles) GAME.newsArticles = [];
   if(!GAME.financeHistory) GAME.financeHistory = [];
 
-  var artistName = GAME.sn || GAME.artistName || 'Artist';
+  var artistName = getArtistName();
   var playerId = GAME.playerId || 'local';
 
   var outletMap = {tiktok_trend:'undertone',meme:'undertone',celebrity_cosign:'room_service',playlist_feature:'airtime',radio_play:'airtime',chart_surge:'chartwell'};
@@ -5412,6 +5430,10 @@ function initGameStats(situation){
   // Set home region
   const homeRegion=S.country||'North America';
   GAME.homeRegion=homeRegion;
+
+  // Sync artist name from character into GAME so article generation works correctly
+  GAME.sn = S.sn || (S.fn && S.ln ? (S.fn+' '+S.ln).trim() : '') || S.fn || '';
+  GAME.artistName = S.artistName || GAME.sn || '';
   
   // Starting stats - EVERYONE STARTS EQUAL
   let totalFans=0;
@@ -9240,7 +9262,9 @@ function showSongDetails(songId){
   var song=GAME.songs.find(function(s){return s.id===songId;});
   if(!song) return;
   var isReleased=song.released, isRecorded=song.recorded, isWritten=song.written;
-  var isInProg=song.inProgress&&!song.released;
+  // isInProg is true for both regular in-progress songs AND collab songs currently being written
+  var _isCollabWriting = song.status==='writing' && !!song.collab_start_time && !!song.collab_duration_ms && !song.released;
+  var isInProg=(song.inProgress&&!song.released) || _isCollabWriting;
   if(song.inProgress&&song.released){song.inProgress=false;song.inProgressType=null;}
   var statusColor=isReleased?'#2ed573':isRecorded?'#ff9800':isInProg?'#a29bfe':'#667eea';
 
@@ -9373,6 +9397,10 @@ function showSongDetails(songId){
     // Show AI Lyrics during writing phase
     if(song.inProgressType==='writing' || (song.status==='writing' && song.collab_request_id)){
       actionsHTML+='<button onclick="generateAILyrics('+songId+')" style="width:100%;padding:11px;background:var(--surf);border:1.5px solid var(--acc);color:var(--acc);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation;margin-bottom:8px">✨ Generate Lyrics</button>';
+    }
+    // Show Set Topic button for collab songs during writing (topic needed before recording)
+    if(song.status==='writing' && song.collab_request_id){
+      actionsHTML+='<button onclick="editSongTopic('+songId+')" style="width:100%;padding:11px;background:var(--surf);border:1.5px solid var(--bord);color:var(--txt);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation;margin-bottom:8px">🎯 '+(song.topic?'Change Topic ('+song.topic+')':'Set Song Topic')+'</button>';
     }
   } else if(!isRecorded&&!isReleased){
     // Only allow lyric generation before release
@@ -10060,12 +10088,13 @@ function checkStreamMilestones(song){
           song._milestonesSeen[key] = true;
           
           let headline = '';
-          if(position === 1) headline = '🔥 '+GAME.artistName.toUpperCase()+' HITS #1 WITH "'+song.title+'"!';
-          else if(position <= 5) headline = '⭐ '+GAME.artistName+' BREAKS TOP 5 WITH "'+song.title+'"';
-          else if(position <= 10) headline = '📈 '+GAME.artistName+' CHARTS TOP 10: "'+song.title+'" CLIMBS';
+          var _chartAn = getArtistName();
+          if(position === 1) headline = '🔥 '+_chartAn.toUpperCase()+' HITS #1 WITH "'+song.title+'"!';
+          else if(position <= 5) headline = '⭐ '+_chartAn+' BREAKS TOP 5 WITH "'+song.title+'"';
+          else if(position <= 10) headline = '📈 '+_chartAn+' CHARTS TOP 10: "'+song.title+'" CLIMBS';
           else if(position <= 25) headline = '📊 "'+song.title+'" ENTERS TOP 25 CHARTS';
-          else if(position <= 50) headline = '🎵 '+GAME.artistName+' BREAKS TOP 50 WITH NEW SINGLE';
-          else headline = '📈 '+GAME.artistName+' CHART DEBUT: "'+song.title+'"';
+          else if(position <= 50) headline = '🎵 '+_chartAn+' BREAKS TOP 50 WITH NEW SINGLE';
+          else headline = '📈 '+_chartAn+' CHART DEBUT: "'+song.title+'"';
           
           if(!GAME.newsArticles) GAME.newsArticles = [];
           GAME.newsArticles.push({
@@ -22602,6 +22631,16 @@ function loadGame(){
       // Initialize new fields for old saves
       if(!GAME.messages) GAME.messages = [];
       if(!GAME.pendingCollabs) GAME.pendingCollabs = [];
+
+      // Backfill artist name into GAME if missing (old saves pre-fix)
+      if(savedChar){
+        try{
+          var _tempS=JSON.parse(savedChar);
+          var _loadedName = _tempS.artistName || _tempS.sn || (_tempS.fn&&_tempS.ln?(_tempS.fn+' '+_tempS.ln).trim():'') || _tempS.fn || '';
+          if(_loadedName && !GAME.artistName){ GAME.artistName = _loadedName; }
+          if(_loadedName && !GAME.sn){ GAME.sn = _loadedName; }
+        }catch(e){}
+      }
 
       initStories(); // Clean up expired stories
       cleanupTours(); // Clean up completed/corrupted tours
