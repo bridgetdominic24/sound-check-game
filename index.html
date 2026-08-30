@@ -37701,19 +37701,11 @@ function _silentDayCatchUp(day, showFirst){
     processPromoCampaigns();
   }
 
-  // Streaming revenue for released songs (simplified daily calc)
-  if(GAME.songs) GAME.songs.forEach(function(song){
-    if(!song.released || !song.streams) return;
-    // Use proper algorithm for catch-up streams too
-    const dailyStreams = typeof calculateDailySongStreams === 'function' ? calculateDailySongStreams(song) : 0;
-    if(dailyStreams > 0){
-      song.streams = (song.streams||0) + dailyStreams;
-      song.weeklyStreams = (song.weeklyStreams||0) + dailyStreams;
-      if(typeof distributeStreamsToRegions === 'function') distributeStreamsToRegions(song, dailyStreams);
-      const rev = dailyStreams * 0.004;
-      GAME.money = (GAME.money||0) + rev;
-    }
-  });
+  // Streaming revenue for released songs — use the same full algorithm
+  // as the live path so catch-up and online play are identical.
+  // _processDailyStreams() handles platform splits, fan gains, viral-window
+  // ticking, and finance-history recording — no simplified version needed.
+  if(typeof _processDailyStreams === 'function') _processDailyStreams();
 }
 
 function _onDayAdvanced(newDay){
