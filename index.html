@@ -9554,11 +9554,22 @@ function showSongDetails(songId){
   // ── HELPER ──────────────────────────────────────────────────────────────────
   var _fmtN=function(n){if(n>=1e9)return (n/1e9).toFixed(1)+'B';if(n>=1e6)return (n/1e6).toFixed(1)+'M';if(n>=1e3)return (n/1e3).toFixed(1)+'K';return String(n);};
 
+  // ── Royalty fraction: what THIS player earns on this song ───────────────────
+  // royalty_pct = Artist B (receiver) share. Sender gets (100 - royalty_pct)%.
+  var _royFrac = 1.0;
+  if(song.collaborators && song.collaborators.length > 0){
+    if(song.royalty_pct !== undefined){
+      _royFrac = song.isCollabReceiver ? (song.royalty_pct/100) : ((100-song.royalty_pct)/100);
+    } else {
+      _royFrac = 1/(song.collaborators.length + 1); // NPC / even-split fallback
+    }
+  }
+
   // ── QUICK STATS BAR (released only — 4 boxes below status badge) ────────────
   var quickStatsBarHTML='';
   if(isReleased){
     var _qs_total=song.streams||0;
-    var _qs_split=song.collaborators&&song.collaborators.length>0?1/(song.collaborators.length+1):(1-(song.collabRevenueSplit||0));
+    var _qs_split=_royFrac; // your negotiated royalty fraction
     var _qs_rev=(_qs_total*0.004*_qs_split).toFixed(0);
     var _qs_peak=song.peakPosition?'#'+song.peakPosition:'—';
     var _qs_weeks=song.weeksOnChart||0;
@@ -9693,8 +9704,7 @@ function showSongDetails(songId){
   // Quick stats bar (released)
   var _qsH='';
   if(isReleased){
-    var _qss=song.collaborators&&song.collaborators.length>0?1/(song.collaborators.length+1):(1-(song.collabRevenueSplit||0));
-    var _qsr=Math.floor((song.streams||0)*0.004*_qss)+(song.iMusic_revenue||0);
+    var _qsr=Math.floor((song.streams||0)*0.004*_royFrac)+Math.floor((song.iMusic_revenue||0)*_royFrac);
     var _qspk=song.peakPosition?'#'+song.peakPosition:'—';
     _qsH='<div style="padding:0 16px 14px;border-bottom:1px solid var(--bord)">'
       +'<div class="sd-qs">'
@@ -9728,9 +9738,16 @@ function showSongDetails(songId){
     var _ct=song.collaborators.length+1;
     var _cRec=song.isCollabReceiver;
     var _cBp=song.royalty_pct!==undefined?song.royalty_pct:Math.round(100/_ct);
+    // yourPct = your share; otherPct = the other party's share
     var _cYr=_cRec?_cBp:(100-_cBp);
+    // Other person's % — use royalty_pct if set, else even split
+    var _cOtherPct=song.royalty_pct!==undefined?(_cRec?(100-_cBp):_cBp):Math.round(100/_ct);
     _cH='<div class="sd-sec" style="padding-top:0"><div class="sd-collab"><div class="sd-collab-hd">👥 Collaborators</div>'
-      +song.collaborators.map(function(c){return '<div class="sd-collab-row"><span style="font-size:22px">'+(c.roleLabel?c.roleLabel.split(' ')[0]:'🎵')+'</span><div class="sd-cr-inf"><b>'+(c.name||'Artist')+'</b><span>'+(c.roleLabel||'Collaborator')+'</span></div><span style="font-size:14px;font-weight:900;color:var(--acc)">'+Math.round((c.split||0)*100)+'%</span></div>';}).join('')
+      +song.collaborators.map(function(c,ci){
+        // Each listed collaborator gets _cOtherPct if only one; for multiple, divide evenly
+        var _thisPct = song.collaborators.length===1 ? _cOtherPct : Math.round((100-_cYr)/song.collaborators.length);
+        return '<div class="sd-collab-row"><span style="font-size:22px">'+(c.roleLabel?c.roleLabel.split(' ')[0]:'🎵')+'</span><div class="sd-cr-inf"><b>'+(c.name||'Artist')+'</b><span>'+(c.roleLabel||'Collaborator')+'</span></div><span style="font-size:14px;font-weight:900;color:var(--acc)">'+_thisPct+'%</span></div>';
+      }).join('')
       +'<div class="sd-royalty">Your royalty: '+_cYr+'%</div></div></div>';
   } else if(song.featuredArtist||song.collabArtist){
     var _cFa=song.featuredArtist||song.collabArtist;
@@ -9808,8 +9825,7 @@ function showSongDetails(songId){
   // Performance grid (released)
   var _pfH='';
   if(isReleased){
-    var _pfSp=song.collaborators&&song.collaborators.length>0?1/(song.collaborators.length+1):(1-(song.collabRevenueSplit||0));
-    var _pfRev=Math.floor((song.streams||0)*0.004*_pfSp)+(song.iMusic_revenue||0);
+    var _pfRev=Math.floor((song.streams||0)*0.004*_royFrac)+Math.floor((song.iMusic_revenue||0)*_royFrac);
     _pfH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Performance</div>'
       +'<div class="sd-perf">'
       +'<div class="sd-pg-c"><span class="sd-pg-v" style="color:var(--acc)">'+(song.streams||0).toLocaleString()+'</span><span class="sd-pg-l">Total Streams</span></div>'
@@ -9842,7 +9858,7 @@ function showSongDetails(songId){
           +'<div class="sd-plat-ico">🎵</div>'
           +'<div class="sd-plat-nm">iMusic <span style="background:rgba(232,180,76,.15);color:var(--acc);font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px">Purchases</span></div>'
           +'<div class="sd-plat-n" style="color:var(--acc)">'+_iMsP.toLocaleString()+'</div>'
-          +'<div style="flex:none;font-size:11px;color:var(--mut)">$'+Math.floor(_iMrP)+'</div></div>':'')
+          +'<div style="flex:none;font-size:11px;color:var(--mut)">$'+Math.floor(_iMrP*_royFrac)+'</div></div>':'')
         +'</div></div>';
     }
   }
@@ -39151,6 +39167,17 @@ function _processDailyStreams(){
       _exclActive = (GAME.day||1) <= _distrib.exclusivityEndDay;
     }
 
+    // ── Collab royalty multiplier: this player's negotiated share ────────────
+    // royalty_pct is Artist B (receiver/acceptor) share. Sender gets the rest.
+    var _royMult = 1.0;
+    if(song.collaborators && song.collaborators.length > 0){
+      if(song.royalty_pct !== undefined){
+        _royMult = song.isCollabReceiver ? (song.royalty_pct/100) : ((100-song.royalty_pct)/100);
+      } else {
+        _royMult = 1/(song.collaborators.length + 1); // even-split fallback
+      }
+    }
+
     // Platform init
     if(!song.platforms) song.platforms = {spotify:0,apple:0,youtube:0,amazon:0,soundcloud:0,itunes:0};
 
@@ -39166,7 +39193,7 @@ function _processDailyStreams(){
       song.iMusic_revenue = (song.iMusic_revenue||0) + dailyNew * _iMusicPrice;
       // Superfan: higher loyalty gain during purchase exclusivity
       GAME.fanLoyalty = Math.min(100, (GAME.fanLoyalty||0) + Math.ceil(dailyNew * 0.05));
-      totalRev += dailyNew * _iMusicPrice;
+      totalRev += dailyNew * _iMusicPrice * _royMult;
 
     } else if(_exclActive && _excl !== 'all'){
       // ── Streaming platform exclusivity ──────────────────────────────────────
@@ -39182,7 +39209,7 @@ function _processDailyStreams(){
       song.platforms[_exclKey] = (song.platforms[_exclKey]||0) + _bonused;
       // Revenue rate for exclusive platform
       var _exclRateMap = {spotify:0.003, apple:0.007, soundcloud:0.004};
-      totalRev += _bonused * (_exclRateMap[_exclKey] || 0.003);
+      totalRev += _bonused * (_exclRateMap[_exclKey] || 0.003) * _royMult;
 
     } else {
       // ── Normal multi-platform distribution ──────────────────────────────────
@@ -39219,8 +39246,8 @@ function _processDailyStreams(){
       // Purchases increase fan loyalty
       if(_itPurchases > 0) GAME.fanLoyalty = Math.min(100, (GAME.fanLoyalty||0) + Math.ceil(_itPurchases*0.01));
 
-      // Revenue: streaming platforms + iMusic purchase revenue
-      const rev = Math.floor(dailyNew*_sp2/_tot2)*0.003 + Math.floor(dailyNew*_ap2/_tot2)*0.007 + Math.floor(dailyNew*_yt2/_tot2)*0.001 + Math.floor(dailyNew*(_am2+_sc2)/_tot2)*0.004 + _iMusicRev2;
+      // Revenue: streaming platforms + iMusic — apply royalty fraction before paying out
+      const rev = (Math.floor(dailyNew*_sp2/_tot2)*0.003 + Math.floor(dailyNew*_ap2/_tot2)*0.007 + Math.floor(dailyNew*_yt2/_tot2)*0.001 + Math.floor(dailyNew*(_am2+_sc2)/_tot2)*0.004 + _iMusicRev2) * _royMult;
       totalRev += rev;
     }
 
