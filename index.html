@@ -23783,7 +23783,7 @@ function getSVG(name, size='16px') {
 const LOOPIFY_CSS = `
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900&display=swap');
-.loop { background: #121212; color: #fff; min-height: 100%; display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans', 'Circular Std', ui-sans-serif, -apple-system, sans-serif; padding-bottom: 112px; }
+.loop { background: #121212; color: #fff; min-height: 100%; display: flex; flex-direction: column; font-family: 'Plus Jakarta Sans', 'Circular Std', ui-sans-serif, -apple-system, sans-serif; }
 .loop .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; }
 .loop .topbar h2 { font-size: 22px; font-weight: 800; flex: 1; text-align: center; }
 .loop .topbar .ic { display: flex; gap: 16px; font-size: 20px; color: #e0e0e0; cursor: pointer; }
@@ -23853,7 +23853,7 @@ const LOOPIFY_CSS = `
 .loop .librow .cover { width: 56px; height: 56px; font-size: 22px; display: flex; align-items: center; justify-content: center; background: #333; border-radius: 6px; }
 .loop .librow b { display: block; font-size: 14.5px; font-weight: 600; }
 .loop .librow span { font-size: 12px; color: #a7a7a7; }
-.loop .foot { flex-shrink: 0; background: #121212; }
+.loop .foot { flex-shrink: 0; background: #121212; position: sticky; bottom: 0; z-index: 10; }
 .loop .npbar { margin: 0 8px; background: #3d2a4a; border-radius: 8px; display: flex; align-items: center; gap: 10px; padding: 7px 10px; box-shadow: 0 4px 14px rgba(0,0,0,.5); z-index: 5; cursor: pointer; }
 .loop .npbar .cover { width: 38px; height: 38px; font-size: 16px; background: #5a3d6e; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
 .loop .npbar .ti b { font-size: 12.5px; }
@@ -23904,13 +23904,33 @@ function showLoopifyHome(){
     chartHTML+=`<div class="chartrow" onclick="loopShowTrack('${song.id}','${song.artistId}')"><div class="pos">${idx+1}</div><div class="mv ${movementClass}">${movement}</div><div class="cover sm" style="${covStyle}">${song.coverImage?'':song.cover||'♫'}</div><div class="ti"><b>${song.title}</b><span>${song.artistName}</span></div><div class="strm">${streamStr}</div><div class="dots">⋮</div></div>`;
   });
   // Popular artists — always show current user first
-  const myTotalStreams=GAME.songs.reduce((s,sg)=>s+(sg.streams||0),0);
-  const myListeners=myTotalStreams>=1000000?(myTotalStreams/1000000).toFixed(1)+'M':myTotalStreams>=1000?Math.round(myTotalStreams/1000)+'K':myTotalStreams||'New';
-  let popularArtistsHTML=`<div class="pcard" onclick="loopShowArtist('${currentUser?.id}')"><div class="cover" style="border-radius:50%;background:#535353;color:#fff;font-size:28px;font-weight:700">${(S.artistName||'?').charAt(0).toUpperCase()}</div><b>${S.artistName}</b><span>${myListeners} listeners</span></div>`;
+  // Monthly listeners = sum of last 4 weeks of weeklyStreamsHistory across all released songs
+  function _monthlyListeners(songs, totalStreamsFallback){
+    var sum=0;
+    (songs||[]).filter(function(sg){return sg.released;}).forEach(function(sg){
+      if(sg.weeklyStreamsHistory&&sg.weeklyStreamsHistory.length>0){
+        sg.weeklyStreamsHistory.forEach(function(h){sum+=(h.streams||0);});
+      } else {
+        // fallback: treat weeklyStreams as one week, extrapolate 4 weeks
+        sum+=(sg.weeklyStreams||0)*Math.min(4,GAME.week||1);
+      }
+    });
+    // If no weekly data at all, estimate ~8% of total streams as monthly
+    return sum||Math.round((totalStreamsFallback||0)*0.08);
+  }
+  function _fmtListeners(n){return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?Math.round(n/1000)+'K':n||'New';}
+  const myMonthly=_monthlyListeners(GAME.songs,GAME.songs.reduce((s,sg)=>s+(sg.streams||0),0));
+  const myListeners=_fmtListeners(myMonthly);
+  const myPic=GAME.artistProfile&&GAME.artistProfile.profilePicType==='image'&&GAME.artistProfile.profilePic;
+  const myAvatar=myPic?`<div class="cover" style="border-radius:50%;background:url('${myPic}') center/cover;background-size:cover"></div>`:`<div class="cover" style="border-radius:50%;background:#535353;color:#fff;font-size:28px;font-weight:700">${(S.artistName||'?').charAt(0).toUpperCase()}</div>`;
+  let popularArtistsHTML=`<div class="pcard" onclick="loopShowArtist('${currentUser?.id}')">${myAvatar}<b>${S.artistName}</b><span>${myListeners} monthly</span></div>`;
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
-    window.allPlayers.filter(p=>p.id!==currentUser?.id).slice(0,5).forEach(p=>{
-      const pStr=p.totalStreams>=1000000?(p.totalStreams/1000000).toFixed(1)+'M':p.totalStreams>=1000?Math.round(p.totalStreams/1000)+'K':p.totalStreams||'New';
-      popularArtistsHTML+=`<div class="pcard" onclick="loopShowArtist('${p.id}')"><div class="cover" style="border-radius:50%;background:#535353;color:#fff;font-size:28px;font-weight:700">${(p.artistName||p.name||'?').charAt(0).toUpperCase()}</div><b>${p.artistName||p.name||'Artist'}</b><span>${pStr} listeners</span></div>`;
+    window.allPlayers.filter(p=>p.id!==currentUser?.id).slice(0,7).forEach(p=>{
+      const pMonthly=_monthlyListeners(p.gameSongs,p.totalStreams);
+      const pStr=_fmtListeners(pMonthly);
+      const pPic=p.profilePic||p.profile_pic||null;
+      const pAvatar=pPic?`<div class="cover" style="border-radius:50%;background:url('${pPic}') center/cover;background-size:cover"></div>`:`<div class="cover" style="border-radius:50%;background:#535353;color:#fff;font-size:28px;font-weight:700">${(p.artistName||p.name||'?').charAt(0).toUpperCase()}</div>`;
+      popularArtistsHTML+=`<div class="pcard" onclick="loopShowArtist('${p.id}')">${pAvatar}<b>${p.artistName||p.name||'Artist'}</b><span>${pStr} monthly</span></div>`;
     });
   }
   const hr=new Date().getHours();const tod=hr<12?'morning':hr<18?'afternoon':'evening';
@@ -24891,15 +24911,16 @@ function showIMusicArtist(artistId){
     if(player){artistName=player.artistName||player.name||'Unknown';songs=player.gameSongs||[];totalStreams=player.totalStreams||songs.reduce((a,s)=>a+(s.streams||0),0);bio=player.bio||'';}
   }
   var imPlays=Math.floor(totalStreams*0.07);
-  var sold=Math.floor(imPlays/10)||0;
+  // Use actual tracked iMusic_sales if available, otherwise estimate
+  var sold=songs.reduce(function(a,s){return a+(s.iMusic_sales||0);},0)||Math.floor(imPlays/10)||0;
   var isFollowing=GAME.loopifyFollowing&&GAME.loopifyFollowing[artistId];
   var songsHTML='';
   var allArtistSongs=songs.sort((a,b)=>(b.platforms&&b.platforms.itunes||0)-(a.platforms&&a.platforms.itunes||0)).slice(0,8);
   allArtistSongs.forEach(function(song,i){
     var cover=song.cover||'&#9834;';
     var coverStyle=song.coverImage?`background:url('${song.coverImage}') center/cover`:'background:#e5e5ea';
-    var sp=song.platforms&&song.platforms.itunes?song.platforms.itunes:Math.floor((song.streams||0)*0.07);
-    var spSold=Math.floor(sp/10)||0;
+    // Use real tracked iMusic_sales; fall back to platform stream estimate
+    var spSold=song.iMusic_sales||Math.floor((song.platforms&&song.platforms.itunes?song.platforms.itunes:Math.floor((song.streams||0)*0.07))/10)||0;
     var price2=(0.99+Math.floor(Math.random()*2)*0.30).toFixed(2);
     songsHTML+=`<div class="buyrow" onclick="showIMusicSongDetail('${song.id}','${artistId}')" style="cursor:pointer"><div class="pos">${i+1}</div><div class="cover sm" style="${coverStyle}">${song.coverImage?'':cover}</div><div class="ti"><b>${song.title}</b><span style="color:#86868b">${spSold>=1000?Math.floor(spSold/1000)+'K':spSold} sold</span></div><button class="price" onclick="event.stopPropagation();imBuy(this,${price2})">$${price2}</button></div>`;
   });
