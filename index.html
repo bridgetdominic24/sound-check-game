@@ -6223,8 +6223,8 @@ function updateMusicStats(){
       const fmt = rawTotal >= 1000000 ? (rawTotal/1000000).toFixed(1)+'M' : rawTotal >= 1000 ? (rawTotal/1000).toFixed(1)+'K' : rawTotal.toString();
       // Check if any region is confirmed — if not, show ~ prefix
       const anyConfirmed = GAME.fanAnalytics && Object.values(GAME.fanAnalytics).some(function(a){ return a && a.completed && ((GAME.day||1) - (a.completedDay||0)) < 60; });
-      fanEl.textContent = anyConfirmed ? fmt : '~' + fmt;
-      fanEl.style.opacity = anyConfirmed ? '1' : '0.75';
+      fanEl.textContent = anyConfirmed ? fmt : 'est. ' + fmt;
+      fanEl.style.opacity = anyConfirmed ? '1' : '0.85';
       fanEl.title = anyConfirmed ? 'Confirmed fan count' : 'Estimated — tap to run analytics';
     } else {
       fanEl.textContent = '0';
@@ -8690,7 +8690,7 @@ function getFanDisplayCount(region){
   // Show estimate: within 20% accuracy
   // Stable estimate — round to nearest 50 so it doesn't flicker on every updateStats call
   const estimate = Math.round(fans / 50) * 50;
-  return {count: estimate, label: '~'+formatFans(estimate), estimated: true};
+  return {count: estimate, label: 'est. '+formatFans(estimate), estimated: true};
 }
 
 function getTotalFansDisplay(){
@@ -8704,7 +8704,7 @@ function getTotalFansDisplay(){
   });
   const formatted = total >= 1000000 ? (total/1000000).toFixed(1)+'M' :
                     total >= 1000 ? (total/1000).toFixed(1)+'K' : total.toString();
-  return {display: (anyConfirmed ? '' : '~') + formatted, estimated: !anyConfirmed, total};
+  return {display: (anyConfirmed ? '' : 'est. ') + formatted, estimated: !anyConfirmed, total};
 }
 
 // ── SHOW DISTRIBUTION SCREEN (before release) ────────────────────
@@ -18548,11 +18548,12 @@ function showFansDetail(){
   }
   function dotOpacity(region, base){
     const f = regionFans[region] || 0;
-    if(f === 0) return '0.08';
+    if(f === 0) return '0'; // no fans → completely invisible
     return Math.max(0.15, Math.min(0.98, base * (f / maxFans) + 0.15)).toFixed(2);
   }
   function glowRadius(region, max){
     const f = regionFans[region] || 0;
+    if(f === 0) return '0'; // no fans → no glow ring
     return Math.max(2, Math.min(max, (f / maxFans) * max)).toFixed(1);
   }
 
