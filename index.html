@@ -3055,8 +3055,8 @@ async function onAuthSuccess(){
 
         // Pre-load all players so every streaming platform can show them immediately
         // (without this, platforms only show other players after Loopify is opened first)
-        if(GAME_MODE === 'multi' && typeof _fetchLoopifyPlayers === 'function'){
-          _fetchLoopifyPlayers();
+        if(GAME_MODE === 'multi' && typeof _fetchAllPlayers === 'function'){
+          _fetchAllPlayers();
         }
 
         // Show "game was reset" popup once per device after a wipe
@@ -23897,7 +23897,13 @@ function _loopifyML(songs,totalStreamsFallback){
 }
 function _loopifyFmt(n){return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?Math.round(n/1000)+'K':n||'0';}
 
-async function _fetchLoopifyPlayers(){
+// Loads all other players' public data into window.allPlayers.
+// Called once at startup so every streaming platform (Loopify, Orange,
+// iMusic, SoundPuff, Sahara, Yourtube) can show other players' music
+// without any one platform being responsible for the initial fetch.
+// Each platform then filters songs by song.platforms[key] > 0, so when
+// a song isn't distributed to a platform it won't appear there.
+async function _fetchAllPlayers(){
   if(!supabase||!currentUser) return;
   try{
     var {data,error}=await supabase.from('players').select('user_id,artist_name,game_data');
@@ -23916,17 +23922,19 @@ async function _fetchLoopifyPlayers(){
           genre:s.genre,subgenre:s.subgenre,weeklyStreams:s.weeklyStreams||0,
           weeklyStreamsHistory:s.weeklyStreamsHistory||[],platforms:s.platforms||{},
           chartPosition:s.chartPosition,peakPosition:s.peakPosition,weeksOnChart:s.weeksOnChart,
-          iMusic_sales:s.iMusic_sales||0,released:true
+          iMusic_sales:s.iMusic_sales||0,released:true,
+          // Which platforms this song is actually distributed on (for future per-platform filtering)
+          distributedPlatforms:s.distributedPlatforms||null
         };}).sort(function(a,b){return(b.streams||0)-(a.streams||0);})
       };
     });
-  }catch(e){console.error('_fetchLoopifyPlayers',e);}
+  }catch(e){console.error('_fetchAllPlayers',e);}
 }
 
 async function showLoopifyUI(){
   if(!GAME||!GAME.songs){showToast('Loading...','purple');return;}
   if(!GAME.loopifyView)GAME.loopifyView='home';
-  if(!window.allPlayers||!window.allPlayers.length){await _fetchLoopifyPlayers();}
+  if(!window.allPlayers||!window.allPlayers.length){await _fetchAllPlayers();}
   switch(GAME.loopifyView){
     case'home':showLoopifyHome();break;
     case'search':showLoopifySearch();break;
