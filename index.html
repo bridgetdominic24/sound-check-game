@@ -3052,7 +3052,13 @@ async function onAuthSuccess(){
         
         // Initialize server time (multiplayer only)
         initServerTime();
-        
+
+        // Pre-load all players so every streaming platform can show them immediately
+        // (without this, platforms only show other players after Loopify is opened first)
+        if(GAME_MODE === 'multi' && typeof _fetchLoopifyPlayers === 'function'){
+          _fetchLoopifyPlayers();
+        }
+
         // Show "game was reset" popup once per device after a wipe
         // Only show if seenVersion was previously set (player was around before wipe)
         if(GAME_MODE === 'multi'){
@@ -23878,9 +23884,13 @@ function _loopifyML(songs,totalStreamsFallback){
   var sum=0;
   (songs||[]).filter(function(sg){return sg.released||sg.streams>0;}).forEach(function(sg){
     if(sg.weeklyStreamsHistory&&sg.weeklyStreamsHistory.length>0){
-      sg.weeklyStreamsHistory.forEach(function(h){sum+=(h.streams||0);});
-    } else {
-      sum+=(sg.weeklyStreams||0)*Math.min(4,GAME.week||1);
+      // Sum last 4 archived weeks only (not all history)
+      sg.weeklyStreamsHistory.slice(-4).forEach(function(h){sum+=(h.streams||0);});
+    } else if(sg.weeklyStreams>0){
+      // weeklyStreams is THIS week's count (resets each week) — extrapolate to 4 weeks
+      // Cap at 25% of total streams to guard against un-reset legacy data
+      var safeWeekly=sg.streams>0?Math.min(sg.weeklyStreams,sg.streams*0.25):sg.weeklyStreams;
+      sum+=safeWeekly*Math.min(4,GAME.week||1);
     }
   });
   return sum||Math.round((totalStreamsFallback||0)*0.08);
@@ -23957,29 +23967,15 @@ function showLoopifyHome(){
   });
   // Popular artists — always show current user first
   // Monthly listeners = sum of last 4 weeks of weeklyStreamsHistory across all released songs
-  function _monthlyListeners(songs, totalStreamsFallback){
-    var sum=0;
-    (songs||[]).filter(function(sg){return sg.released;}).forEach(function(sg){
-      if(sg.weeklyStreamsHistory&&sg.weeklyStreamsHistory.length>0){
-        sg.weeklyStreamsHistory.forEach(function(h){sum+=(h.streams||0);});
-      } else {
-        // fallback: treat weeklyStreams as one week, extrapolate 4 weeks
-        sum+=(sg.weeklyStreams||0)*Math.min(4,GAME.week||1);
-      }
-    });
-    // If no weekly data at all, estimate ~8% of total streams as monthly
-    return sum||Math.round((totalStreamsFallback||0)*0.08);
-  }
-  function _fmtListeners(n){return n>=1000000?(n/1000000).toFixed(1)+'M':n>=1000?Math.round(n/1000)+'K':n||'New';}
-  const myMonthly=_monthlyListeners(GAME.songs,GAME.songs.reduce((s,sg)=>s+(sg.streams||0),0));
-  const myListeners=_fmtListeners(myMonthly);
+  const myMonthly=_loopifyML(GAME.songs,GAME.songs.reduce((s,sg)=>s+(sg.streams||0),0));
+  const myListeners=_loopifyFmt(myMonthly);
   const myPic=GAME.artistProfile&&GAME.artistProfile.profilePicType==='image'&&GAME.artistProfile.profilePic;
   const myAvatar=myPic?`<div class="cover" style="border-radius:50%;background:url('${myPic}') center/cover;background-size:cover"></div>`:`<div class="cover" style="border-radius:50%;background:#535353;color:#fff;font-size:28px;font-weight:700">${(S.artistName||'?').charAt(0).toUpperCase()}</div>`;
   let popularArtistsHTML=`<div class="pcard" onclick="loopShowArtist('${currentUser?.id}')">${myAvatar}<b>${S.artistName}</b><span>${myListeners} monthly</span></div>`;
   if(window.allPlayers&&Array.isArray(window.allPlayers)){
     window.allPlayers.filter(p=>p.id!==currentUser?.id).slice(0,7).forEach(p=>{
-      const pMonthly=_monthlyListeners(p.gameSongs,p.totalStreams);
-      const pStr=_fmtListeners(pMonthly);
+      const pMonthly=_loopifyML(p.gameSongs,p.totalStreams);
+      const pStr=_loopifyFmt(pMonthly);
       const pPic=p.profilePic||p.profile_pic||null;
       const pAvatar=pPic?`<div class="cover" style="border-radius:50%;background:url('${pPic}') center/cover;background-size:cover"></div>`:`<div class="cover" style="border-radius:50%;background:#535353;color:#fff;font-size:28px;font-weight:700">${(p.artistName||p.name||'?').charAt(0).toUpperCase()}</div>`;
       popularArtistsHTML+=`<div class="pcard" onclick="loopShowArtist('${p.id}')">${pAvatar}<b>${p.artistName||p.name||'Artist'}</b><span>${pStr} monthly</span></div>`;
@@ -39163,6 +39159,20 @@ function _silentDayCatchUp(day, showFirst){
     processPromoCampaigns();
   }
 
+  // Weekly reset: archive weeklyStreams to history, then zero it for the new week
+  // This MUST happen BEFORE _processDailyStreams() so the new week starts at 0
+  if(info.dow === 0 && GAME.songs){
+    GAME.songs.forEach(function(song){
+      if(!song.released) return;
+      if(!Array.isArray(song.weeklyStreamsHistory)) song.weeklyStreamsHistory = [];
+      if(song.weeklyStreams > 0){
+        song.weeklyStreamsHistory.push({week: info.week - 1, streams: song.weeklyStreams});
+        if(song.weeklyStreamsHistory.length > 4) song.weeklyStreamsHistory.shift();
+      }
+      song.weeklyStreams = 0;
+    });
+  }
+
   // Streaming revenue for released songs — use the same full algorithm
   // as the live path so catch-up and online play are identical.
   // _processDailyStreams() handles platform splits, fan gains, viral-window
@@ -39184,9 +39194,15 @@ function _onDayAdvanced(newDay){
     const yearsElapsed = Math.floor(weeksAlive/52);
     GAME.age = GAME.startAge + yearsElapsed;
     GAME.year = 2017 + yearsElapsed;
-    // Reset weeklyStreams at start of each week so THIS WEEK shows correctly
+    // Archive completed week's streams, then reset weeklyStreams so THIS WEEK starts at 0
     if(GAME.songs) GAME.songs.forEach(function(song){
-      if(song.released) song.weeklyStreams = 0;
+      if(!song.released) return;
+      if(!Array.isArray(song.weeklyStreamsHistory)) song.weeklyStreamsHistory = [];
+      if(song.weeklyStreams > 0){
+        song.weeklyStreamsHistory.push({week: info.week - 1, streams: song.weeklyStreams});
+        if(song.weeklyStreamsHistory.length > 4) song.weeklyStreamsHistory.shift();
+      }
+      song.weeklyStreams = 0;
     });
 
     // ── Hype/buzz decay (multiplayer) ──────────────────────────
