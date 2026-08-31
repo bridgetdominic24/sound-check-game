@@ -25142,16 +25142,22 @@ async function loadPentagramFeed(){
     const {data, error} = await supabase.from('players').select('*');
     if(!error && data){
       window.allPlayers = data.map(function(p){
+        var gd = p.game_data || {};
+        var ap = gd.artistProfile || {};
         return {
           id: p.user_id,
           artistName: p.artist_name,
           email: p.email,
-          socialPosts: p.game_data && p.game_data.socialPosts ? p.game_data.socialPosts : [],
-          socialUsernames: p.game_data && p.game_data.socialUsernames ? p.game_data.socialUsernames : {},
-          profilePic: p.game_data && p.game_data.artistProfile && p.game_data.artistProfile.profilePic ? p.game_data.artistProfile.profilePic : null,
-          gameSongs: p.game_data && p.game_data.songs ? p.game_data.songs.filter(function(s){return s.released;}).map(function(s){return{id:s.id,title:s.title,streams:s.streams||0,cover:s.cover,genre:s.genre,releaseDay:s.releaseDay,chartPosition:s.chartPosition,peakPosition:s.peakPosition,weeksOnChart:s.weeksOnChart,collabs:s.collabs,lyrics:s.lyrics};}).sort(function(a,b){return(b.streams||0)-(a.streams||0);}) : [],
-          totalStreams: p.game_data && p.game_data.songs ? p.game_data.songs.reduce(function(s,sg){return s+(sg.streams||0);},0) : 0,
-          bio: p.game_data && p.game_data.artistProfile ? p.game_data.artistProfile.bio || '' : ''
+          socialPosts: gd.socialPosts || [],
+          socialUsernames: gd.socialUsernames || {},
+          profilePic: ap.profilePic || null,
+          profilePicType: ap.profilePicType || 'emoji',
+          stories: gd.stories || [],
+          following: gd.following || {},
+          fans: (gd.fans || 0) + Object.values(gd.fansByRegion||{}).reduce(function(s,v){return s+v;},0),
+          gameSongs: gd.songs ? gd.songs.filter(function(s){return s.released;}).map(function(s){return{id:s.id,title:s.title,streams:s.streams||0,cover:s.cover,genre:s.genre,releaseDay:s.releaseDay,chartPosition:s.chartPosition,peakPosition:s.peakPosition,weeksOnChart:s.weeksOnChart,collabs:s.collabs,lyrics:s.lyrics};}).sort(function(a,b){return(b.streams||0)-(a.streams||0);}) : [],
+          totalStreams: gd.songs ? gd.songs.reduce(function(s,sg){return s+(sg.streams||0);},0) : 0,
+          bio: ap.bio || ''
         };
       });
     }
@@ -25691,13 +25697,20 @@ async function loadRookieFYP(){
       const {data, error} = await supabase.from('players').select('*');
       if(!error && data){
         window.allPlayers = data.map(function(p){
+          var gd = p.game_data || {};
+          var ap = gd.artistProfile || {};
           return {
             id: p.user_id,
             artistName: p.artist_name,
             email: p.email,
-            socialPosts: p.game_data && p.game_data.socialPosts ? p.game_data.socialPosts : [],
-            socialUsernames: p.game_data && p.game_data.socialUsernames ? p.game_data.socialUsernames : {},
-            profilePic: p.game_data && p.game_data.artistProfile && p.game_data.artistProfile.profilePic ? p.game_data.artistProfile.profilePic : null
+            socialPosts: gd.socialPosts || [],
+            socialUsernames: gd.socialUsernames || {},
+            profilePic: ap.profilePic || null,
+            profilePicType: ap.profilePicType || 'emoji',
+            stories: gd.stories || [],
+            following: gd.following || {},
+            fans: (gd.fans || 0) + Object.values(gd.fansByRegion||{}).reduce(function(s,v){return s+v;},0),
+            bio: ap.bio || ''
           };
         });
       }
@@ -26201,13 +26214,20 @@ async function showY(){
       const {data, error} = await supabase.from('players').select('*');
       if(!error && data){
         window.allPlayers = data.map(function(p){
+          var gd = p.game_data || {};
+          var ap = gd.artistProfile || {};
           return {
             id: p.user_id,
             artistName: p.artist_name,
             email: p.email,
-            socialPosts: p.game_data && p.game_data.socialPosts ? p.game_data.socialPosts : [],
-            socialUsernames: p.game_data && p.game_data.socialUsernames ? p.game_data.socialUsernames : {},
-            profilePic: p.game_data && p.game_data.artistProfile && p.game_data.artistProfile.profilePic ? p.game_data.artistProfile.profilePic : null
+            socialPosts: gd.socialPosts || [],
+            socialUsernames: gd.socialUsernames || {},
+            profilePic: ap.profilePic || null,
+            profilePicType: ap.profilePicType || 'emoji',
+            stories: gd.stories || [],
+            following: gd.following || {},
+            fans: (gd.fans || 0) + Object.values(gd.fansByRegion||{}).reduce(function(s,v){return s+v;},0),
+            bio: ap.bio || ''
           };
         });
       }
@@ -26370,7 +26390,7 @@ function yPostHTML(post, handle, profilePic){
     +(post.taggedSong?'<div style="display:flex;align-items:center;gap:6px;background:#111;border:1px solid #2f3336;border-radius:12px;padding:6px 10px;margin:6px 0;font-size:13px;color:#1d9bf0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'+escapeHtml(post.taggedSong.title||'')+(post.taggedSong.artist?' — '+escapeHtml(post.taggedSong.artist):'')+'</div>':'')
     +'<div class="yw-acts">'
     +'<div class="yw-act" onclick="showPostComments(\''+post.id+'\',\''+(post._playerId||'')+'\',\'twitter\');event.stopPropagation()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>'+realCommentCount+'</div>'
-    +'<div class="yw-act" data-repost="1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/></svg>'+Math.floor((post.likes||0)*0.05)+'</div>'
+    +'<div class="yw-act" data-repost="1" data-postid="'+String(post.id).replace(/"/g,'')+'"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/></svg>'+Math.floor((post.likes||0)*0.05)+'</div>'
     +'<div class="yw-act" id="likeBtn_'+safeId+'" onclick="likePost(\''+safeId+'\');event.stopPropagation()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg><span id="likesCount_'+safeId+'">'+formatSocial(post.likes||0)+'</span></div>'
     +'<div class="yw-act" style="color:#71767b"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'+formatSocial((post.views||post.likes*8)||0)+'</div>'
     +'</div>'
@@ -26381,8 +26401,12 @@ function yAttachClicks(container){
   (container||document).querySelectorAll('.yw-row[data-action]').forEach(function(row){
     row.addEventListener('click', function(e){
       // Check if repost button clicked
-      if(e.target.closest('[data-repost]')){
-        showToast('Reposted!','green');
+      var repostBtn = e.target.closest('[data-repost]');
+      if(repostBtn){
+        var postId = repostBtn.dataset.postid;
+        var post = postId && window._yFeedPostMap && window._yFeedPostMap[postId];
+        if(post) repostPost(post, 'twitter');
+        else showToast('Reposted!','green');
         e.stopPropagation(); return;
       }
       const action=this.dataset.action;
@@ -26397,6 +26421,9 @@ function yBuildFeed(handle, followers, myPosts, feedPosts, profilePic, bio){
   const pane=document.getElementById('y-pane');
   if(!pane) return;
   const all=[...myPosts.slice(0,3).map(p=>Object.assign({},p,{_mine:true})),...feedPosts];
+  // Store posts by id for repost lookup in yAttachClicks
+  window._yFeedPostMap = {};
+  all.forEach(function(p){ window._yFeedPostMap[String(p.id)] = p; });
   let html='<div class="yw-top">Home</div>'
     +'<div class="yw-tabs"><div class="yw-tab on">For you</div><div class="yw-tab">Following</div></div>';
   if(all.length===0){
@@ -26541,8 +26568,10 @@ function yBuildProfile(handle, followers, myPosts, profilePic, bio){
     +'<span><strong style="color:#fff">'+formatSocial(followers)+'</strong> <span style="color:#71767b">Followers</span></span>'
     +'<span><strong style="color:#fff">'+myPosts.length+'</strong> <span style="color:#71767b">Posts</span></span>'
     +'</div></div>'
-    +'<div class="yw-tabs" style="top:0"><div class="yw-tab on">Posts</div><div class="yw-tab">Media</div></div>';
+    +'<div class="yw-tabs" style="top:0"><div class="yw-tab on" id="ypTab-posts" onclick="yProfileTab(\'posts\',this)">Posts</div><div class="yw-tab" id="ypTab-reposts" onclick="yProfileTab(\'reposts\',this)">Reposts</div><div class="yw-tab" id="ypTab-media" onclick="yProfileTab(\'media\',this)">Media</div></div>';
 
+  // Posts tab content
+  html += '<div id="yp-posts-content">';
   if(!myPosts.length){
     html+='<div style="padding:60px 20px;text-align:center">'
       +'<div style="font-size:22px;font-weight:700;color:#fff;margin-bottom:8px">No posts yet</div>'
@@ -26557,7 +26586,7 @@ function yBuildProfile(handle, followers, myPosts, profilePic, bio){
         +'<span style="color:#71767b;font-size:14px">@'+handle+'</span>'
         +'<span style="color:#71767b;font-size:14px">· '+getPostTimestamp(post)+'</span>'
         +'</div>'
-        +'<div class="yw-txt">'+post.text+'</div>'
+        +'<div class="yw-txt">'+escapeHtml(post.text||'')+'</div>'
         +(post.image?'<img class="yw-img" src="'+post.image+'">':'')
         +'<div class="yw-acts">'
         +'<div class="yw-act"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>'+Math.floor((post.likes||0)*0.08)+'</div>'
@@ -26565,8 +26594,53 @@ function yBuildProfile(handle, followers, myPosts, profilePic, bio){
         +'</div></div></div>';
     });
   }
+  html += '</div>';
+
+  // Reposts tab content (hidden by default)
+  var myReposts = (GAME.reposts||[]).filter(function(r){ return !r.platform || r.platform==='twitter'; });
+  html += '<div id="yp-reposts-content" style="display:none">';
+  if(!myReposts.length){
+    html+='<div style="padding:60px 20px;text-align:center">'
+      +'<div style="font-size:22px;font-weight:700;color:#fff;margin-bottom:8px">No reposts yet</div>'
+      +'<div style="color:#71767b">Posts you repost will appear here.</div></div>';
+  } else {
+    myReposts.slice().reverse().forEach(function(r){
+      html+='<div class="yw-row">'
+        +'<div style="width:40px;height:40px;border-radius:50%;background:#1d9bf033;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#1d9bf0;font-size:18px">↺</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;color:#71767b;margin-bottom:4px">You reposted · '+r.date+'</div>'
+        +'<div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:2px">'+escapeHtml(r.originalArtist||'')+'</div>'
+        +'<div class="yw-txt" style="margin:0">'+escapeHtml(r.text||'')+'</div>'
+        +'</div></div>';
+    });
+  }
+  html += '</div>';
+
+  // Media tab content (hidden by default)
+  var mediaPosts = myPosts.filter(function(p){ return p.image||p.gif; });
+  html += '<div id="yp-media-content" style="display:none">';
+  if(!mediaPosts.length){
+    html+='<div style="padding:60px 20px;text-align:center"><div style="color:#71767b">No media posts yet.</div></div>';
+  } else {
+    html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px">';
+    mediaPosts.forEach(function(p){
+      html+='<div style="aspect-ratio:1;overflow:hidden"><img src="'+(p.image||p.gif)+'" style="width:100%;height:100%;object-fit:cover"></div>';
+    });
+    html+='</div>';
+  }
+  html += '</div>';
+
   pane.innerHTML=html;
   yAttachClicks(pane);
+}
+
+function yProfileTab(tab, btn){
+  document.querySelectorAll('#y-pane .yw-tab').forEach(function(t){ t.classList.remove('on'); });
+  if(btn) btn.classList.add('on');
+  ['posts','reposts','media'].forEach(function(t){
+    var el = document.getElementById('yp-'+t+'-content');
+    if(el) el.style.display = t===tab ? '' : 'none';
+  });
 }
 
 async function yNav(tab, btn){
@@ -38217,6 +38291,29 @@ function checkDailyEconomy(){
 
   // Daily streams — use the real algorithm (fans, hype, quality, promo, trends, virality)
   _processDailyStreams();
+
+  // Social post engagement trickle — posts continue gaining likes/views every day
+  // at a rate proportional to the player's total fan count, so older posts keep
+  // feeling alive without spiking unrealistically.
+  (function(){
+    var posts = GAME.socialPosts;
+    if(!posts || !posts.length) return;
+    var totalFans = (GAME.fans || 0) + Object.values(GAME.fansByRegion||{}).reduce(function(s,v){return s+v;},0);
+    // Base daily likes per post scales with fans but never goes below 1 or above 500
+    var baseLikesPerDay = Math.min(500, Math.max(1, Math.floor(totalFans * 0.0004)));
+    var now = Date.now();
+    posts.forEach(function(post){
+      if(post.isNPC || post.isSystemPost || post.isGenerated) return;
+      // Posts older than 14 game days decay — gain 10% as much
+      var ageInDays = post.week ? Math.max(0, (GAME.week||1) - (post.week||1)) : 0;
+      var decayFactor = ageInDays > 14 ? 0.1 : 1;
+      var gain = Math.max(0, Math.floor(baseLikesPerDay * decayFactor * (0.7 + Math.random() * 0.6)));
+      if(gain === 0) return;
+      post.likes = (post.likes || 0) + gain;
+      // Views grow at ~8-10x likes (platform realistic)
+      post.views = (post.views || 0) + gain * (8 + Math.floor(Math.random() * 3));
+    });
+  })();
 
   if(typeof checkViralMoment==='function') checkViralMoment();
   if(info.dow === 0 && typeof processPromoCampaigns==='function') processPromoCampaigns();
