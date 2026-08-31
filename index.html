@@ -290,6 +290,84 @@ input[type=range].age-range{-webkit-appearance:none;width:100%;height:4px;backgr
 .phone.font-times *{font-family:'Times New Roman',Times,serif !important}
 .phone.font-courier *{font-family:'Courier New',Courier,monospace !important}
 
+/* ── Song Detail Overlay ──────────────────────────────────── */
+.sd-ov{position:fixed;inset:0;background:var(--bg);z-index:200000;overflow-y:auto;padding-bottom:90px;font-family:var(--fb)}
+.sd-hero{text-align:center;border-bottom:1px solid var(--bord);background:linear-gradient(180deg,var(--acc-bg) 0%,transparent 100%);padding:20px 16px 14px}
+.sd-art{width:110px;height:110px;border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:52px;margin:0 auto 12px;border:2px solid rgba(255,255,255,.1);position:relative;box-shadow:0 8px 32px rgba(0,0,0,.45);cursor:pointer;overflow:hidden}
+.sd-art img{width:100%;height:100%;object-fit:cover;border-radius:20px}
+.sd-art-edit{position:absolute;bottom:-4px;right:-4px;width:26px;height:26px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid var(--bg)}
+.sd-title{font-family:var(--fd);font-size:22px;font-weight:700;margin-bottom:7px;color:var(--txt)}
+.sd-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;border-radius:99px;padding:5px 14px;margin-bottom:5px}
+.sd-dur{font-size:12px;color:var(--mut);margin-top:3px}
+.sd-sec{padding:14px 16px}
+.sd-sh{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px}
+.sd-qs{display:flex;gap:1px;background:var(--bord);border:1px solid var(--bord);border-radius:14px;overflow:hidden;margin:0 16px 0}
+.sd-qs-c{flex:1;background:var(--card);padding:11px 6px;text-align:center}
+.sd-qs-v{font-size:15px;font-weight:900;display:block;margin-bottom:2px;color:var(--acc)}
+.sd-qs-l{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--mut)}
+.sd-ig{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--bord);border:1px solid var(--bord);border-radius:14px;overflow:hidden}
+.sd-ig-c{background:var(--card);padding:11px 13px}
+.sd-ig-l{font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);margin-bottom:4px}
+.sd-ig-v{font-size:13px;font-weight:700;color:var(--txt)}
+.sd-qbar{height:5px;border-radius:3px;background:var(--surf);overflow:hidden;margin-top:5px}
+.sd-qfill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--acc),var(--acc-txt,#fff))}
+.sd-origin{border:1px solid var(--bord);border-radius:13px;padding:13px 14px;background:var(--card)}
+.sd-skill-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.sd-skill-nm{font-size:11.5px;font-weight:700;flex:none;width:72px;color:var(--txt)}
+.sd-skill-tr{flex:1;height:7px;border-radius:4px;background:var(--surf);overflow:hidden}
+.sd-skill-f{height:100%;border-radius:4px}
+.sd-skill-v{font-size:12px;font-weight:800;flex:none;width:24px;text-align:right;color:var(--txt)}
+.sd-skill-b{font-size:10px;color:var(--mut);flex:none}
+.sd-qtot{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--acc-bg);border:1px solid var(--acc);border-radius:9px;margin-top:8px;opacity:.85}
+.sd-collab{border:1px solid var(--bord);border-radius:13px;overflow:hidden}
+.sd-collab-hd{padding:11px 14px;border-bottom:1px solid var(--bord);font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;background:rgba(0,0,0,.12);color:var(--txt)}
+.sd-collab-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--bord)}
+.sd-collab-row:last-child{border:none}
+.sd-cr-inf{flex:1}.sd-cr-inf b{font-size:13px;font-weight:700;display:block;color:var(--txt)}.sd-cr-inf span{font-size:11px;color:var(--mut)}
+.sd-royalty{padding:9px 14px;font-size:12px;color:var(--mut)}
+.sd-prc{border:1px solid var(--acc);border-radius:13px;padding:13px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;background:var(--acc-bg)}
+.sd-prc-ico{width:42px;height:42px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;color:var(--acc-txt)}
+.sd-prc-inf b{font-size:13px;font-weight:700;color:var(--acc);display:block;margin-bottom:2px}.sd-prc-inf span{font-size:11.5px;color:var(--mut);line-height:1.4}
+.sd-mv-cta{border:1px dashed var(--bord);border-radius:13px;padding:13px 14px;display:flex;align-items:center;gap:12px;cursor:pointer}
+.sd-mv-cta:active{opacity:.8}
+.sd-sab{width:100%;border-radius:12px;font-size:14px;font-weight:800;padding:13px;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;font-family:var(--fb);cursor:pointer;touch-action:manipulation;border:none}
+.sd-sab-p{background:var(--acc);color:var(--acc-txt)}.sd-sab-o{background:transparent;border:1.5px solid var(--acc) !important;color:var(--acc)}.sd-sab-s{background:var(--card);border:1px solid var(--bord) !important;color:var(--txt)}.sd-sab-d{background:transparent;border:1.5px solid #f44336 !important;color:#f44336}
+.sd-cp-boxes{display:flex;gap:8px}
+.sd-cp-box{flex:1;background:var(--card);border:1px solid var(--bord);border-radius:11px;padding:10px 6px;text-align:center}
+.sd-cp-box b{font-size:16px;font-weight:900;display:block;margin-bottom:2px;color:var(--txt)}
+.sd-cp-region{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}.sd-cp-peak{font-size:9px;color:var(--mut);margin-top:2px}
+.sd-perf{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--bord);border:1px solid var(--bord);border-radius:14px;overflow:hidden}
+.sd-pg-c{background:var(--card);padding:12px 14px}
+.sd-pg-v{font-size:18px;font-weight:900;display:block;margin-bottom:2px;color:var(--txt)}.sd-pg-l{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--mut)}
+.sd-plat-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bord)}.sd-plat-item:last-child{border:none}
+.sd-plat-ico{font-size:18px;flex:none}.sd-plat-nm{font-size:13px;font-weight:700;flex:1;color:var(--txt)}.sd-plat-n{font-size:13px;font-weight:800;flex:none;color:var(--txt)}.sd-plat-pct{font-size:11px;color:var(--mut);flex:none;width:30px;text-align:right}
+.sd-plat-bw{flex:none;width:48px;height:5px;border-radius:3px;background:var(--surf);overflow:hidden;margin-left:2px}
+.sd-plat-bf{height:100%;border-radius:3px;background:var(--acc)}
+.sd-rb{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.sd-rb-l{font-size:12px;font-weight:700;flex:none;width:100px;color:var(--txt)}.sd-rb-tr{flex:1;height:7px;border-radius:4px;background:var(--surf);overflow:hidden}.sd-rb-f{height:100%;border-radius:4px;background:var(--acc)}.sd-rb-pct{font-size:11px;font-weight:700;color:var(--mut);flex:none;width:30px;text-align:right}.sd-rb-ch{font-size:10.5px;font-weight:800;flex:none;width:36px;text-align:right;color:var(--mut)}
+.sd-mvs{background:var(--card);border:1px solid var(--bord);border-radius:13px;overflow:hidden}
+.sd-mvs-hd{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--bord)}
+.sd-mvs-ico{font-size:22px;flex:none}.sd-mvs-inf{flex:1}.sd-mvs-inf b{font-size:13px;font-weight:700;display:block;color:var(--txt)}.sd-mvs-inf span{font-size:11px;color:var(--mut)}
+.sd-mvs-stats{display:flex;gap:1px;background:var(--bord)}
+.sd-mvs-stat{flex:1;background:var(--card);padding:10px;text-align:center}
+.sd-mvs-stat b{font-size:15px;font-weight:900;display:block;margin-bottom:2px;color:var(--txt)}.sd-mvs-stat span{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+.sd-wt-bar{height:4px;background:var(--surf);margin-top:4px;border-radius:2px;overflow:hidden}
+.sd-wt-f{height:100%;border-radius:2px;background:var(--acc)}
+.sd-promo-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bord)}.sd-promo-row:last-child{border:none}
+.sd-par-ico{font-size:18px;flex:none}.sd-par-inf{flex:1}.sd-par-inf b{font-size:12.5px;font-weight:700;display:block;color:var(--txt)}.sd-par-inf span{font-size:11px;color:var(--mut)}
+.sd-par-st{font-size:10px;font-weight:800;border-radius:4px;padding:2px 8px;flex:none}
+.sd-press-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--bord)}.sd-press-row:last-child{border:none}
+.sd-pa-out{font-size:9px;font-weight:800;border-radius:4px;padding:2px 8px;flex:none;align-self:flex-start}
+.sd-pa-ttl{flex:1;font-size:12.5px;font-weight:700;line-height:1.4;color:var(--txt)}.sd-pa-age{font-size:10.5px;color:var(--mut);flex:none}
+.sd-concept-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:10px}
+.sd-cg-img{aspect-ratio:1;border-radius:8px;object-fit:cover;width:100%}
+.sd-concept-tag{font-size:11px;font-weight:700;background:var(--acc-bg);border:1px solid var(--acc);border-radius:6px;padding:3px 9px;color:var(--acc);display:inline-block;margin-bottom:6px}
+.sd-concept-desc{font-size:12.5px;color:var(--mut);line-height:1.6;margin-bottom:10px}
+.sd-fan-q{font-size:12px;font-style:italic;line-height:1.6;margin-bottom:5px;padding-left:10px;border-left:2px solid var(--acc);color:var(--txt)}
+.sd-lyrics{font-size:12.5px;font-style:italic;color:var(--mut);line-height:1.7}
+.sd-sticky{padding:12px 16px;border-top:1px solid var(--bord);background:var(--surf);position:sticky;bottom:0;z-index:5}
+.sd-sticky-btn{width:100%;background:var(--acc);color:var(--acc-txt);border-radius:12px;font-size:14px;font-weight:800;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;border:none;font-family:var(--fb)}
+
 </style>
 
 <!-- Supabase SDK -->
@@ -9606,39 +9684,342 @@ function showSongDetails(songId){
     }
   }
 
-  var html='<div style="max-width:500px;margin:0 auto;padding:16px">'
-    // Back button
-    +'<button id="sdBackBtn" style="background:var(--surf);border:1.5px solid var(--bord);color:var(--txt);border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer;margin-bottom:16px;touch-action:manipulation" onclick="_closeOverlay(this)">←</button>'
-    // Cover art + title
-    +'<div style="text-align:center;margin-bottom:20px">'
-    +'<div onclick="editSongCover('+songId+')" style="width:130px;height:130px;border-radius:16px;background:var(--surf);border:2px solid var(--bord);display:inline-flex;align-items:center;justify-content:center;font-size:52px;margin-bottom:10px;position:relative;cursor:pointer">'
-    +(coverArt?'<img src="'+coverArt+'" style="width:100%;height:100%;object-fit:cover;border-radius:14px">':coverEmoji)
-    +(isReleased?'':'<div style="position:absolute;bottom:5px;right:5px;background:var(--acc);color:var(--acc-txt);border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px">✏️</div>')
-    +'</div>'
-    +'<div style="font-size:20px;font-weight:800;color:var(--txt);margin-bottom:4px">'+song.title+(song.featuredArtist?' ft. '+song.featuredArtist:'')+'</div>'
-    +'<div style="display:inline-flex;align-items:center;gap:6px;background:'+statusColor+'22;color:'+statusColor+';padding:4px 12px;border-radius:20px;font-size:12px;font-weight:800">'
-    +(isReleased?'📀 Released':isRecorded?'🎙️ Recorded':isInProg?'⏳ In Progress':'✍️ Written')
-    +'</div>'
-    +'<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px">'
-    +'<span style="font-size:12px;color:var(--mut)">⏱ '+durationStr+'</span>'
-    +(isReleased && releaseDateStr?'<span style="font-size:12px;color:var(--mut)">· Released '+releaseDateStr+'</span>':'')
-    +(!isReleased && song.scheduledReleaseDate?'<span style="font-size:12px;color:var(--acc)">📅 Drops '+song.scheduledReleaseDate+'</span>':'')
-    +'</div></div>'
-    +quickStatsBarHTML
-    // Song info card
-    +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
-    +'<div><div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Genre</div><div style="font-size:14px;font-weight:600;color:var(--txt)">'+(song.genre||song.subgenre||'—')+'</div></div>'
-    +'<div><div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Topic '+((!isRecorded&&!isReleased)?'<button onclick="editSongTopic('+songId+')" style="background:none;border:none;color:var(--acc);cursor:pointer;font-weight:700;font-size:10px;margin-left:4px">✏️</button>':'')+'</div><div style="font-size:14px;font-weight:600;color:var(--txt)">'+(song.topic||song.topicCategory?(song.topic+(song.topicCategory?' ('+song.topicCategory+')':'')):'—')+'</div></div>'
-    +'<div><div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Quality</div><div style="font-size:14px;font-weight:600;color:var(--txt)">'+(song.quality||0)+'/100</div></div>'
-    +'<div><div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:4px">'+writtenLabel+'</div><div style="font-size:14px;font-weight:600;color:var(--txt)">'+writtenDateStr+'</div></div>'
-    +(recordedDateStr?'<div><div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:4px">'+recordedLabel+'</div><div style="font-size:14px;font-weight:600;color:var(--txt)">'+recordedDateStr+'</div></div>':'')
-    +(isReleased && releaseDateStr?'<div><div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Released</div><div style="font-size:14px;font-weight:600;color:var(--txt)">'+releaseDateStr+'</div></div>':'')
-    +(!isReleased && song.scheduledReleaseDate?'<div><div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--acc);margin-bottom:4px">📅 Drops</div><div style="font-size:14px;font-weight:600;color:var(--acc)">'+song.scheduledReleaseDate+'</div></div>':'')
-    +'</div></div>'
-    +collabHTML+conceptHTML+lyricsCardHTML+statsHTML+recordedExtrasHTML+releasedExtrasHTML+actionsHTML
-    +(!isReleased?'<button onclick="deleteSong('+songId+')" style="width:100%;padding:12px;background:none;border:2px solid #f44336;color:#f44336;border-radius:10px;cursor:pointer;font-family:var(--fb);font-size:14px;margin-top:8px">🗑️ Delete Song</button>':'')
+  // ── BUILD NEW BLUEPRINT HTML ────────────────────────────────────────────────
+  var _coverArtInner = coverArt ? '<img src="'+coverArt+'" alt="cover">' : '<span style="font-size:52px">'+coverEmoji+'</span>';
+  var _artEditBadge = !isReleased ? '<div class="sd-art-edit">✏</div>' : '';
+  var _statusBadgeStyle = 'background:'+statusColor+'22;color:'+statusColor;
+  var _statusLabel = isReleased?'📀 Released':isRecorded?'🎙 Recorded':isInProg?'⏳ In Progress':'✍️ Written';
+
+  // Quick stats bar (released)
+  var _qsH='';
+  if(isReleased){
+    var _qss=song.collaborators&&song.collaborators.length>0?1/(song.collaborators.length+1):(1-(song.collabRevenueSplit||0));
+    var _qsr=Math.floor((song.streams||0)*0.004*_qss)+(song.iMusic_revenue||0);
+    var _qspk=song.peakPosition?'#'+song.peakPosition:'—';
+    _qsH='<div style="padding:0 16px 14px;border-bottom:1px solid var(--bord)">'
+      +'<div class="sd-qs">'
+      +'<div class="sd-qs-c"><span class="sd-qs-v">'+_fmtN(song.streams||0)+'</span><span class="sd-qs-l">Streams</span></div>'
+      +'<div class="sd-qs-c"><span class="sd-qs-v" style="color:#2ed573">$'+_fmtN(Math.floor(_qsr))+'</span><span class="sd-qs-l">Revenue</span></div>'
+      +'<div class="sd-qs-c"><span class="sd-qs-v" style="color:var(--txt)">'+_qspk+'</span><span class="sd-qs-l">Peak</span></div>'
+      +'<div class="sd-qs-c"><span class="sd-qs-v" style="color:var(--txt)">'+(song.weeksOnChart||0)+'</span><span class="sd-qs-l">Wks Chart</span></div>'
+      +'</div></div>';
+  }
+
+  // Info grid (6 cells)
+  var _qbp=Math.min(100,song.quality||0);
+  var _topEd=(!isRecorded&&!isReleased)?'<button onclick="editSongTopic('+songId+')" style="background:none;border:none;color:var(--acc);cursor:pointer;font-weight:700;font-size:10px;margin-left:3px">✏</button>':'';
+  var _topVal=song.topic?song.topic+(song.topicCategory?' ('+song.topicCategory+')':''):'—';
+  var _cell6 = isReleased ? '<div class="sd-ig-c"><div class="sd-ig-l">Released</div><div class="sd-ig-v">'+(releaseDateStr||'—')+'</div></div>'
+    : isRecorded ? '<div class="sd-ig-c"><div class="sd-ig-l">'+recordedLabel+'</div><div class="sd-ig-v">'+(recordedDateStr||'—')+'</div></div>'
+    : '<div class="sd-ig-c"><div class="sd-ig-l">'+writtenLabel+'</div><div class="sd-ig-v">'+writtenDateStr+'</div></div>';
+  var _cell5 = (isRecorded||isReleased) ? '<div class="sd-ig-c"><div class="sd-ig-l">Studio</div><div class="sd-ig-v">'+(song.studioName||song.studio||'Home Studio')+'</div></div>'
+    : '<div class="sd-ig-c"><div class="sd-ig-l">'+writtenLabel+'</div><div class="sd-ig-v">'+writtenDateStr+'</div></div>';
+  var _igH='<div class="sd-sec"><div class="sd-ig">'
+    +'<div class="sd-ig-c"><div class="sd-ig-l">Genre</div><div class="sd-ig-v">'+(song.genre||'—')+'</div></div>'
+    +'<div class="sd-ig-c"><div class="sd-ig-l">Topic '+_topEd+'</div><div class="sd-ig-v">'+_topVal+'</div></div>'
+    +'<div class="sd-ig-c"><div class="sd-ig-l">Subgenre</div><div class="sd-ig-v">'+(song.subgenre||'—')+'</div></div>'
+    +'<div class="sd-ig-c"><div class="sd-ig-l">Quality</div><div class="sd-ig-v">'+_qbp+'/100<div class="sd-qbar"><div class="sd-qfill" style="width:'+_qbp+'%"></div></div></div></div>'
+    +_cell5+_cell6
     +'</div></div>';
+
+  // Collaborators
+  var _cH='';
+  if(song.collaborators&&song.collaborators.length>0){
+    var _ct=song.collaborators.length+1;
+    var _cRec=song.isCollabReceiver;
+    var _cBp=song.royalty_pct!==undefined?song.royalty_pct:Math.round(100/_ct);
+    var _cYr=_cRec?_cBp:(100-_cBp);
+    _cH='<div class="sd-sec" style="padding-top:0"><div class="sd-collab"><div class="sd-collab-hd">👥 Collaborators</div>'
+      +song.collaborators.map(function(c){return '<div class="sd-collab-row"><span style="font-size:22px">'+(c.roleLabel?c.roleLabel.split(' ')[0]:'🎵')+'</span><div class="sd-cr-inf"><b>'+(c.name||'Artist')+'</b><span>'+(c.roleLabel||'Collaborator')+'</span></div><span style="font-size:14px;font-weight:900;color:var(--acc)">'+Math.round((c.split||0)*100)+'%</span></div>';}).join('')
+      +'<div class="sd-royalty">Your royalty: '+_cYr+'%</div></div></div>';
+  } else if(song.featuredArtist||song.collabArtist){
+    var _cFa=song.featuredArtist||song.collabArtist;
+    _cH='<div class="sd-sec" style="padding-top:0"><div class="sd-collab"><div class="sd-collab-hd">🎤 Featured Artist</div><div class="sd-collab-row"><span style="font-size:22px">🎤</span><div class="sd-cr-inf"><b>'+_cFa+'</b><span>Featured Artist</span></div></div><div class="sd-royalty">Your royalty: 100%</div></div></div>';
+  } else {
+    _cH='<div class="sd-sec" style="padding-top:0"><div class="sd-collab"><div class="sd-collab-hd">Solo Release</div><div class="sd-royalty" style="border:none">Your royalty: 100%</div></div></div>';
+  }
+
+  // Quality breakdown (recorded pre-release)
+  var _qbH='';
+  if(isRecorded&&!isReleased){
+    var _qbW=GAME.skills.writing||0,_qbV=GAME.skills.singing||GAME.skills.vocals||0,_qbP=GAME.skills.production||0;
+    _qbH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Quality Breakdown</div><div class="sd-origin">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:22px">✏</span>'
+      +'<div><div style="font-size:13px;font-weight:700;color:var(--txt)">'+(song.writtenBySelf===false?'External production':'Self-written')+' · '+(song.studioName||song.studio||'Home Studio')+'</div>'
+      +'<div style="font-size:11.5px;color:var(--mut)">How the quality score was calculated</div></div></div>'
+      +[['Writing',_qbW,'#a97de8'],['Singing',_qbV,'#5a9df3'],['Production',_qbP,'#4cc98a']].map(function(sk){
+        var p=Math.min(100,Math.round(sk[1]));
+        return '<div class="sd-skill-row"><div class="sd-skill-nm">'+sk[0]+'</div><div class="sd-skill-tr"><div class="sd-skill-f" style="width:'+p+'%;background:'+sk[2]+'"></div></div><div class="sd-skill-v">'+Math.round(sk[1])+'</div><div class="sd-skill-b">+'+( (sk[1]/3).toFixed(1))+' pts</div></div>';
+      }).join('')
+      +'<div style="font-size:11px;color:var(--mut);padding-top:7px;margin-top:6px;border-top:1px solid var(--bord)">Avg '+Math.round((_qbW+_qbV+_qbP)/3)+' · topic/subgenre bonus · studio bonus</div>'
+      +'<div class="sd-qtot"><span style="font-size:12px;font-weight:700;color:var(--acc)">Final quality</span><span style="font-size:22px;font-weight:900;color:var(--acc)">'+(song.quality||0)+' / 100</span></div>'
+      +'</div></div>';
+  }
+
+  // Pre-release campaign CTA (recorded)
+  var _prcH='';
+  if(isRecorded&&!isReleased){
+    var _prH=song.hype||GAME.hype||0;
+    var _prM=_prH>=80?'1.4x':_prH>=60?'1.3x':_prH>=40?'1.15x':_prH>=20?'1.0x':'0.9x';
+    _prcH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Pre-Release Campaign</div>'
+      +'<div class="sd-prc" onclick="showPromoManager('+songId+')">'
+      +'<div class="sd-prc-ico">🚀</div>'
+      +'<div class="sd-prc-inf"><b>Launch Pre-Release Campaign</b><span>Build fan momentum before release day. More momentum = higher chart peak on release.</span></div>'
+      +'<span style="font-size:20px;color:var(--acc)">›</span></div>'
+      +'<div style="margin-top:8px;background:var(--card);border:1px solid var(--bord);border-radius:10px;padding:10px 12px">'
+      +'<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:5px">Current momentum</div>'
+      +'<div style="height:7px;border-radius:4px;background:var(--surf);overflow:hidden;margin-bottom:5px"><div style="height:100%;width:'+Math.min(100,_prH)+'%;border-radius:4px;background:var(--acc)"></div></div>'
+      +'<div style="font-size:11.5px;color:var(--mut)">'+_prH+' pts · Multiplier at launch: '+_prM+'</div></div></div>';
+  }
+
+  // Music Video (recorded pre-release)
+  var _mvPH='';
+  if(isRecorded&&!isReleased){
+    if(song.mvId){
+      _mvPH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Music Video</div>'
+        +'<div class="sd-mvs"><div class="sd-mvs-hd"><div class="sd-mvs-ico">🎬</div><div class="sd-mvs-inf"><b>'+song.title+' — Official MV</b><span>Planned · YTM</span></div></div>'
+        +'<div class="sd-mvs-stats"><div class="sd-mvs-stat"><b>'+(song.mvViews||0).toLocaleString()+'</b><span>YTM Views</span></div>'
+        +'<div class="sd-mvs-stat"><b>'+(song.mvChartPosition?'#'+song.mvChartPosition:'—')+'</b><span>YTM Chart</span></div>'
+        +'<div class="sd-mvs-stat"><b>'+(song.mvWatchTimePct||0)+'%<div class="sd-wt-bar"><div class="sd-wt-f" style="width:'+Math.min(100,song.mvWatchTimePct||0)+'%"></div></div></b><span>Watch-time</span></div></div></div></div>';
+    } else {
+      _mvPH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Music Video</div>'
+        +'<div class="sd-mv-cta" onclick="showToast(\'Music video upload coming soon!\',\'blue\')">'
+        +'<div style="width:42px;height:42px;border-radius:50%;background:var(--card);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none">🎬</div>'
+        +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:2px">No MV planned yet</div><div style="font-size:11.5px;color:var(--mut);line-height:1.4">Boosts Yourtube chart, press coverage, and YTM milestone rewards.</div></div>'
+        +'<span style="font-size:15px;color:var(--acc)">›</span></div></div>';
+    }
+  }
+
+  // Chart positions (released)
+  var _cpH='';
+  if(isReleased){
+    var _cpB=[];
+    if(song.loopifyChartPos) _cpB.push(['🔄','Loopify','#'+song.loopifyChartPos,song.loopifyChartPeak?'peaked #'+song.loopifyChartPeak:'']);
+    if(song.africaChartPos) _cpB.push(['🌍','Africa '+(song.africaChartPos===1?'🔥':''),'#'+song.africaChartPos,song.africaWeeksNo1?song.africaWeeksNo1+' wks at #1':'']);
+    if(song.europeChartPos) _cpB.push(['🌐','Europe','#'+song.europeChartPos,song.europeChartPeak?'peaked #'+song.europeChartPeak:'']);
+    if(song.mvChartPosition) _cpB.push(['▶','YTM','#'+song.mvChartPosition,song.mvViews?_fmtN(song.mvViews)+' views':'']);
+    if(_cpB.length>0){
+      _cpH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Chart Positions</div><div class="sd-cp-boxes">'
+        +_cpB.map(function(b){return '<div class="sd-cp-box"><b>'+b[2]+'</b><div class="sd-cp-region">'+b[1]+'</div>'+(b[3]?'<div class="sd-cp-peak">'+b[3]+'</div>':'')+'</div>';}).join('')
+        +'</div></div>';
+    }
+  }
+
+  // Performance grid (released)
+  var _pfH='';
+  if(isReleased){
+    var _pfSp=song.collaborators&&song.collaborators.length>0?1/(song.collaborators.length+1):(1-(song.collabRevenueSplit||0));
+    var _pfRev=Math.floor((song.streams||0)*0.004*_pfSp)+(song.iMusic_revenue||0);
+    _pfH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Performance</div>'
+      +'<div class="sd-perf">'
+      +'<div class="sd-pg-c"><span class="sd-pg-v" style="color:var(--acc)">'+(song.streams||0).toLocaleString()+'</span><span class="sd-pg-l">Total Streams</span></div>'
+      +'<div class="sd-pg-c"><span class="sd-pg-v" style="color:#2ed573">$'+Math.floor(_pfRev).toLocaleString()+'</span><span class="sd-pg-l">Your Revenue</span></div>'
+      +'<div class="sd-pg-c"><span class="sd-pg-v">'+(song.weeklyStreams||0).toLocaleString()+'</span><span class="sd-pg-l">This Week</span></div>'
+      +'<div class="sd-pg-c"><span class="sd-pg-v" style="font-size:13px">'+(song.weeksOnChart>0?'Week '+((song.releaseWeek||0)+(song.weeksOnChart||0)):'—')+'</span><span class="sd-pg-l">Charting</span></div>'
+      +'</div></div>';
+  }
+
+  // Platform breakdown (released)
+  var _platH='';
+  if(isReleased){
+    var _plPl=song.platforms||{};
+    var _plIc={spotify:'🔄',apple:'🍊',youtube:'▶',amazon:'🏜',soundcloud:'💧'};
+    var _plNm={spotify:'Loopify',apple:'Orange Music',youtube:'Yourtube',amazon:'Sahara',soundcloud:'SoundPuff'};
+    var _plOrd=['spotify','apple','youtube','amazon','soundcloud'];
+    var _plEn=_plOrd.filter(function(k){return(_plPl[k]||0)>0;}).map(function(k){return[k,_plPl[k]||0];}).sort(function(a,b){return b[1]-a[1];});
+    var _iMsP=song.iMusic_sales||0;
+    var _iMrP=song.iMusic_revenue||0;
+    var _plMax=_plEn.length>0?_plEn[0][1]:1;
+    if(_plEn.length>0||_iMsP>0){
+      _platH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">By Platform</div>'
+        +'<div style="background:var(--card);border:1px solid var(--bord);border-radius:13px;padding:10px 14px">'
+        +_plEn.map(function(e){
+          var pct=(song.streams||0)>0?Math.round(e[1]/(song.streams||1)*100):0;
+          var bpct=Math.round(e[1]/_plMax*100);
+          return '<div class="sd-plat-item"><div class="sd-plat-ico">'+(_plIc[e[0]]||'🎵')+'</div><div class="sd-plat-nm">'+(_plNm[e[0]]||e[0])+'</div><div class="sd-plat-n">'+e[1].toLocaleString()+'</div><div class="sd-plat-bw"><div class="sd-plat-bf" style="width:'+bpct+'%"></div></div><div class="sd-plat-pct">'+pct+'%</div></div>';
+        }).join('')
+        +(_iMsP>0?'<div class="sd-plat-item" style="background:rgba(232,180,76,.05);border-radius:8px;padding:8px;margin-top:6px">'
+          +'<div class="sd-plat-ico">🎵</div>'
+          +'<div class="sd-plat-nm">iMusic <span style="background:rgba(232,180,76,.15);color:var(--acc);font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px">Purchases</span></div>'
+          +'<div class="sd-plat-n" style="color:var(--acc)">'+_iMsP.toLocaleString()+'</div>'
+          +'<div style="flex:none;font-size:11px;color:var(--mut)">$'+Math.floor(_iMrP)+'</div></div>':'')
+        +'</div></div>';
+    }
+  }
+
+  // Top regions (released)
+  var _regH='';
+  if(isReleased){
+    var _rgFbr=GAME.fansByRegion||{};
+    var _rgEn=Object.entries(_rgFbr).filter(function(e){return e[1]>0;}).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+    if(_rgEn.length>0){
+      var _rgTot=Object.values(_rgFbr).reduce(function(a,b){return a+b;},0);
+      var _rgMax=_rgEn[0][1];
+      _regH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Top Regions</div>'
+        +_rgEn.map(function(e){
+          var pct=_rgTot>0?Math.round(e[1]/_rgTot*100):0;
+          var bpct=_rgMax>0?Math.round(e[1]/_rgMax*100):0;
+          return '<div class="sd-rb"><div class="sd-rb-l">'+e[0]+'</div><div class="sd-rb-tr"><div class="sd-rb-f" style="width:'+bpct+'%"></div></div><div class="sd-rb-pct">'+pct+'%</div><div class="sd-rb-ch"></div></div>';
+        }).join('')
+        +'</div>';
+    }
+  }
+
+  // MV stats (released)
+  var _mvRH='';
+  if(isReleased&&song.mvId){
+    _mvRH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Music Video Performance</div>'
+      +'<div class="sd-mvs"><div class="sd-mvs-hd"><div class="sd-mvs-ico">🎬</div>'
+      +'<div class="sd-mvs-inf"><b>'+song.title+' — Official MV</b><span>Released Wk '+(song.releaseWeek||'?')+' · YTM</span></div></div>'
+      +'<div class="sd-mvs-stats">'
+      +'<div class="sd-mvs-stat"><b style="color:var(--acc)">'+(song.mvViews||0).toLocaleString()+'</b><span>YTM Views</span></div>'
+      +'<div class="sd-mvs-stat"><b>'+(song.mvChartPosition?'#'+song.mvChartPosition:'—')+'</b><span>YTM Chart</span></div>'
+      +'<div class="sd-mvs-stat"><b>'+(song.mvWatchTimePct||0)+'%<div class="sd-wt-bar"><div class="sd-wt-f" style="width:'+Math.min(100,song.mvWatchTimePct||0)+'%"></div></div></b><span>Watch-time</span></div>'
+      +'</div></div></div>';
+  }
+
+  // Active promo (released)
+  var _proH='';
+  if(isReleased){
+    var _proPl=song.activePromo||[];
+    if(_proPl.length>0){
+      var _proIc={social:'📱',radio:'📻',playlist:'🎧',pr:'📰',billboard:'🌆'};
+      _proH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Active Promo</div>'
+        +'<div style="background:var(--card);border:1px solid var(--bord);border-radius:13px;padding:10px 13px">'
+        +_proPl.map(function(p){
+          var stc=p.status==='active'?'background:rgba(76,201,138,.1);color:#2ed573':p.status==='done'?'background:rgba(76,201,138,.1);color:#2ed573':'background:var(--surf);color:var(--mut)';
+          return '<div class="sd-promo-row"><div class="sd-par-ico">'+(_proIc[p.type]||'🎯')+'</div><div class="sd-par-inf"><b>'+(p.name||p.type||'Campaign')+'</b><span>'+(p.desc||'')+'</span></div><div class="sd-par-st" style="'+stc+'">'+(p.status||'active').toUpperCase()+'</div></div>';
+        }).join('')
+        +'</div></div>';
+    }
+  }
+
+  // Press coverage (released)
+  var _prsH='';
+  if(isReleased){
+    var _prsArt=song.pressArticles||[];
+    if(_prsArt.length>0){
+      var _prsOc={VELOUR:'#d4af37',CHARTWELL:'#667eea','ROOM SERVICE':'#ff6b6b',UNDERTONE:'#2ed573',AIRTIME:'#ff9800'};
+      _prsH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Press Coverage</div>'
+        +'<div style="background:var(--card);border:1px solid var(--bord);border-radius:13px;padding:10px 13px">'
+        +_prsArt.slice(0,5).map(function(a){
+          var c=_prsOc[a.outlet]||'var(--mut)';
+          return '<div class="sd-press-row"><div class="sd-pa-out" style="background:'+c+'22;color:'+c+'">'+(a.outlet||'Press')+'</div><div class="sd-pa-ttl">'+(a.title||'Untitled')+'</div><div class="sd-pa-age">Wk '+(a.week||'?')+'</div></div>';
+        }).join('')
+        +'</div></div>';
+    }
+  }
+
+  // Concept + fan reactions + lyrics (released)
+  var _conH='';
+  if(isReleased&&(song.conceptAnalysis||song.conceptImage||song.conceptMood||(song.conceptImages&&song.conceptImages.length))){
+    var _conImgs=song.conceptImages||(song.conceptImage?[song.conceptImage]:[]);
+    _conH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Concept</div>';
+    if(_conImgs.length>0){
+      _conH+='<div class="sd-concept-grid">';
+      _conImgs.slice(0,3).forEach(function(img){_conH+='<img class="sd-cg-img" src="'+img+'">';});
+      _conH+='</div>';
+    }
+    if(song.conceptMood) _conH+='<div class="sd-concept-tag">'+song.conceptMood+'</div>';
+    if(song.conceptAnalysis) _conH+='<div class="sd-concept-desc">'+song.conceptAnalysis+'</div>';
+    if(song.conceptFanReactions&&song.conceptFanReactions.length>0){
+      _conH+='<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:7px">Fan Reactions</div>';
+      song.conceptFanReactions.slice(0,3).forEach(function(r){_conH+='<div class="sd-fan-q">'+r+'</div>';});
+    }
+    _conH+='</div>';
+  }
+  if(song.aiLyrics){
+    _conH+='<div class="sd-sec" style="padding-top:0"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="sd-sh" style="margin:0">Lyrics</div><button onclick="showFullLyrics('+songId+')" style="font-size:12px;color:var(--acc);background:none;border:1px solid var(--acc);border-radius:20px;cursor:pointer;font-weight:700;font-family:var(--fb);padding:3px 10px">View Full</button></div>'
+      +'<div class="sd-lyrics">'+(song.aiLyrics||'').slice(0,200).replace(/</g,'&lt;')+(song.aiLyrics.length>200?'...':'')+'</div></div>';
+  }
+
+  // Action buttons
+  var _aH='<div class="sd-sec" style="padding-top:0">';
+  if(isInProg){
+    var _aPp=Math.round((typeof getSongProgressPct==='function'?getSongProgressPct(song):0)*100);
+    var _aPl=typeof getSongProgressLabel==='function'?getSongProgressLabel(song):'In Progress';
+    _aH+='<div style="background:var(--acc-bg);border:1px solid var(--acc);border-radius:10px;padding:12px;text-align:center;margin-bottom:8px"><div style="font-size:13px;font-weight:700;color:var(--acc)">'+_aPl+'</div><div style="margin-top:8px;height:6px;background:var(--bord);border-radius:3px;overflow:hidden"><div style="width:'+_aPp+'%;height:100%;background:var(--acc);border-radius:3px"></div></div></div>';
+    if(song.inProgressType==='writing'||(song.status==='writing'&&song.collab_request_id)){
+      _aH+='<button class="sd-sab sd-sab-o" onclick="generateAILyrics('+songId+')">✨ Generate Lyrics</button>';
+    }
+    if(song.status==='writing'&&song.collab_request_id){
+      _aH+='<button class="sd-sab sd-sab-s" onclick="editSongTopic('+songId+')">'+(song.topic?'🎯 Change Topic ('+song.topic+')':'🎯 Set Song Topic')+'</button>';
+    }
+  } else if(!isRecorded&&!isReleased){
+    if(!song.released) _aH+='<button class="sd-sab sd-sab-o" onclick="generateAILyrics('+songId+')">✨ Generate Lyrics</button>';
+    _aH+='<button class="sd-sab sd-sab-p" onclick="(typeof startRecording===\'function\'?startRecording('+songId+'):null);var s=document.querySelector(\'[data-sdid=\\\''+songId+'\\\']\');if(s)s.remove();">🎙 Record This Song</button>';
+    _aH+='<button class="sd-sab sd-sab-s" onclick="editSongName('+songId+')">✏ Edit Name</button>';
+    _aH+='<button class="sd-sab sd-sab-d" onclick="deleteSong('+songId+')">🗑 Delete Song</button>';
+  } else if(isRecorded&&!isReleased){
+    if(song.scheduledReleaseDay){
+      var _aSi=dayInfo(song.scheduledReleaseDay);
+      var _aSr=dayToRealDate(song.scheduledReleaseDay);
+      var _aMns=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var _aSl=_aSi.dayName+', '+_aMns[_aSr.getMonth()]+' '+_aSr.getDate()+', '+_aSr.getFullYear();
+      _aH+='<div style="background:var(--acc-bg);border:1.5px solid var(--acc);border-radius:12px;padding:14px;text-align:center;margin-bottom:8px"><div style="font-size:13px;font-weight:800;color:var(--acc);margin-bottom:4px">📅 Release Scheduled</div><div style="font-size:12px;color:var(--mut)">Dropping '+_aSl+'</div></div>';
+      _aH+='<button class="sd-sab" style="background:transparent;border:1.5px solid #ff6b6b;color:#ff6b6b" onclick="cancelScheduledRelease('+songId+')">❌ Cancel Scheduled Release</button>';
+    } else {
+      _aH+='<button class="sd-sab sd-sab-p" onclick="prepareRelease('+songId+')">🚀 Release Now</button>';
+      _aH+='<button class="sd-sab sd-sab-o" onclick="GAME._pendingReleaseSongId='+songId+';GAME.pendingReleaseSong='+songId+';GAME._releaseNow=false;closeMenu();setTimeout(function(){showConceptUpload();},120);">📅 Schedule Release</button>';
+    }
+    _aH+='<button class="sd-sab sd-sab-s" onclick="editSongName('+songId+')">✏ Edit Name</button>';
+    _aH+='<button class="sd-sab sd-sab-d" onclick="deleteSong('+songId+')">🗑 Delete Song</button>';
+  } else if(isReleased){
+    // Released — sticky promo btn handles promote; just show edit
+    _aH+='<button class="sd-sab sd-sab-s" onclick="editSongName('+songId+')">✏ Edit Name</button>';
+  }
+  _aH+='</div>';
+
+  var html='<div class="sd-ov">'
+    // Topbar
+    +'<div style="background:var(--surf);border-bottom:1px solid var(--bord);padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10">'
+    +'<button onclick="_closeOverlay(this)" style="background:var(--card);border:1px solid var(--bord);color:var(--txt);border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none">←</button>'
+    +'<div style="flex:1"><div style="font-size:15px;font-weight:800;color:var(--txt)">Song Details</div>'
+    +'<div style="font-size:10.5px;color:var(--mut)">'+(isReleased?'Released':isRecorded?'Pre-release':'Written')+'</div></div>'
+    +'</div>'
+    // Hero
+    +'<div class="sd-hero">'
+    +'<div class="sd-art" onclick="'+(isReleased?'void 0':'editSongCover('+songId+')')+'">'
+    +_coverArtInner+_artEditBadge+'</div>'
+    +'<div class="sd-title">'+song.title+(song.featuredArtist?' ft. '+song.featuredArtist:'')+'</div>'
+    +'<span class="sd-badge" style="'+_statusBadgeStyle+'">'+_statusLabel+'</span>'
+    +'<div class="sd-dur">⏱ '+durationStr
+    +(isReleased && releaseDateStr ? ' · Released '+releaseDateStr : '')
+    +(!isReleased && song.scheduledReleaseDate ? ' · <span style="color:var(--acc)">📅 Drops '+song.scheduledReleaseDate+'</span>' : '')
+    +'</div></div>'
+    // Quick stats (released)
+    +_qsH
+    // Info grid
+    +_igH
+    // Quality breakdown (recorded)
+    +_qbH
+    // Collaborators
+    +_cH
+    // Pre-release campaign (recorded)
+    +_prcH
+    // MV pre-release (recorded)
+    +_mvPH
+    // Chart positions (released)
+    +_cpH
+    // Performance grid (released)
+    +_pfH
+    // Platform breakdown (released)
+    +_platH
+    // Top regions (released)
+    +_regH
+    // MV stats (released)
+    +_mvRH
+    // Active promo (released)
+    +_proH
+    // Press coverage (released)
+    +_prsH
+    // Concept + lyrics (released)
+    +_conH
+    // Actions
+    +_aH
+    // Sticky promote button (released)
+    +(isReleased?'<div class="sd-sticky"><button class="sd-sticky-btn" onclick="showPromoManager('+songId+')">🎯 Promote This Song</button></div>':'')
+    +'</div>';
 
   var sdWrapper=_insertOverlay(html);
   sdWrapper.id='sdOverlay';
