@@ -7887,6 +7887,13 @@ async function openChart(type){
   openMenu('',html);
 }
 
+// Returns the combined chart units for a song:
+//   streams contribution + iMusic purchases (weighted 1.25× since buyers = higher intent)
+// Used for chart position sorting instead of raw streams alone.
+function getChartUnits(song){
+  return Math.floor((song.streams||0)/1000) + Math.floor((song.iMusic_sales||0)*1.25);
+}
+
 async function getAllChartsData(){
   // Get ALL player songs that are CHARTING (100K+ streams OR have chartPosition set)
   const playerSongs = GAME.songs.filter(s => {
@@ -7896,6 +7903,7 @@ async function getAllChartsData(){
     artist: S.artistName || 'You',
     title: s.title,
     streams: s.streams,
+    iMusic_sales: s.iMusic_sales || 0,
     weeklyStreams: s.weeklyStreams || s.streams,
     genre: s.genre,
     isPlayer: true,
@@ -7941,6 +7949,7 @@ async function getAllChartsData(){
                 artist: player.artist_name,
                 title: song.title,
                 streams: song.streams || 0,
+                iMusic_sales: song.iMusic_sales || 0,
                 weeklyStreams: song.weeklyStreams || song.streams || 0,
                 genre: song.genre || 'Pop',
                 isPlayer: false,
@@ -8036,8 +8045,8 @@ async function getAllChartsData(){
     }
   }
   
-  // Combine and sort by current streams (highest first)
-  const allSongs = [...playerSongs, ...competitors].sort((a, b) => b.streams - a.streams);
+  // Combine and sort by chart units (streams + weighted iMusic purchases)
+  const allSongs = [...playerSongs, ...competitors].sort((a, b) => getChartUnits(b) - getChartUnits(a));
   const totalOnChart = allSongs.length;
 
   // Load last-week global snapshot — this is the single source of truth for movement arrows.
@@ -9345,17 +9354,30 @@ function showSongDetails(songId){
       +'</div>';
     // Platform breakdown
     var platforms=song.platforms||{};
-    var platIcons={spotify:'🔁',apple:'🍊',youtube:'▶️',amazon:'🏜️',soundcloud:'💨',itunes:'🎶'};
-    var platNames={spotify:'Loopify',apple:'Orange Music',youtube:'Yourtube',amazon:'Sahara',soundcloud:'SoundPuff',itunes:'iMusic'};
-    var VALID_PLAT_ORDER=['spotify','apple','youtube','amazon','soundcloud','itunes'];
+    // Streaming platforms only (iMusic is purchases, handled separately below)
+    var platIcons={spotify:'🔁',apple:'🍊',youtube:'▶️',amazon:'🏜️',soundcloud:'💨'};
+    var platNames={spotify:'Loopify',apple:'Orange Music',youtube:'Yourtube',amazon:'Sahara',soundcloud:'SoundPuff'};
+    var VALID_PLAT_ORDER=['spotify','apple','youtube','amazon','soundcloud'];
     var platEntries=VALID_PLAT_ORDER.filter(function(k){return (platforms[k]||0)>0;}).map(function(k){return [k,platforms[k]||0];}).sort(function(a,b){return b[1]-a[1];});
-    if(platEntries.length>0){
-            // Lyrics shown separately in lyricsCardHTML below — not duplicated here
-                  statsHTML+='<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">By Platform</div>'
+    var iMusicSales=song.iMusic_sales||0;
+    var iMusicRev=song.iMusic_revenue||0;
+    if(platEntries.length>0 || iMusicSales>0){
+      // Lyrics shown separately in lyricsCardHTML below — not duplicated here
+      statsHTML+='<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">By Platform</div>'
         +platEntries.map(function(e){
           var pct=totalStreams>0?Math.round(e[1]/totalStreams*100):0;
           return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:13px">'+(platIcons[e[0]]||'🎵')+'</span><span style="font-size:12px;color:var(--mut);flex:1">'+(platNames[e[0]]||e[0])+'</span><span style="font-size:12px;font-weight:700;color:var(--txt)">'+e[1].toLocaleString()+'</span><span style="font-size:11px;color:var(--mut)">'+pct+'%</span></div>';
-        }).join('')+'</div>';
+        }).join('');
+      // iMusic: purchases row (separate from streaming)
+      if(iMusicSales>0){
+        statsHTML+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;padding:8px;background:rgba(232,180,76,.07);border-radius:8px;margin-top:6px">'
+          +'<span style="font-size:13px">🎶</span>'
+          +'<span style="font-size:12px;color:var(--mut);flex:1">iMusic <span style="background:rgba(232,180,76,.15);color:var(--acc);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;letter-spacing:.5px">Purchases</span></span>'
+          +'<span style="font-size:12px;font-weight:700;color:var(--acc)">'+iMusicSales.toLocaleString()+' downloads</span>'
+          +(iMusicRev>0?'<span style="font-size:11px;color:var(--mut)">$'+iMusicRev.toFixed(2)+'</span>':'')
+          +'</div>';
+      }
+      statsHTML+='</div>';
     }
     // Regional breakdown
     var fansByRegion=GAME.fansByRegion||{};
@@ -30213,6 +30235,14 @@ function showReleaseReview(){
         </div>`
     }
 
+    <div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:10px">🎶 iMusic Price</div>
+      <div style="display:flex;gap:8px">
+        ${['0.99','1.29','1.49'].map(p=>`<button id="imusic-price-${p.replace('.','_')}" onclick="(function(){var s=GAME.songs&&GAME.songs.find(function(x){return x.id===(GAME.pendingReleaseSongs&&GAME.pendingReleaseSongs[0]||GAME.pendingReleaseSong);});if(s)s.iMusicPrice=parseFloat('${p}');['0.99','1.29','1.49'].forEach(function(v){var b=document.getElementById('imusic-price-'+v.replace('.','_'));if(b){b.style.background=v==='${p}'?'var(--acc)':'var(--surf)';b.style.color=v==='${p}'?'var(--acc-txt)':'var(--txt)';b.style.borderColor=v==='${p}'?'var(--acc)':'var(--bord)';}});})();" style="flex:1;padding:10px 6px;border:1.5px solid ${(mainSong.iMusicPrice||0.99).toFixed(2)===p?'var(--acc)':'var(--bord)'};border-radius:8px;background:${(mainSong.iMusicPrice||0.99).toFixed(2)===p?'var(--acc)':'var(--surf)'};color:${(mainSong.iMusicPrice||0.99).toFixed(2)===p?'var(--acc-txt)':'var(--txt)'};font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation">$${p}</button>`).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--mut);margin-top:8px">Per download on iMusic. Streaming revenue on other platforms is unaffected.</div>
+    </div>
+
     <button class="ms-btn" onclick="GAME._releaseNow=true;proceedToPromotions()" style="margin-bottom:10px">🚀 Release Now →</button>
     <button onclick="GAME._releaseNow=false;showConceptUpload()" style="width:100%;padding:14px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;font-size:15px;font-weight:700;color:var(--txt);cursor:pointer;touch-action:manipulation">📅 Schedule Release</button>
   </div>`;
@@ -38605,28 +38635,41 @@ function _processDailyStreams(){
     const dailyNew = calculateDailySongStreams(song);
     if(dailyNew <= 0) return;
 
-    song.streams = (song.streams||0) + dailyNew;
-    song.weeklyStreams = (song.weeklyStreams||0) + dailyNew;
-    totalNewStreams += dailyNew;
-
-    // Distribute to regions
-    if(typeof distributeStreamsToRegions === 'function'){
-      distributeStreamsToRegions(song, dailyNew);
-    }
-
-    // Distribute streams to platforms with correct splits + slight per-song randomization
+    // Calculate platform split first so iMusic can be separated before updating stream counts
     if(!song.platforms) song.platforms = {spotify:0,apple:0,youtube:0,amazon:0,soundcloud:0,itunes:0};
     var _rv2=function(base,spread){return Math.max(0.01,base+(Math.random()-0.5)*spread);};
     var _sp2=_rv2(0.42,0.04),_ap2=_rv2(0.25,0.03),_yt2=_rv2(0.15,0.03),_am2=_rv2(0.06,0.02),_sc2=_rv2(0.05,0.02),_it2=_rv2(0.07,0.02);
     var _tot2=_sp2+_ap2+_yt2+_am2+_sc2+_it2;
-    song.platforms.spotify = (song.platforms.spotify||0) + Math.floor(dailyNew*_sp2/_tot2);
-    song.platforms.apple   = (song.platforms.apple||0)   + Math.floor(dailyNew*_ap2/_tot2);
-    song.platforms.youtube = (song.platforms.youtube||0) + Math.floor(dailyNew*_yt2/_tot2);
-    song.platforms.amazon  = (song.platforms.amazon||0)  + Math.floor(dailyNew*_am2/_tot2);
-    song.platforms.soundcloud=(song.platforms.soundcloud||0)+Math.floor(dailyNew*_sc2/_tot2);
-    song.platforms.itunes  = (song.platforms.itunes||0)  + Math.floor(dailyNew*_it2/_tot2);
-    // Revenue: weighted by platform rates (spotify $0.003, apple $0.007, youtube $0.001, others $0.004)
-    const rev = Math.floor(dailyNew*_sp2/_tot2)*0.003 + Math.floor(dailyNew*_ap2/_tot2)*0.007 + Math.floor(dailyNew*_yt2/_tot2)*0.001 + Math.floor(dailyNew*(_am2+_sc2+_it2)/_tot2)*0.004;
+
+    // iMusic is a PURCHASE platform — separate its share from streaming counts
+    var _itPurchases=Math.floor(dailyNew*_it2/_tot2);
+    var _streamingNew=dailyNew-_itPurchases;
+
+    song.streams = (song.streams||0) + _streamingNew;
+    song.weeklyStreams = (song.weeklyStreams||0) + _streamingNew;
+    totalNewStreams += _streamingNew;
+
+    // Distribute to regions using total activity (iMusic purchases also drive regional fans)
+    if(typeof distributeStreamsToRegions === 'function'){
+      distributeStreamsToRegions(song, dailyNew);
+    }
+
+    // Streaming platform counts (Loopify, Orange, Yourtube, Sahara, SoundPuff)
+    song.platforms.spotify    = (song.platforms.spotify||0)     + Math.floor(dailyNew*_sp2/_tot2);
+    song.platforms.apple      = (song.platforms.apple||0)       + Math.floor(dailyNew*_ap2/_tot2);
+    song.platforms.youtube    = (song.platforms.youtube||0)     + Math.floor(dailyNew*_yt2/_tot2);
+    song.platforms.amazon     = (song.platforms.amazon||0)      + Math.floor(dailyNew*_am2/_tot2);
+    song.platforms.soundcloud = (song.platforms.soundcloud||0)  + Math.floor(dailyNew*_sc2/_tot2);
+    // iMusic: track purchase units separately (legacy platforms.itunes untouched for backward compat)
+    song.iMusic_sales   = (song.iMusic_sales||0)   + _itPurchases;
+    var _iMusicPrice    = song.iMusicPrice || 0.99;
+    var _iMusicRev      = _itPurchases * _iMusicPrice;
+    song.iMusic_revenue = (song.iMusic_revenue||0) + _iMusicRev;
+    // Purchases increase fan loyalty
+    if(_itPurchases > 0) GAME.fanLoyalty = Math.min(100, (GAME.fanLoyalty||0) + Math.ceil(_itPurchases*0.01));
+
+    // Revenue: streaming platforms + iMusic purchase revenue
+    const rev = Math.floor(dailyNew*_sp2/_tot2)*0.003 + Math.floor(dailyNew*_ap2/_tot2)*0.007 + Math.floor(dailyNew*_yt2/_tot2)*0.001 + Math.floor(dailyNew*(_am2+_sc2)/_tot2)*0.004 + _iMusicRev;
     totalRev += rev;
 
     // Fan gain from streams — 1% of daily streams convert to new fans
