@@ -164,6 +164,11 @@ input[type=range].age-range{-webkit-appearance:none;width:100%;height:4px;backgr
 .ms-stat-value{font-size:22px;font-weight:800;margin-bottom:2px;font-family:var(--fb);color:var(--txt)}
 .ms-stat-label{font-size:11px;color:var(--mut);text-transform:uppercase;font-family:var(--fb)}
 .ms-btn{background:var(--acc);border:none;color:var(--acc-txt);font-size:14px;font-weight:700;padding:14px;border-radius:12px;cursor:pointer;text-transform:uppercase;width:100%;margin-bottom:10px;font-family:var(--fb);transition:transform 0.15s ease,box-shadow 0.15s ease;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+.collab-vibe-pill{margin-top:6px;padding:6px 10px;border-radius:8px;display:flex;align-items:center;gap:7px;font-size:12px;border:1px solid;line-height:1.4}
+.collab-vibe-fire{background:rgba(22,163,74,.09);border-color:rgba(22,163,74,.22);color:#14532d}
+.collab-vibe-spark{background:rgba(37,99,235,.07);border-color:rgba(37,99,235,.2);color:#1e3a8a}
+.collab-vibe-think{background:rgba(245,158,11,.09);border-color:rgba(245,158,11,.25);color:#78350f}
+.collab-vibe-bolt{background:rgba(220,38,38,.07);border-color:rgba(220,38,38,.2);color:#7f1d1d}
 .ms-btn:active{transform:scale(0.97);box-shadow:0 1px 4px rgba(0,0,0,0.15)}
 .ms-btn:active{transform:scale(0.98)}
 .filter-pill{background:var(--surf);border:2px solid var(--bord);color:var(--txt);padding:8px 16px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:var(--fb);transition:all 0.2s}.filter-pill.active{background:var(--acc);border-color:var(--acc);color:var(--acc-txt)}.filter-pill:hover{transform:translateY(-2px)}
@@ -4864,6 +4869,61 @@ const SKILL_DECAY_GRACE   = 14; // game days idle before decay begins
 const SKILL_DECAY_SLOW    = 14; // game days between each -1pt for slow-decay skills
 const SKILL_DECAY_MODERATE = 7; // game days between each -1pt for moderate-decay skills
 
+// ── GENRE COMPATIBILITY MATRIX ───────────────────────────────────────
+// Used for collab vibe calculations — never shown as a number to players.
+// Negotiation skill does NOT apply to player collabs (staff/labels only).
+const GENRE_COMPAT_MATRIX = {
+  'Afrobeats':   { 'R&B':92, 'Hip-hop':85, 'Pop':78, 'K-pop':72, 'Electronic':65, 'Alternative':55 },
+  'R&B':         { 'Afrobeats':92, 'Hip-hop':90, 'Pop':82, 'K-pop':70, 'Electronic':60, 'Alternative':65 },
+  'Hip-hop':     { 'R&B':90, 'Afrobeats':85, 'Pop':72, 'K-pop':65, 'Electronic':68, 'Alternative':70 },
+  'K-pop':       { 'Pop':88, 'R&B':70, 'Afrobeats':72, 'Hip-hop':65, 'Electronic':75, 'Alternative':55 },
+  'Pop':         { 'K-pop':88, 'R&B':82, 'Electronic':75, 'Hip-hop':72, 'Afrobeats':78, 'Alternative':65 },
+  'Electronic':  { 'Pop':75, 'K-pop':75, 'Hip-hop':68, 'R&B':60, 'Afrobeats':65, 'Alternative':62 },
+  'Alternative': { 'Hip-hop':70, 'R&B':65, 'Pop':65, 'Electronic':62, 'Afrobeats':55, 'K-pop':55 },
+};
+
+function getGenreCompat(genreA, genreB) {
+  if (!genreA || !genreB) return 60;
+  if (genreA === genreB) return 100;
+  return (GENRE_COMPAT_MATRIX[genreA] && GENRE_COMPAT_MATRIX[genreA][genreB])
+    ? GENRE_COMPAT_MATRIX[genreA][genreB] : 60;
+}
+
+// Returns vibe object — never shows the number to players
+function getCollabVibe(myGenre, theirGenre, relationshipScore) {
+  const compat = getGenreCompat(myGenre, theirGenre);
+  const rel = relationshipScore || 0;
+  const combined = (compat * 0.6) + (Math.max(0, Math.min(100, rel + 50)) * 0.4);
+  if (combined >= 78) return { label: 'Great energy',    emoji: '🔥', desc: 'styles click naturally',                    cls: 'vibe-fire'  };
+  if (combined >= 62) return { label: 'Could work',      emoji: '✨', desc: 'interesting combination, worth exploring',  cls: 'vibe-spark' };
+  if (combined >= 46) return { label: 'Interesting mix', emoji: '🤔', desc: 'different worlds, some risk involved',      cls: 'vibe-think' };
+  return                     { label: 'Wild card',       emoji: '⚡', desc: 'very different sounds, could surprise everyone', cls: 'vibe-bolt' };
+}
+
+// ── COLLAB SESSION QUALITY + OUTCOME ────────────────────────────────
+function calcCollabQuality(leadArtist, featArtist, song, sessionResult) {
+  const leadAvg  = ((leadArtist.skills.writing||0)+(leadArtist.skills.singing||0)+(leadArtist.skills.production||0))/3;
+  const featAvg  = ((featArtist.skills.writing||0)+(featArtist.skills.singing||0)+(featArtist.skills.production||0))/3;
+  const skillBase = Math.round((leadAvg * 0.6) + (featAvg * 0.4));
+  const tagBonus  = (song.category ? 3 : 0) + (song.topic ? 3 : 0) + (song.subgenre ? 4 : 0);
+  const studioBoost = song.studioBoost || 0;
+  const SESSION_MODIFIERS = { great:12, lightning:20, surprise:8, good:0, disagreement:-5, mediocre:-8 };
+  const modifier = SESSION_MODIFIERS[sessionResult] != null ? SESSION_MODIFIERS[sessionResult] : 0;
+  return Math.min(100, Math.max(5, skillBase + tagBonus + studioBoost + modifier));
+}
+
+function rollCollabSession(myGenre, theirGenre, relationshipScore, myWellbeing, theirWellbeing) {
+  const compat    = getGenreCompat(myGenre, theirGenre) / 100;
+  const rel       = Math.max(0, Math.min(100, (relationshipScore||0) + 50)) / 100;
+  const avgWell   = ((myWellbeing||50) + (theirWellbeing||50)) / 2 / 100;
+  const chemistry = (rel * 0.4) + (compat * 0.4) + (avgWell * 0.2);
+  const roll = Math.random(); // only randomness — picks outcome within chemistry tier
+  if (chemistry > 0.75) { return roll < 0.85 ? 'great' : 'leak'; }
+  else if (chemistry > 0.50) { if(roll<0.70) return 'good'; if(roll<0.90) return 'disagreement'; return 'cancelled'; }
+  else if (chemistry > 0.25) { if(roll<0.40) return 'surprise'; if(roll<0.75) return 'mediocre'; return 'breakdown'; }
+  else { if(roll<0.15) return 'lightning'; if(roll<0.60) return 'mediocre'; return 'publicBreakdown'; }
+}
+
 function _redistributeFansToRegions(){
   // One-time: if all fans are in North America but we have streams,
   // redistribute some to other regions (10% spread)
@@ -6417,14 +6477,25 @@ function renderSongs(){
     release.songs.forEach((song,idx)=>{
       if(!song)return;
       const isLast=idx===release.songs.length-1;
-      const featBadge=song.collaborators&&song.collaborators.length>0?`<span style="font-size:11px;background:var(--acc-bg);color:var(--acc);padding:2px 6px;border-radius:4px;margin-left:6px">ft. ${song.collaborators.map(c=>c.name).join(', ')}</span>`:'';
+      const _gs=GAME.songs&&GAME.songs.find(gs=>gs.id===song.id)||song;
+      const _isRcvr=_gs.isCollabReceiver;
+      const _collabNames=((_gs.collaborators||song.collaborators)||[]).map(c=>c.name).join(', ');
+      const _payInfo=filter==='collabs'&&(_gs.payment_summary||_gs.paymentType)?` · ${_gs.payment_summary||_gs.paymentType}`:'';
+      const featBadge=_collabNames?(
+        filter==='collabs'&&_isRcvr
+          ?`<span style="font-size:11px;background:var(--acc-bg);color:var(--acc);padding:2px 6px;border-radius:4px;margin-left:6px">feat. you</span>`
+          :`<span style="font-size:11px;background:var(--acc-bg);color:var(--acc);padding:2px 6px;border-radius:4px;margin-left:6px">ft. ${_collabNames}</span>`
+      ):'';
+      const _titleLine=filter==='collabs'&&_isRcvr&&_collabNames
+        ?`<span style="font-size:11px;color:var(--mut)">by ${_collabNames}</span> ${song.title}${featBadge}`
+        :`${song.title}${featBadge}`;
       const streams=song.streams||0;
       const padding=isSingle?'0 0':'0 0';
-      
+
       html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px ${padding};${!isSingle&&!isLast?'border-bottom:0.5px solid var(--bord)':''};cursor:pointer" onclick="songOptions(${song.id})">
         <div style="flex:1">
-          <div style="font-size:14px;font-weight:500;color:var(--txt)">${song.title}${featBadge}</div>
-          <div style="font-size:12px;color:var(--mut)">${song.subgenre||song.genre} · ${song.lengthTotal?Math.floor(song.lengthTotal/60)+':'+String(song.lengthTotal%60).padStart(2,'0'):'3:00'} · Quality ${song.quality}/100</div>
+          <div style="font-size:14px;font-weight:500;color:var(--txt)">${_titleLine}</div>
+          <div style="font-size:12px;color:var(--mut)">${song.subgenre||song.genre} · ${song.lengthTotal?Math.floor(song.lengthTotal/60)+':'+String(song.lengthTotal%60).padStart(2,'0'):'3:00'} · Quality ${song.quality}/100${_payInfo}</div>
         </div>
         <div style="text-align:right;font-size:13px;color:var(--mut)">${streams.toLocaleString()}</div>
       </div>`;
@@ -6446,8 +6517,14 @@ function renderSongs(){
     
     visibleInProgress.forEach((song,idx)=>{
       const isLast=idx===visibleInProgress.length-1;
-      const featBadge=song.collaborators&&song.collaborators.length>0?`<span style="font-size:11px;background:var(--acc-bg);color:var(--acc);padding:2px 6px;border-radius:4px;margin-left:6px">ft. ${song.collaborators.map(c=>c.name).join(', ')}</span>`:'';
-      
+      const _ipCollabNames=(song.collaborators||[]).map(c=>c.name).join(', ');
+      const _ipPayInfo=filter==='collabs'&&(song.payment_summary||song.paymentType)?` · ${song.payment_summary||song.paymentType}`:'';
+      const featBadge=_ipCollabNames?(
+        filter==='collabs'&&song.isCollabReceiver
+          ?`<span style="font-size:11px;background:var(--acc-bg);color:var(--acc);padding:2px 6px;border-radius:4px;margin-left:6px">feat. you</span>`
+          :`<span style="font-size:11px;background:var(--acc-bg);color:var(--acc);padding:2px 6px;border-radius:4px;margin-left:6px">ft. ${_ipCollabNames}</span>`
+      ):'';
+
       // Calculate progress based on elapsed time with slowdown
       const now=Date.now();
       const startTime=song.collab_start_time;
@@ -6469,8 +6546,8 @@ function renderSongs(){
       
       html+=`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;${isLast?'':'border-bottom:0.5px solid var(--bord)'};cursor:pointer" onclick="songOptions(${song.id})" data-collab-song-id="${song.id}">
         <div style="flex:1">
-          <div style="font-size:14px;font-weight:500;color:var(--txt);margin-bottom:4px">${song.title}${featBadge}</div>
-          <div style="font-size:12px;color:var(--mut);margin-bottom:6px">${song.subgenre||song.genre} · ${song.collab_type||'Collab'}</div>
+          <div style="font-size:14px;font-weight:500;color:var(--txt);margin-bottom:4px">${filter==='collabs'&&song.isCollabReceiver&&_ipCollabNames?`<span style="font-size:11px;color:var(--mut)">by ${_ipCollabNames}</span> ${song.title}${featBadge}`:song.title+featBadge}</div>
+          <div style="font-size:12px;color:var(--mut);margin-bottom:6px">${song.subgenre||song.genre} · ${song.collab_type||'Collab'}${_ipPayInfo}</div>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
             <span style="font-size:10px;background:var(--bord);color:var(--mut);padding:2px 6px;border-radius:4px">${durationMin} min</span>
             <span style="font-size:10px;color:var(--mut)" data-progress-label>${progress}% • ${minLeft}m left</span>
@@ -6495,7 +6572,13 @@ function renderSongs(){
     
     visibleDrafts.forEach((song,idx)=>{
       const isLast=idx===visibleDrafts.length-1;
-      const featBadge=song.collaborators&&song.collaborators.length>0?`<span style="font-size:11px;background:var(--acc-bg);color:var(--acc);padding:2px 6px;border-radius:4px;margin-left:6px">ft. ${song.collaborators.map(c=>c.name).join(', ')}</span>`:'';
+      const _drCollabNames=(song.collaborators||[]).map(c=>c.name).join(', ');
+      const _drPayInfo=filter==='collabs'&&(song.payment_summary||song.paymentType)?` · ${song.payment_summary||song.paymentType}`:'';
+      const featBadge=_drCollabNames?(
+        filter==='collabs'&&song.isCollabReceiver
+          ?`<span style="font-size:11px;background:var(--acc-bg);color:var(--acc);padding:2px 6px;border-radius:4px;margin-left:6px">feat. you</span>`
+          :`<span style="font-size:11px;background:var(--acc-bg);color:var(--acc);padding:2px 6px;border-radius:4px;margin-left:6px">ft. ${_drCollabNames}</span>`
+      ):'';
       const isSongWriting = song.inProgress===true && (song.inProgressType==='writing' || song.inProgressType==='recording') && !song.released;
       const status = isSongWriting ? 'In Progress' : song.recorded ? 'Recorded' : 'Written';
       const progPct = isSongWriting && song.progressStartTime && song.progressDuration
@@ -6507,8 +6590,8 @@ function renderSongs(){
 
       html+=`<div style="display:flex;justify-content:space-between;align-items:${isSongWriting?'flex-start':'center'};padding:10px 0;${isLast?'':'border-bottom:0.5px solid var(--bord)'};cursor:pointer;opacity:${isSongWriting?'1':'0.7'}" onclick="songOptions(${song.id})">
         <div style="flex:1">
-          <div style="font-size:14px;font-weight:500;color:var(--txt)">${song.title}${featBadge}</div>
-          <div style="font-size:12px;color:var(--mut);margin-bottom:${isSongWriting?'5px':'0'}">${song.subgenre||song.genre} · ${isSongWriting?`<span style='color:var(--acc);font-weight:700'>${song.inProgressType==='recording'?'🎙️ Recording...':'✍️ Writing...'}</span>`:status}</div>
+          <div style="font-size:14px;font-weight:500;color:var(--txt)">${filter==='collabs'&&song.isCollabReceiver&&_drCollabNames?`<span style="font-size:11px;color:var(--mut)">by ${_drCollabNames}</span> ${song.title}${featBadge}`:song.title+featBadge}</div>
+          <div style="font-size:12px;color:var(--mut);margin-bottom:${isSongWriting?'5px':'0'}">${song.subgenre||song.genre} · ${isSongWriting?`<span style='color:var(--acc);font-weight:700'>${song.inProgressType==='recording'?'🎙️ Recording...':'✍️ Writing...'}</span>`:status}${_drPayInfo}</div>
           ${isSongWriting?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
             <div style="flex:1;height:4px;background:var(--bord);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--acc);width:${progPct}%"></div></div>
             <span style="font-size:10px;color:var(--mut);flex-shrink:0">${timeLeftLabel}</span>
@@ -20008,8 +20091,8 @@ function showCollabTypeSelect(){
 }
 function selectCollabType(typeId){
   _collab={type:typeId,subTypes:[]};
-  
-  selectCollabSong(typeId);
+  // New flow: Type → Artist → Propose (song+payment+note combined)
+  selectCollabArtistStep();
 }
 function toggleFullCollabSub(subId){
   var idx=_collab.subTypes.indexOf(subId);
@@ -20020,7 +20103,7 @@ function toggleFullCollabSub(subId){
   var btn=document.getElementById('fullCollabNext');
   if(btn){btn.disabled=_collab.subTypes.length<2;btn.style.background=_collab.subTypes.length>=2?'var(--acc)':'var(--bord)';btn.style.color=_collab.subTypes.length>=2?'var(--acc-txt)':'var(--mut)';btn.textContent='Select '+_collab.subTypes.length+' sub-type'+((_collab.subTypes.length!==1)?'s':'');}
 }
-function proceedFullCollab(){if(_collab.subTypes.length>=2) selectCollabSong('full');}
+function proceedFullCollab(){if(_collab.subTypes.length>=2) selectCollabArtistStep();}
 function selectCollabSong(typeId){
   var canCreateNew = typeId!=='remix' && typeId!=='feature';
   var html='<div style="padding:16px 16px 80px"><div style="font-size:13px;color:var(--mut);margin-bottom:16px">'+(canCreateNew?'Choose a song or start fresh.':'Choose an existing song to collaborate on.')+'</div>';
@@ -20146,11 +20229,19 @@ function selectCollabArtistStep(){
         var genre=p.genre||sd.genre||'';
         var fans=Object.values(sd.fansByRegion||{}).reduce(function(a,b){return a+b;},0);
         var safeName=name.replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-        html2+='<div class="collab-artist-card" data-artist-name="'+name.toLowerCase()+'" style="display:flex;align-items:center;gap:12px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;padding:12px 14px;cursor:pointer;touch-action:manipulation;margin-bottom:8px" onclick="_collab.artistId=\''+p.user_id+'\';_collab.artistName=\''+safeName+'\';showCollabDealTerms()">'
+        var myGenre=(GAME.characterData&&GAME.characterData.genre)||GAME.genre||'';
+        var relScore=(GAME.relationships&&GAME.relationships[p.user_id])||0;
+        var vibe=getCollabVibe(myGenre,genre,relScore);
+        var safeGenre=genre.replace(/'/g,"\\'");
+        var artistDataStr=encodeURIComponent(JSON.stringify({id:p.user_id,name:name,genre:genre,fans:fans,label:(sd.signedLabel||sd.ownedLabel||'')}));
+        html2+='<div class="collab-artist-card" data-artist-name="'+name.toLowerCase()+'" style="background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;padding:12px 14px;cursor:pointer;touch-action:manipulation;margin-bottom:8px" onclick="_collab.artistId=\''+p.user_id+'\';_collab.artistName=\''+safeName+'\';_collab.artistGenre=\''+safeGenre+'\';closeMenu();setTimeout(function(){openCollabProposeScreen(JSON.parse(decodeURIComponent(\''+artistDataStr+'\')))},60)">'
+          +'<div style="display:flex;align-items:center;gap:12px">'
           +'<div style="width:44px;height:44px;border-radius:50%;background:var(--acc-bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎵</div>'
           +'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:800;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+name+'</div>'
-          +'<div style="font-size:12px;color:var(--mut)">'+genre+' • '+fans.toLocaleString()+' fans</div></div>'
-          +'<div style="color:var(--mut);font-size:18px">›</div></div>';
+          +'<div style="font-size:12px;color:var(--mut)">'+genre+(genre?' • ':'')+fans.toLocaleString()+' fans</div></div>'
+          +'<div style="color:var(--mut);font-size:18px">›</div></div>'
+          +'<div class="collab-vibe-pill collab-'+vibe.cls+'"><span>'+vibe.emoji+'</span><span><b>'+vibe.label+'</b> — '+vibe.desc+'</span></div>'
+          +'</div>';
       });
       el.innerHTML=html2;
     });
@@ -20162,11 +20253,239 @@ function selectCollabArtistStep(){
 function filterCollabArtists(query){
   const cards=document.querySelectorAll('.collab-artist-card');
   const q=query.toLowerCase();
-  cards.forEach(card=>{
+  cards.forEach(function(card){
     const artistName=card.dataset.artistName||'';
-    card.style.display=artistName.includes(q)?'flex':'none';
+    card.style.display=artistName.includes(q)?'block':'none';
   });
 }
+// ── COMBINED PROPOSE SCREEN (Task 5) ────────────────────────────────
+// Called after artist selected from artist search.
+// Shows: WITH (locked), TYPE row, SONG picker, PAYMENT toggle, NOTE, SEND button.
+function openCollabProposeScreen(artist){
+  // artist = { id, name, genre, fans, label }
+  var myGenre=(GAME.characterData&&GAME.characterData.genre)||GAME.genre||'';
+  var relScore=(GAME.relationships&&GAME.relationships[artist.id])||0;
+  var vibe=getCollabVibe(myGenre,artist.genre||'',relScore);
+  var typeLabels=[
+    {id:'feature',icon:'🎤',name:'Feature'},
+    {id:'cowrite',icon:'✍️',name:'Co-write'},
+    {id:'producer',icon:'🎛️',name:'Producer'},
+    {id:'full',icon:'⭐',name:'Full'},
+  ];
+  // Use previously selected type from showCollabTypeSelect if available, else feature
+  var selType=_collab.type||'feature';
+  // Ensure new flow type names align (songwriter → cowrite in this screen)
+  if(selType==='songwriter') selType='cowrite';
+
+  var mySongs=(GAME.songs||[]).filter(function(s){return s.written||s.recorded;});
+  var songPickerRows=mySongs.map(function(s){
+    var badge=s.released?'<span style="font-size:10px;background:#2ed573;color:white;padding:1px 6px;border-radius:10px;margin-left:5px">OUT</span>':s.recorded?'<span style="font-size:10px;background:#ff9800;color:white;padding:1px 6px;border-radius:10px;margin-left:5px">REC</span>':'';
+    return '<div class="cp-song-item" data-sid="'+s.id+'" data-stitle="'+s.title.replace(/"/g,'&quot;')+'" onclick="cpSelectSong(\''+s.id+'\',\''+s.title.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background 0.15s;border:1.5px solid transparent">'
+      +'<span style="font-size:18px">🎵</span>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+s.title+badge+'</div>'
+      +'<div style="font-size:11px;color:var(--mut)">Q:'+s.quality+'/100</div></div>'
+      +'<span class="cp-check" style="font-size:16px;opacity:0">✓</span></div>';
+  }).join('');
+
+  var html='<div style="padding:16px 16px 90px">'
+    // WITH block (locked)
+    +'<div style="background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;padding:12px 14px;margin-bottom:12px">'
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:6px">WITH</div>'
+    +'<div style="font-size:15px;font-weight:800;color:var(--txt)">'+vibe.emoji+' '+artist.name+'</div>'
+    +'<div style="font-size:12px;color:var(--mut)">'+(artist.genre||'')+(artist.fans?(' • '+artist.fans.toLocaleString()+' fans'):'')+'</div>'
+    +'<div class="collab-vibe-pill collab-'+vibe.cls+'" style="margin-top:8px"><span>'+vibe.emoji+'</span><span><b>'+vibe.label+'</b> — '+vibe.desc+'</span></div>'
+    +'</div>'
+    // TYPE row
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">TYPE</div>'
+    +'<div id="cp-type-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px">'
+    +typeLabels.map(function(t){
+      var active=t.id===selType;
+      return '<button id="cp-type-'+t.id+'" onclick="cpSelectType(\''+t.id+'\')" style="padding:10px 4px;background:'+(active?'var(--acc)':'var(--surf)')+';color:'+(active?'var(--acc-txt)':'var(--txt)')+';border:'+(active?'none':'1.5px solid var(--bord)')+';border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;touch-action:manipulation;font-family:var(--fb)">'+t.icon+'<br>'+t.name+'</button>';
+    }).join('')
+    +'</div>'
+    // SONG picker
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">SONG</div>'
+    +'<div id="cp-song-head" onclick="cpToggleSongPicker()" style="display:flex;align-items:center;justify-content:space-between;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;padding:12px 14px;cursor:pointer;margin-bottom:4px">'
+    +'<div id="cp-song-label" style="font-size:14px;font-weight:700;color:var(--mut)">Choose a song</div>'
+    +'<div id="cp-song-chevron" style="font-size:16px;color:var(--mut);transition:transform 0.2s">▼</div></div>'
+    +'<div id="cp-song-list" style="display:none;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;overflow:hidden;margin-bottom:12px">'
+    +'<div onclick="cpSelectSong(\'new\',\'✨ Start New Track\')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--acc-bg);cursor:pointer;border-bottom:1px solid var(--bord)">'
+    +'<span>✨</span><div style="font-size:13px;font-weight:800;color:var(--acc)">Start New Track</div></div>'
+    +songPickerRows
+    +'</div>'
+    // PAYMENT toggle
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">PAYMENT</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">'
+    +'<button id="cp-pt-flat" onclick="cpSelectPayType(\'flat\')" style="padding:9px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--fb)">💵 Flat Fee</button>'
+    +'<button id="cp-pt-royalty" onclick="cpSelectPayType(\'royalty\')" style="padding:9px;background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--fb)">📊 Royalty %</button>'
+    +'<button id="cp-pt-mix" onclick="cpSelectPayType(\'mix\')" style="padding:9px;background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--fb)">🤝 Mix</button>'
+    +'</div>'
+    // Flat block
+    +'<div id="cp-pay-flat" style="margin-bottom:10px">'
+    +'<input type="number" id="cp-flat-amt" value="5000" min="0" step="500" placeholder="$ amount" style="width:100%;padding:12px;background:var(--surf);border:2px solid var(--bord);border-radius:8px;font-size:15px;font-weight:700;color:var(--txt);font-family:var(--fb);box-sizing:border-box">'
+    +'</div>'
+    // Royalty slider block (hidden by default)
+    +'<div id="cp-pay-royalty" style="display:none;margin-bottom:10px">'
+    +'<div style="font-size:12px;color:var(--mut);margin-bottom:6px">Their royalty share (your streams)</div>'
+    +'<div style="display:flex;align-items:center;gap:10px">'
+    +'<div id="cp-sv-fa" style="font-size:14px;font-weight:800;color:var(--acc);min-width:36px">65%</div>'
+    +'<input type="range" id="cp-royalty-slider" min="20" max="80" value="35" oninput="cpUpdateSplit(this.value)" style="flex:1">'
+    +'<div id="cp-sv-fb" style="font-size:14px;font-weight:800;color:var(--mut);min-width:36px;text-align:right">35%</div>'
+    +'</div>'
+    +'<div id="cp-sv-h" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center">You: 65% · Them: 35%</div>'
+    +'</div>'
+    // Mix block (hidden by default)
+    +'<div id="cp-pay-mix" style="display:none;margin-bottom:10px">'
+    +'<input type="number" id="cp-mix-amt" value="2000" min="0" step="250" placeholder="$ flat portion" style="width:100%;padding:10px;background:var(--surf);border:2px solid var(--bord);border-radius:8px;font-size:14px;font-weight:700;color:var(--txt);font-family:var(--fb);box-sizing:border-box;margin-bottom:8px">'
+    +'<div style="font-size:12px;color:var(--mut);margin-bottom:6px">Their royalty share (your streams)</div>'
+    +'<div style="display:flex;align-items:center;gap:10px">'
+    +'<div id="cp-sv-fa2" style="font-size:14px;font-weight:800;color:var(--acc);min-width:36px">65%</div>'
+    +'<input type="range" id="cp-royalty-slider2" min="20" max="80" value="35" oninput="cpUpdateSplit2(this.value)" style="flex:1">'
+    +'<div id="cp-sv-fb2" style="font-size:14px;font-weight:800;color:var(--mut);min-width:36px;text-align:right">35%</div>'
+    +'</div>'
+    +'<div id="cp-sv-h2" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center">You: 65% · Them: 35%</div>'
+    +'</div>'
+    // NOTE
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px;margin-top:4px">NOTE <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px">(optional)</span></div>'
+    +'<div style="position:relative;margin-bottom:14px">'
+    +'<textarea id="cp-note" maxlength="200" placeholder="Say something about this collab..." oninput="document.getElementById(\'cp-note-count\').textContent=200-this.value.length" style="width:100%;padding:10px;background:var(--surf);border:2px solid var(--bord);border-radius:8px;font-size:13px;color:var(--txt);font-family:var(--fb);resize:none;min-height:72px;box-sizing:border-box"></textarea>'
+    +'<div id="cp-note-count" style="position:absolute;bottom:8px;right:10px;font-size:11px;color:var(--mut)">200</div>'
+    +'</div>'
+    // SEND button
+    +'<button onclick="cpSendProposal(\''+artist.id+'\',\''+artist.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')" style="width:100%;padding:14px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">📤 Send Proposal</button>'
+    +'</div>';
+
+  window._cp={type:selType,songId:null,songTitle:null,payType:'flat',royaltyPct:35,flatAmt:5000,mixFlat:2000,mixRoyalty:35,artistId:artist.id,artistName:artist.name,vibeLabel:vibe.label};
+  openMenu('🤝 Propose Collab',html);
+}
+function cpSelectType(t){
+  window._cp.type=t;
+  ['feature','cowrite','producer','full'].forEach(function(id){
+    var btn=document.getElementById('cp-type-'+id);
+    if(!btn) return;
+    var active=id===t;
+    btn.style.background=active?'var(--acc)':'var(--surf)';
+    btn.style.color=active?'var(--acc-txt)':'var(--txt)';
+    btn.style.border=active?'none':'1.5px solid var(--bord)';
+  });
+}
+function cpToggleSongPicker(){
+  var list=document.getElementById('cp-song-list');
+  var chev=document.getElementById('cp-song-chevron');
+  if(!list) return;
+  var open=list.style.display!=='none';
+  list.style.display=open?'none':'block';
+  if(chev) chev.style.transform=open?'':'rotate(180deg)';
+}
+function cpSelectSong(id,title){
+  window._cp.songId=id;
+  window._cp.songTitle=title;
+  var lbl=document.getElementById('cp-song-label');
+  if(lbl){lbl.textContent=title;lbl.style.color='var(--txt)';}
+  // Update checkmarks
+  document.querySelectorAll('.cp-song-item .cp-check').forEach(function(el){el.style.opacity='0';});
+  var rows=document.querySelectorAll('.cp-song-item[data-sid="'+id+'"] .cp-check');
+  rows.forEach(function(el){el.style.opacity='1';});
+  // Close picker
+  var list=document.getElementById('cp-song-list');
+  var chev=document.getElementById('cp-song-chevron');
+  if(list) list.style.display='none';
+  if(chev) chev.style.transform='';
+}
+function cpSelectPayType(t){
+  window._cp.payType=t;
+  ['flat','royalty','mix'].forEach(function(id){
+    var btn=document.getElementById('cp-pt-'+id);
+    if(!btn) return;
+    var active=id===t;
+    btn.style.background=active?'var(--acc)':'var(--surf)';
+    btn.style.color=active?'var(--acc-txt)':'var(--txt)';
+    btn.style.border=active?'none':'1.5px solid var(--bord)';
+  });
+  var pf=document.getElementById('cp-pay-flat'),pr=document.getElementById('cp-pay-royalty'),pm=document.getElementById('cp-pay-mix');
+  if(pf) pf.style.display=t==='flat'?'block':'none';
+  if(pr) pr.style.display=t==='royalty'?'block':'none';
+  if(pm) pm.style.display=t==='mix'?'block':'none';
+}
+function cpUpdateSplit(v){
+  window._cp.royaltyPct=parseInt(v);
+  var mine=100-parseInt(v);
+  var fa=document.getElementById('cp-sv-fa'),fb=document.getElementById('cp-sv-fb'),h=document.getElementById('cp-sv-h');
+  if(fa) fa.textContent=mine+'%';
+  if(fb) fb.textContent=v+'%';
+  if(h) h.textContent='You: '+mine+'% · Them: '+v+'%';
+}
+function cpUpdateSplit2(v){
+  window._cp.mixRoyalty=parseInt(v);
+  var mine=100-parseInt(v);
+  var fa=document.getElementById('cp-sv-fa2'),fb=document.getElementById('cp-sv-fb2'),h=document.getElementById('cp-sv-h2');
+  if(fa) fa.textContent=mine+'%';
+  if(fb) fb.textContent=v+'%';
+  if(h) h.textContent='You: '+mine+'% · Them: '+v+'%';
+}
+async function cpSendProposal(artistId,artistName){
+  var cp=window._cp||{};
+  var songId=cp.songId||null;
+  var songTitle=cp.songTitle||'New Track';
+  var payType=cp.payType||'flat';
+  var flatAmt=0,royaltyPct=0;
+  if(payType==='flat'){
+    var fEl=document.getElementById('cp-flat-amt');
+    flatAmt=parseInt(fEl?fEl.value:0)||0;
+    royaltyPct=0;
+  } else if(payType==='royalty'){
+    flatAmt=0;
+    royaltyPct=cp.royaltyPct||35;
+  } else {
+    var mEl=document.getElementById('cp-mix-amt');
+    flatAmt=parseInt(mEl?mEl.value:0)||0;
+    royaltyPct=cp.mixRoyalty||35;
+  }
+  var note=(document.getElementById('cp-note')||{}).value||'';
+  var paymentSummary=payType==='flat'?('$'+flatAmt.toLocaleString()+' flat fee'):payType==='royalty'?(royaltyPct+'% royalty'):('$'+flatAmt.toLocaleString()+' + '+royaltyPct+'%');
+
+  if(!GAME_MODE||GAME_MODE!=='multi'||!currentUser||!supabase){showToast('Collabs require multiplayer mode','error');return;}
+  if(!songId){showToast('Please choose a song or start a new track','error');return;}
+
+  var collabType=cp.type||'feature';
+  // Map cowrite→songwriter for compatibility with existing DB/accept flow
+  var dbType=collabType==='cowrite'?'songwriter':collabType;
+
+  try{
+    const {data:me}=await supabase.from('players').select('artist_name').eq('user_id',currentUser.id).single();
+    var fromArtistName=me&&me.artist_name?me.artist_name:(GAME.sn||'Unknown Artist');
+    var request={
+      from_user_id:currentUser.id,
+      from_artist_name:fromArtistName,
+      to_user_id:artistId,
+      to_artist_name:artistName,
+      collab_type:dbType,
+      sub_types:[],
+      song_id:(songId&&songId!=='new')?parseInt(songId):null,
+      song_title:songTitle,
+      offered_fee:flatAmt,
+      royalty_pct:royaltyPct,
+      fee_type:payType,
+      payment_type:payType,
+      flat_amount:flatAmt,
+      message:note,
+      note:note,
+      list_credits:true,
+      status:'pending',
+      round:1,
+      max_rounds:2,
+      vibe_label:cp.vibeLabel||'',
+      payment_summary:paymentSummary,
+      created_at:new Date().toISOString()
+    };
+    var {error:insertErr}=await supabase.from('collab_requests').insert(request);
+    if(insertErr) throw insertErr;
+    GAME.messages.push({type:'collab_sent',from:fromArtistName,to:artistName,message:'Sent '+collabType+' proposal to '+artistName+' — '+paymentSummary,time:new Date(),subType:'collab'});
+    closeMenu();
+    showToast('Proposal sent to '+artistName+'! 📤','success');
+  }catch(e){showToast('Error sending proposal: '+(e.message||e),'error');}
+}
+
 // Collab Duration Constants (REAL MINUTES - single player is HALF of multiplayer)
 const COLLAB_DURATIONS_MS = {
   feature: { single: 5*60*1000, multi: 20*60*1000 },   // 5 min / 20 min
@@ -20506,6 +20825,53 @@ async function respondCollab(requestId,action){
       if(_collabSpeedBonusA > 0) durationMs = Math.round(durationMs * (1 - _collabSpeedBonusA));
       const startTime=Date.now();
       
+      // ── SESSION ROLL (Task 9) ─────────────────────────────────────────
+      var _myGenre=(GAME.characterData&&GAME.characterData.genre)||GAME.genre||'';
+      var _theirGenre=req.artist_genre||req.genre||'';
+      var _relScore=(GAME.relationships&&GAME.relationships[req.from_user_id])||0;
+      var _myWell=GAME.wellbeing||50;
+      var _sessionResult=rollCollabSession(_myGenre,_theirGenre,_relScore,_myWell,50);
+      // breakdown/publicBreakdown = no song
+      var _noSong=_sessionResult==='breakdown'||_sessionResult==='publicBreakdown';
+      // Apply relationship/wellbeing effects
+      if(!GAME.relationships) GAME.relationships={};
+      var _relChange={great:15,lightning:15,surprise:10,good:5,disagreement:0,mediocre:-5,breakdown:-15,publicBreakdown:-25,cancelled:0,leak:15}[_sessionResult]||0;
+      GAME.relationships[req.from_user_id]=(GAME.relationships[req.from_user_id]||0)+_relChange;
+      var _wellChange={great:3,lightning:5,surprise:2,good:0,disagreement:0,mediocre:0,breakdown:-3,publicBreakdown:-5,leak:3}[_sessionResult]||0;
+      if(_wellChange!==0) GAME.wellbeing=Math.max(0,Math.min(100,(GAME.wellbeing||50)+_wellChange));
+      // Build dummy artist objects for calcCollabQuality
+      var _meSkills={writing:GAME.skills&&GAME.skills.writing||0,singing:GAME.skills&&GAME.skills.singing||0,production:GAME.skills&&GAME.skills.production||0};
+      var _themSkills={writing:30,singing:30,production:30}; // fallback avg for other player
+      var _songForQual={category:req.song_category||null,topic:req.song_topic||null,subgenre:'Collab',studioBoost:0};
+      var _calcQuality=50;
+      if(!_noSong){
+        _calcQuality=calcCollabQuality({skills:_meSkills},{skills:_themSkills},_songForQual,_sessionResult);
+      }
+      // Leak: Room Service rumor
+      if(_sessionResult==='leak'){
+        _seedStudioTease(GAME.sn||GAME.artistName||'You',req.from_artist_name||'a collaborator',currentUser?currentUser.id:null,req.from_user_id||null);
+      }
+      // Session outcome narrative
+      var _sessionNarrative={
+        great:'The session was electric — everything clicked.',
+        lightning:'Lightning in a bottle! The best collab session imaginable.',
+        surprise:'An unexpected gem emerged from the session.',
+        good:'A solid session. The track came together well.',
+        disagreement:'Creative differences slowed things down but the track survived.',
+        mediocre:'The energy was off. The track exists, but barely.',
+        breakdown:'The session collapsed. No track was made.',
+        publicBreakdown:'Things got messy — publicly. No track was made.',
+        cancelled:'The session was cancelled.',
+        leak:'An incredible session — but someone leaked it to the press.'
+      }[_sessionResult]||'The session concluded.';
+      if(_noSong){
+        GAME.messages.push({type:'collab_outcome',from:req.from_artist_name,message:'Session outcome: '+_sessionNarrative+' ('+_sessionResult+')',time:new Date(),subType:'collab'});
+        saveToCloud();
+        showEvent('🎵','Session Outcome',_sessionNarrative+'\n\nNo track was created.',['OK']);
+        return; // early return — no track, no further processing
+      }
+      // ── END SESSION ROLL ─────────────────────────────────────────────
+
       const stableId = req.song_id || ('collab_'+req.id);
       const newTrack={
         id:stableId,
@@ -20515,7 +20881,7 @@ async function respondCollab(requestId,action){
         written:0,
         recorded:false,
         released:false,
-        quality:50,
+        quality:_calcQuality,
         streams:0,
         collaborators:[{id:req.from_user_id,name:req.from_artist_name}],
         status:'writing',
@@ -20528,9 +20894,13 @@ async function respondCollab(requestId,action){
         offered_fee:req.offered_fee||0,
         royalty_pct:req.royalty_pct||0,
         fee_type:req.fee_type||'lump',
-        isCollabReceiver:true  // Mark that this user is the receiver/acceptor
+        payment_type:req.payment_type||req.fee_type||'flat',
+        flat_amount:req.flat_amount||req.offered_fee||0,
+        featArtistId:req.from_user_id,
+        isCollabReceiver:true,
+        sessionResult:_sessionResult
       };
-      
+
       GAME.songs.push(newTrack);
       GAME.energy=Math.max(0,GAME.energy-energyCost);
       GAME.creativity=Math.max(0,GAME.creativity-creativityCost);
@@ -20562,13 +20932,15 @@ async function respondCollab(requestId,action){
           if(_fw2) _fw2.gigPay = (_fw2.gigPay||0) + _upfrontFee;
         }
       }
-      // Show reward summary
-      var _rewardMsg = '✅ Collaboration accepted!\n\n'
-        + '🎵 Song added to your drafts\n'
+      // Show reward summary (with session result)
+      var _sessionEmoji={great:'🔥',lightning:'⚡',surprise:'✨',good:'✅',disagreement:'🤔',mediocre:'😐',leak:'📰'}[_sessionResult]||'🎵';
+      var _rewardMsg = _sessionEmoji + ' ' + _sessionNarrative + '\n\n'
+        + '🎵 Song added — Q: ' + _calcQuality + '/100\n'
         + '🎸 +' + _cb.xp + ' ' + _cb.skill.charAt(0).toUpperCase() + _cb.skill.slice(1) + ' XP\n'
         + '🔥 +' + _cb.hype + ' Hype\n'
+        + (_relChange !== 0 ? '🤝 Relationship '+((_relChange>0)?'+':'')+_relChange+'\n' : '')
         + (_upfrontFee > 0 ? '\n💰 +$' + _upfrontFee.toLocaleString() + ' upfront fee' : '');
-      showEvent('🤝', _cb.label + ' Accepted!', _rewardMsg, ['Let\'s go!']);
+      showEvent('🤝', _cb.label + ' — Session Done!', _rewardMsg, ['Let\'s go!']);
       // ─────────────────────────────────────────────────────────────────────
 
       saveToCloud();
@@ -32330,26 +32702,42 @@ async function showMessages(activeTab='all'){
   if(displayMessages.length > 0 || (activeTab==='collabs' && collabRequests.length>0) || (activeTab==='all' && collabRequests.length>0)){
     contentHTML += '<div style="max-width:800px;margin:0 auto">';
     
-    // Show collab requests if on collabs or all tab
+    // Show collab requests if on collabs or all tab — new card design
     if((activeTab==='collabs' || activeTab==='all') && collabRequests.length>0){
-      collabRequests.forEach((req,i)=>{
+      const typeIconMap={feature:'🎤',producer:'🎛️',songwriter:'✍️',cowrite:'✍️',full:'⭐'};
+      collabRequests.forEach(function(req){
         const isSent=req.from_user_id===currentUser.id;
         const otherName=isSent?req.to_artist_name:req.from_artist_name;
-        const statusColorMap={pending:'#667eea',countered:'#ffa502',accepted:'#2ed573',declined:'#dc3545'};
-        const statusColor=statusColorMap[req.status]||'#667eea';
-        const icon=isSent?'📤':'📥';
-        
-        contentHTML+=`<div data-message-card style="background:#f9f9f9;border:2px solid ${statusColor};border-radius:12px;padding:20px;margin-bottom:16px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'" onclick="window.respondCollabRequest('${req.id}','${isSent}')">
-          <div style="display:flex;gap:12px;align-items:start">
-            <div style="font-size:24px">${icon}</div>
-            <div style="flex:1;min-width:0">
-              <div style="font-weight:700;font-size:15px;margin-bottom:4px">${isSent?'📤 Sent':'📥 Received'} - ${req.collab_type.charAt(0).toUpperCase()+req.collab_type.slice(1)}</div>
-              <div style="font-size:13px;color:#666;margin-bottom:8px">${isSent?'To: ':'From: '}<strong>${otherName}</strong></div>
-              <div style="font-size:12px;color:#666;margin-bottom:6px">Song: <strong>${req.song_title||'New Track'}</strong></div>
-              <div style="font-size:12px;color:#999">💰 $${(req.offered_fee||0).toLocaleString()}${req.royalty_pct?' + '+req.royalty_pct+'%':''} • Round ${req.round||1}/3 • <span style="background:${statusColor};color:white;padding:2px 8px;border-radius:6px;font-weight:600">${req.status.toUpperCase()}</span></div>
-            </div>
-          </div>
-        </div>`;
+        const statusColorMap={pending:'var(--acc)',countered:'#ffa502',accepted:'#2ed573',declined:'#dc3545'};
+        const statusColor=statusColorMap[req.status]||'var(--acc)';
+        const typeIcon=typeIconMap[req.collab_type]||'🎵';
+        const typeLabel=(req.collab_type||'').charAt(0).toUpperCase()+(req.collab_type||'').slice(1);
+        const paySum=req.payment_summary||(req.offered_fee?'$'+(req.offered_fee||0).toLocaleString()+(req.royalty_pct?' + '+req.royalty_pct+'%':''):'');
+        const vibeLabel=req.vibe_label||'';
+        const timeAgo=(function(){var d=Date.now()-new Date(req.created_at).getTime();if(d<3600000) return Math.floor(d/60000)+'m ago';if(d<86400000) return Math.floor(d/3600000)+'h ago';return Math.floor(d/86400000)+'d ago';})();
+        const isPendingToMe=req.status==='pending'&&req.to_user_id===currentUser.id;
+        const isCounteredToMe=req.status==='countered'&&req.from_user_id===currentUser.id&&req.countered_by!==currentUser.id;
+        const canAct=isPendingToMe||isCounteredToMe;
+        const reqJson=encodeURIComponent(JSON.stringify(req));
+
+        contentHTML+='<div data-message-card style="background:var(--surf);border:1.5px solid var(--bord);border-radius:12px;padding:14px;margin-bottom:12px">'
+          // Top row: avatar + info
+          +'<div style="display:flex;align-items:center;gap:12px;cursor:pointer" onclick="openCollabEmailView(JSON.parse(decodeURIComponent(\''+reqJson+'\')))">'
+          +'<div style="width:44px;height:44px;border-radius:50%;background:var(--acc-bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎵</div>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:14px;font-weight:800;color:var(--txt)">'+otherName+'</div>'
+          +'<div style="font-size:12px;font-weight:600;color:var(--txt);margin-top:1px">'+typeIcon+' '+typeLabel+' — "'+( req.song_title||'New Track')+'"</div>'
+          +'<div style="font-size:11px;color:var(--mut);margin-top:3px">'+(vibeLabel?vibeLabel+' · ':'')+paySum+' · '+timeAgo+'</div>'
+          +'</div>'
+          +'<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:'+statusColor+';color:'+(req.status==='pending'?'var(--acc-txt)':'white')+'">'+req.status.toUpperCase()+'</span>'
+          +'</div>'
+          // Inline actions for pending/countered
+          +(canAct?'<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--bord)">'
+            +'<button onclick="respondCollab(\''+req.id+'\',\'accept\')" style="flex:1;padding:8px;background:#2ed573;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">✓ Accept</button>'
+            +(canAct&&(req.round||1)<2?'<button onclick="openCollabEmailView(JSON.parse(decodeURIComponent(\''+reqJson+'\')));setTimeout(function(){openCollabCounterSheet(JSON.parse(decodeURIComponent(\''+reqJson+'\')))},300)" style="flex:1;padding:8px;background:#ffa502;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">↔ Counter</button>':'')
+            +'<button onclick="respondCollab(\''+req.id+'\',\'decline\')" style="flex:1;padding:8px;background:#dc3545;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">✗ Decline</button>'
+            +'</div>':'')
+          +'</div>';
       });
     }
     
@@ -32386,6 +32774,202 @@ async function showMessages(activeTab='all'){
   }
   
   contentArea.innerHTML = contentHTML;
+}
+
+// ── EMAIL DETAIL VIEW (Task 7) ─────────────────────────────────────
+// req = collab_requests row (full object)
+function openCollabEmailView(req){
+  var isSent=currentUser&&req.from_user_id===currentUser.id;
+  var otherName=isSent?req.to_artist_name:req.from_artist_name;
+  var myGenre=(GAME.characterData&&GAME.characterData.genre)||GAME.genre||'';
+  var theirGenre=req.artist_genre||req.genre||'';
+  var relScore=(GAME.relationships&&GAME.relationships[(isSent?req.to_user_id:req.from_user_id)])||0;
+  var vibe=getCollabVibe(myGenre,theirGenre,relScore);
+  var typeLabel={feature:'Feature',producer:'Producer',songwriter:'Songwriter',cowrite:'Co-write',full:'Full Collab'}[req.collab_type]||req.collab_type;
+  var typeIcon={feature:'🎤',producer:'🎛️',songwriter:'✍️',cowrite:'✍️',full:'⭐'}[req.collab_type]||'🎵';
+  var paySum=req.payment_summary||(req.offered_fee?'$'+(req.offered_fee||0).toLocaleString()+(req.royalty_pct?' + '+req.royalty_pct+'%':''):'');
+  var counteredSum=req.counter_payment_summary||'';
+  var displayPay=req.status==='countered'&&counteredSum?counteredSum:paySum;
+  var roundNum=req.round||1;
+  var isPendingToMe=req.status==='pending'&&currentUser&&req.to_user_id===currentUser.id;
+  var isCounteredToMe=req.status==='countered'&&currentUser&&req.from_user_id===currentUser.id&&req.countered_by!==currentUser.id;
+  var canAct=isPendingToMe||isCounteredToMe;
+  var reqJson=encodeURIComponent(JSON.stringify(req));
+  var dateStr=new Date(req.created_at).toLocaleDateString();
+  var timeStr=new Date(req.created_at).toLocaleTimeString();
+  var note=req.note||req.message||'';
+
+  var html='<div id="collabEmailModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:210000;overflow-y:auto" onclick="if(event.target===this)this.remove()">'
+    +'<div style="background:var(--bg);min-height:100%;max-width:600px;margin:0 auto;padding-bottom:80px">'
+    // Header bar
+    +'<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--bord);background:var(--surf)">'
+    +'<button onclick="document.getElementById(\'collabEmailModal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--mut);padding:2px 6px">←</button>'
+    +'<div style="flex:1;font-size:16px;font-weight:800;color:var(--txt)">'+typeIcon+' '+typeLabel+' Request</div>'
+    +'</div>'
+    // From block
+    +'<div class="email-from" style="padding:16px;border-bottom:1px solid var(--bord);display:flex;justify-content:space-between;align-items:flex-start">'
+    +'<div><div style="font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">From</div>'
+    +'<div style="font-size:15px;font-weight:800;color:var(--txt)">'+otherName+'</div>'
+    +'<div style="font-size:11px;color:var(--mut)">'+otherName.toLowerCase().replace(/\s+/g,'')+'@soundcheck.game</div></div>'
+    +'<div style="text-align:right"><div style="font-size:11px;color:var(--mut)">'+dateStr+'</div><div style="font-size:11px;color:var(--mut)">'+timeStr+'</div></div>'
+    +'</div>'
+    // Subject + round pill
+    +'<div style="padding:14px 16px;border-bottom:1px solid var(--bord)">'
+    +'<div style="font-size:16px;font-weight:800;color:var(--txt);margin-bottom:6px">'+typeIcon+' '+typeLabel+' Request — "'+( req.song_title||'New Track')+'"</div>'
+    +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#ffa50220;color:#b45309;border:1px solid #ffa502">Round '+roundNum+' of 2</span>'
+    +'</div>'
+    // About artist block
+    +'<div style="padding:14px 16px">'
+    +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:12px;margin-bottom:10px">'
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">About '+otherName+'</div>'
+    +'<div style="font-size:13px;color:var(--txt);line-height:1.9">'
+    +(theirGenre?'<div><span style="color:var(--mut)">Genre:</span> '+theirGenre+'</div>':'')
+    +'</div></div>'
+    // Vibe strip
+    +'<div class="collab-vibe-pill collab-'+vibe.cls+'" style="margin-bottom:10px"><span>'+vibe.emoji+'</span><span><b>'+vibe.label+'</b> — '+vibe.desc+'</span></div>'
+    // Proposal block
+    +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:12px;margin-bottom:10px">'
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:8px">Proposal</div>'
+    +'<div style="font-size:13px;color:var(--txt);line-height:1.9">'
+    +'<div><span style="color:var(--mut)">Type:</span> '+typeLabel+'</div>'
+    +'<div><span style="color:var(--mut)">Song:</span> '+(req.song_title||'New Track')+'</div>'
+    +'<div><span style="color:var(--mut)">Payment:</span> '+displayPay+'</div>'
+    +'</div></div>'
+    // Note block
+    +(note?'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:12px;margin-bottom:10px">'
+      +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:6px">Their Note</div>'
+      +'<div style="font-size:13px;color:var(--txt);font-style:italic">"'+note+'"</div>'
+      +'</div>':'')
+    // What you get block
+    +'<div style="background:rgba(46,213,115,0.07);border:1px solid rgba(46,213,115,0.25);border-radius:10px;padding:12px;margin-bottom:10px">'
+    +'<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#14532d;margin-bottom:8px">What You Get</div>'
+    +'<div style="font-size:13px;color:var(--txt);line-height:1.9">'
+    +'<div>• '+displayPay+' — payment</div>'
+    +'<div>• Exposure to their listeners &amp; regions</div>'
+    +'<div>• Song in your Collabs tab, playable from your profile</div>'
+    +'<div>• Relationship grows — better chemistry next time</div>'
+    +'</div></div>'
+    +'</div>'
+    // Action buttons (sticky bottom)
+    +(canAct?'<div style="position:sticky;bottom:0;background:var(--bg);padding:12px 16px;border-top:1px solid var(--bord);display:flex;gap:10px">'
+      +'<button onclick="respondCollab(\''+req.id+'\',\'accept\');document.getElementById(\'collabEmailModal\').remove()" style="flex:1;padding:12px;background:#2ed573;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--fb)">✓ Accept</button>'
+      +(roundNum<2?'<button onclick="openCollabCounterSheet(JSON.parse(decodeURIComponent(\''+reqJson+'\')))" style="flex:1;padding:12px;background:#ffa502;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--fb)">↔ Counter</button>':'')
+      +'<button onclick="respondCollab(\''+req.id+'\',\'decline\');document.getElementById(\'collabEmailModal\').remove()" style="flex:1;padding:12px;background:#dc3545;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--fb)">✗ Decline</button>'
+      +'</div>':'')
+    +'</div></div>';
+
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+// ── COUNTER SHEET (Task 8) ──────────────────────────────────────────
+function openCollabCounterSheet(req){
+  // Remove any existing sheet
+  var old=document.getElementById('collabCounterSheet');
+  if(old) old.remove();
+
+  var currentPay=req.payment_summary||(req.offered_fee?'$'+(req.offered_fee||0).toLocaleString()+(req.royalty_pct?' + '+req.royalty_pct+'%':''):'—');
+
+  var html='<div id="collabCounterSheet" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:220000;display:flex;flex-direction:column;justify-content:flex-end" onclick="if(event.target===this)this.remove()">'
+    +'<div style="background:var(--bg);border-radius:16px 16px 0 0;padding:0 0 40px;max-height:85vh;overflow-y:auto">'
+    // Handle bar
+    +'<div style="display:flex;justify-content:center;padding:12px"><div style="width:40px;height:4px;background:var(--bord);border-radius:2px"></div></div>'
+    // Round badge
+    +'<div style="padding:0 16px 10px;display:flex;align-items:center;gap:10px">'
+    +'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#ffa50220;color:#b45309;border:1px solid #ffa502">Round 1 of 2 — your counter</span>'
+    +'</div>'
+    +'<div style="padding:0 16px">'
+    +'<div style="font-size:18px;font-weight:800;color:var(--txt);margin-bottom:4px">Counter Proposal</div>'
+    +'<div style="font-size:13px;color:var(--mut);margin-bottom:16px">Adjust the payment terms. If they decline, the request closes. No further rounds.</div>'
+    +'<div style="font-size:12px;color:var(--mut);margin-bottom:12px">Current offer: <b style="color:var(--txt)">'+currentPay+'</b></div>'
+    // Payment toggle
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">'
+    +'<button id="cs-pt-flat" onclick="csSelectPayType(\'flat\')" style="padding:9px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--fb)">💵 Flat Fee</button>'
+    +'<button id="cs-pt-royalty" onclick="csSelectPayType(\'royalty\')" style="padding:9px;background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--fb)">📊 Royalty %</button>'
+    +'<button id="cs-pt-mix" onclick="csSelectPayType(\'mix\')" style="padding:9px;background:var(--surf);color:var(--txt);border:1.5px solid var(--bord);border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--fb)">🤝 Mix</button>'
+    +'</div>'
+    // Flat panel
+    +'<div id="cs-pay-flat" style="margin-bottom:10px"><input type="number" id="cs-flat-amt" value="'+(req.offered_fee||5000)+'" min="0" step="500" placeholder="$ amount" style="width:100%;padding:12px;background:var(--surf);border:2px solid var(--bord);border-radius:8px;font-size:15px;font-weight:700;color:var(--txt);font-family:var(--fb);box-sizing:border-box"></div>'
+    // Royalty panel
+    +'<div id="cs-pay-royalty" style="display:none;margin-bottom:10px"><div style="font-size:12px;color:var(--mut);margin-bottom:6px">Their royalty share</div><div style="display:flex;align-items:center;gap:10px"><div id="cs-sv-fa" style="font-size:14px;font-weight:800;color:var(--acc);min-width:36px">65%</div><input type="range" id="cs-royalty-slider" min="20" max="80" value="'+(req.royalty_pct||35)+'" oninput="csUpdateSplit(this.value)" style="flex:1"><div id="cs-sv-fb" style="font-size:14px;font-weight:800;color:var(--mut);min-width:36px;text-align:right">'+(req.royalty_pct||35)+'%</div></div><div id="cs-sv-h" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center">You: '+(100-(req.royalty_pct||35))+'% · Them: '+(req.royalty_pct||35)+'%</div></div>'
+    // Mix panel
+    +'<div id="cs-pay-mix" style="display:none;margin-bottom:10px"><input type="number" id="cs-mix-amt" value="'+(Math.round((req.offered_fee||2000)/2))+'" min="0" step="250" placeholder="$ flat portion" style="width:100%;padding:10px;background:var(--surf);border:2px solid var(--bord);border-radius:8px;font-size:14px;font-weight:700;color:var(--txt);font-family:var(--fb);box-sizing:border-box;margin-bottom:8px"><div style="font-size:12px;color:var(--mut);margin-bottom:6px">Their royalty share</div><div style="display:flex;align-items:center;gap:10px"><div id="cs-sv-fa2" style="font-size:14px;font-weight:800;color:var(--acc);min-width:36px">65%</div><input type="range" id="cs-royalty-slider2" min="20" max="80" value="35" oninput="csUpdateSplit2(this.value)" style="flex:1"><div id="cs-sv-fb2" style="font-size:14px;font-weight:800;color:var(--mut);min-width:36px;text-align:right">35%</div></div><div id="cs-sv-h2" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center">You: 65% · Them: 35%</div></div>'
+    // Buttons
+    +'<button onclick="csSubmitCounter(\''+req.id+'\')" style="width:100%;padding:14px;background:#ffa502;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb);margin-bottom:10px">Send Counter →</button>'
+    +'<button onclick="document.getElementById(\'collabCounterSheet\').remove()" style="width:100%;padding:12px;background:none;color:var(--mut);border:1.5px solid var(--bord);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--fb)">Cancel</button>'
+    +'</div></div></div>';
+
+  window._csPayType='flat';
+  window._csRoyalty=req.royalty_pct||35;
+  window._csMixRoyalty=35;
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+function csSelectPayType(t){
+  window._csPayType=t;
+  ['flat','royalty','mix'].forEach(function(id){
+    var btn=document.getElementById('cs-pt-'+id);
+    if(!btn) return;
+    btn.style.background=id===t?'var(--acc)':'var(--surf)';
+    btn.style.color=id===t?'var(--acc-txt)':'var(--txt)';
+    btn.style.border=id===t?'none':'1.5px solid var(--bord)';
+  });
+  var pf=document.getElementById('cs-pay-flat'),pr=document.getElementById('cs-pay-royalty'),pm=document.getElementById('cs-pay-mix');
+  if(pf) pf.style.display=t==='flat'?'block':'none';
+  if(pr) pr.style.display=t==='royalty'?'block':'none';
+  if(pm) pm.style.display=t==='mix'?'block':'none';
+}
+function csUpdateSplit(v){
+  window._csRoyalty=parseInt(v);
+  var mine=100-parseInt(v);
+  var fa=document.getElementById('cs-sv-fa'),fb=document.getElementById('cs-sv-fb'),h=document.getElementById('cs-sv-h');
+  if(fa) fa.textContent=mine+'%';if(fb) fb.textContent=v+'%';if(h) h.textContent='You: '+mine+'% · Them: '+v+'%';
+}
+function csUpdateSplit2(v){
+  window._csMixRoyalty=parseInt(v);
+  var mine=100-parseInt(v);
+  var fa=document.getElementById('cs-sv-fa2'),fb=document.getElementById('cs-sv-fb2'),h=document.getElementById('cs-sv-h2');
+  if(fa) fa.textContent=mine+'%';if(fb) fb.textContent=v+'%';if(h) h.textContent='You: '+mine+'% · Them: '+v+'%';
+}
+async function csSubmitCounter(requestId){
+  if(!supabase||!currentUser){showToast('Not connected','error');return;}
+  var payType=window._csPayType||'flat';
+  var flatAmt=0,royaltyPct=0;
+  if(payType==='flat'){var el=document.getElementById('cs-flat-amt');flatAmt=parseInt(el?el.value:0)||0;}
+  else if(payType==='royalty'){royaltyPct=window._csRoyalty||35;}
+  else{var el2=document.getElementById('cs-mix-amt');flatAmt=parseInt(el2?el2.value:0)||0;royaltyPct=window._csMixRoyalty||35;}
+  var countSum=payType==='flat'?('$'+flatAmt.toLocaleString()+' flat fee'):payType==='royalty'?(royaltyPct+'% royalty'):('$'+flatAmt.toLocaleString()+' + '+royaltyPct+'%');
+
+  try{
+    var {data:req,error:fetchErr}=await supabase.from('collab_requests').select('*').eq('id',requestId).single();
+    if(fetchErr||!req) throw fetchErr||new Error('Not found');
+    var {error:upErr}=await supabase.from('collab_requests').update({
+      status:'countered',
+      round:2,
+      counter_payment_type:payType,
+      counter_flat_amount:flatAmt,
+      counter_royalty_pct:royaltyPct,
+      counter_payment_summary:countSum,
+      countered_by:currentUser.id,
+      countered_at:new Date().toISOString()
+    }).eq('id',requestId);
+    if(upErr) throw upErr;
+    // Notify original proposer
+    var notifTarget=req.from_user_id===currentUser.id?req.to_user_id:req.from_user_id;
+    var meName=(await supabase.from('players').select('artist_name').eq('user_id',currentUser.id).single()).data?.artist_name||GAME.sn||'Artist';
+    await supabase.from('notifications').insert({
+      user_id:notifTarget,
+      type:'collab_counter',
+      platform:'system',
+      fromuserid:currentUser.id,
+      fromusername:meName,
+      message:meName+' countered your proposal on "'+(req.song_title||'New Track')+'" — '+countSum,
+      timestamp:Date.now(),
+      read:false
+    });
+    document.getElementById('collabCounterSheet').remove();
+    var modal=document.getElementById('collabEmailModal');
+    if(modal) modal.remove();
+    showToast('Counter sent! ↔','success');
+  }catch(e){showToast('Error: '+(e.message||e),'error');}
 }
 
 // VIEW COLLAB REQUEST WITH NEGOTIATION
@@ -39286,6 +39870,45 @@ function _processDailyStreams(){
         song.viralWindow.daysLeft = 7;
       }
     }
+
+    // ── TASK 10: Deposit royalties to feature artist (royalty or mix) ──────
+    // If this is a collab lead-artist song with royaltyPct > 0, push the
+    // feature artist's cut to their Supabase wallet (once per day, async).
+    if(GAME_MODE==='multi' && supabase && currentUser && song.featArtistId && !song.isCollabReceiver){
+      var _featRoyPct = song.royaltyPct || song.royalty_pct || 0;
+      if(_featRoyPct > 0){
+        // Calculate feature artist's daily revenue share
+        var _featRev = 0;
+        if(song.collaborators && song.collaborators.length > 0){
+          // Use reverse of _royMult: lead gets (100-_featRoyPct)%, feat gets _featRoyPct%
+          // But we already applied _royMult to totalRev for lead.
+          // Approximate feat share: dailyNew * rate * featRoyPct/100
+          // We'll track it on the song for today and push async
+        }
+        // Async push (fire and forget — do not block the daily tick)
+        (function(featId, featPct, dailyStreams){
+          var featRevDay = Math.floor(dailyStreams * 0.004 * (featPct/100) * 100) / 100;
+          if(featRevDay <= 0) return;
+          supabase.from('collab_royalties').insert({
+            song_id: song.id,
+            song_title: song.title,
+            from_player_id: currentUser.id,
+            to_player_id: featId,
+            amount: featRevDay,
+            week: GAME.week,
+            day: GAME.day,
+            created_at: new Date().toISOString()
+          }).then(function(r){
+            if(r.error && r.error.message && r.error.message.includes('does not exist')){
+              // Table not yet created — silently skip
+            } else if(r.error){
+              console.warn('Collab royalty insert error:', r.error.message);
+            }
+          });
+        })(song.featArtistId, _featRoyPct, dailyNew);
+      }
+    }
+    // ── END TASK 10 ──────────────────────────────────────────────────────────
   });
 
   if(totalRev > 0){
