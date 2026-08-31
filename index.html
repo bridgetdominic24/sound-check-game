@@ -9187,6 +9187,8 @@ function showPreReleaseHub(songId){
 
 function openPreReleaseHub(song){
   if(!song) return;
+  // Keep window._viewingSong current so activity buttons that re-open the hub work
+  window._viewingSong=song;
   if(!song.preRelease) song.preRelease={enabled:false,releaseWeek:null,hypePoints:0,weeklyActivity:[],activitiesCompleted:[],consistencyBonus:false,fanMomentum:0.9};
   var pr=song.preRelease;
   pr.enabled=true;
@@ -9206,7 +9208,7 @@ function openPreReleaseHub(song){
   var topbar='<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surf);border-bottom:1px solid var(--bord);flex-shrink:0">'
     +'<button onclick="_closeOverlay(this)" style="background:none;border:none;font-size:22px;color:var(--txt);cursor:pointer;padding:0;line-height:1;touch-action:manipulation">←</button>'
     +'<div style="flex:1"><div style="font-size:15px;font-weight:800;color:var(--txt)">Pre-Release Hub</div>'
-    +'<div style="font-size:10.5px;color:var(--mut)">'+song.title+(releaseWeek?' &bull; dropping Week '+releaseWeek:'')+'</div></div>'
+    +'<div style="font-size:10.5px;color:var(--mut)">'+(song.title||song.name||'Untitled')+(releaseWeek?' &bull; dropping Week '+releaseWeek:'')+'</div></div>'
     +'</div>';
 
   // ── Ticks: which ones are hit ─────────────────────────
@@ -9936,6 +9938,8 @@ function _closeOverlay(el){var p=el;while(p&&p.parentElement&&p.parentElement!==
 function showSongDetails(songId){
   var song=GAME.songs.find(function(s){return s.id===songId;});
   if(!song) return;
+  // Store song reference so overlay buttons can call openPreReleaseHub(window._viewingSong)
+  window._viewingSong=song;
   var isReleased=song.released, isRecorded=song.recorded, isWritten=song.written;
   // isInProg is true for both regular in-progress songs AND collab songs currently being written
   var _isCollabWriting = song.status==='writing' && !!song.collab_start_time && !!song.collab_duration_ms && !song.released;
@@ -10180,7 +10184,7 @@ function showSongDetails(songId){
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
       +[['0.9x','Low',0],['1.0x','Building',5],['1.15x','Buzz',15],['1.3x','Hot',30],['1.4x','Viral',50]].map(function(m){var a=m[0]===_rmul;return '<div style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;'+(a?'background:var(--acc);color:var(--acc-txt);':'background:var(--bord);color:var(--mut);')+'">'+m[0]+' '+m[1]+'</div>';}).join('')
       +'</div>'
-      +'<button onclick="showPreReleaseHub('+songId+')" style="width:100%;padding:11px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🎯 Open Pre-Release Hub</button>'
+      +'<button onclick="openPreReleaseHub(window._viewingSong)" style="width:100%;padding:11px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🎯 Open Pre-Release Hub</button>'
       +'</div>';
     // C. Music Video
     if(song.mvId){
@@ -10353,7 +10357,7 @@ function showSongDetails(songId){
     var _prPct=Math.min(100,(_prPts/50)*100);
     var _prM=_prPts>=50?'1.4x':_prPts>=30?'1.3x':_prPts>=15?'1.15x':_prPts>=5?'1.0x':'0.9x';
     _prcH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Pre-Release Hub</div>'
-      +'<div class="sd-prc" onclick="showPreReleaseHub('+songId+')">'
+      +'<div class="sd-prc" onclick="openPreReleaseHub(window._viewingSong)" style="touch-action:manipulation">'
       +'<div class="sd-prc-ico">🎯</div>'
       +'<div class="sd-prc-inf"><b>Build Fan Momentum</b><span>Complete activities to boost your release multiplier up to 1.4×.</span></div>'
       +'<span style="font-size:20px;color:var(--acc)">›</span></div>'
