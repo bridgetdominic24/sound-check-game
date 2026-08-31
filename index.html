@@ -10119,8 +10119,7 @@ function showSongDetails(songId){
         +'<button onclick="showPromoManager('+songId+')" style="width:100%;padding:14px;background:linear-gradient(135deg,var(--acc),#764ba2);color:var(--acc-txt);border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation;margin-bottom:8px">🎯 Promote This Song</button>';
       actionsHTML+='<button onclick="editSongName('+songId+')" style="width:100%;padding:12px;background:var(--surf);border:2px solid var(--bord);color:var(--txt);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">✏️ Edit Name</button>';
     } else {
-      actionsHTML='<button onclick="prepareRelease('+songId+')" style="width:100%;padding:14px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation;margin-bottom:8px">⚡ Quick Release</button>'
-      +'<button onclick="showPreReleaseHub('+songId+')" style="width:100%;padding:13px;background:linear-gradient(135deg,var(--acc),#764ba2);color:var(--acc-txt);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation;margin-bottom:8px">🎯 Full Production <span style="font-size:11px;opacity:0.85">up to 1.4×</span></button>'
+      actionsHTML='<button onclick="prepareRelease('+songId+')" style="width:100%;padding:14px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation;margin-bottom:8px">🚀 Release Now</button>'
       +'<button onclick="GAME._pendingReleaseSongId='+songId+';GAME.pendingReleaseSong='+songId+';GAME._releaseNow=false;closeMenu();setTimeout(function(){showConceptUpload();},120);" style="width:100%;padding:13px;background:var(--surf);border:2px solid var(--acc);color:var(--acc);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation;margin-bottom:8px">📅 Schedule Release</button>';
       actionsHTML+='<button onclick="editSongName('+songId+')" style="width:100%;padding:12px;background:var(--surf);border:2px solid var(--bord);color:var(--txt);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">✏️ Edit Name</button>';
     }
@@ -10554,8 +10553,7 @@ function showSongDetails(songId){
       _aH+='<div style="background:var(--acc-bg);border:1.5px solid var(--acc);border-radius:12px;padding:14px;text-align:center;margin-bottom:8px"><div style="font-size:13px;font-weight:800;color:var(--acc);margin-bottom:4px">📅 Release Scheduled</div><div style="font-size:12px;color:var(--mut)">Dropping '+_aSl+'</div></div>';
       _aH+='<button class="sd-sab" style="background:transparent;border:1.5px solid #ff6b6b;color:#ff6b6b" onclick="cancelScheduledRelease('+songId+')">❌ Cancel Scheduled Release</button>';
     } else {
-      _aH+='<button class="sd-sab sd-sab-p" onclick="prepareRelease('+songId+')">⚡ Quick Release</button>';
-      _aH+='<button class="sd-sab" style="background:linear-gradient(135deg,var(--acc),#764ba2);color:var(--acc-txt);border:none" onclick="showPreReleaseHub('+songId+')">🎯 Full Production</button>';
+      _aH+='<button class="sd-sab sd-sab-p" onclick="prepareRelease('+songId+')">🚀 Release Now</button>';
       _aH+='<button class="sd-sab sd-sab-o" onclick="GAME._pendingReleaseSongId='+songId+';GAME.pendingReleaseSong='+songId+';GAME._releaseNow=false;closeMenu();setTimeout(function(){showConceptUpload();},120);">📅 Schedule Release</button>';
     }
     _aH+='<button class="sd-sab sd-sab-s" onclick="editSongName('+songId+')">✏ Edit Name</button>';
