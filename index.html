@@ -9100,6 +9100,115 @@ function showPromoManager(songId){
   window.currentPromoSong = {id: songId, selectedPromos: {}};
 }
 
+// ══════════════════════════════════════════════════════
+// PRE-RELEASE HUB — fan momentum activity system
+// Shows before release; awards pts that feed the
+// launch multiplier (0.9x → 1.4x). Replaces old
+// pre-release promo CTA for unreleaseed songs.
+// ══════════════════════════════════════════════════════
+function showPreReleaseHub(songId){
+  var song=GAME.songs.find(function(s){return s.id===songId;});
+  if(!song) return;
+
+  var pts=song.preReleasePts||0;
+  var acts=song.preReleaseActivities||{};
+  var pct=Math.min(100,(pts/50)*100);
+  var mul=pts>=50?'1.4x':pts>=30?'1.3x':pts>=15?'1.15x':pts>=5?'1.0x':'0.9x';
+
+  // Multiplier tick marks
+  var ticks=[{pts:0,label:'0.9x',p:0},{pts:5,label:'1.0x',p:10},{pts:15,label:'1.15x',p:30},{pts:30,label:'1.3x',p:60},{pts:50,label:'1.4x',p:100}];
+  var ticksHTML='<div style="position:relative;height:22px;margin-top:4px">';
+  ticks.forEach(function(t){
+    var active=pts>=t.pts;
+    ticksHTML+='<div style="position:absolute;left:'+t.p+'%;transform:translateX(-50%);text-align:center">'
+      +'<div style="width:1px;height:6px;background:var(--bord);margin:0 auto 2px"></div>'
+      +'<div style="font-size:9px;color:'+(active?'var(--acc)':'var(--mut)')+';font-weight:700;white-space:nowrap">'+t.label+'</div>'
+      +'</div>';
+  });
+  ticksHTML+='</div>';
+
+  // Activity windows
+  var windows=[
+    {label:'📅 6+ Weeks Out',color:'#4ade80',items:[
+      {key:'press_preview',icon:'📰',title:'Press Preview',desc:'Send an early listen to press outlets for coverage.',pts:4},
+      {key:'fan_contest',icon:'🏆',title:'Fan Contest',desc:'Run a cover art or song title guess contest.',pts:3},
+      {key:'exclusive_interview',icon:'🎙️',title:'Exclusive Interview',desc:'Drop an in-depth interview about the project.',pts:5}
+    ]},
+    {label:'📷 4+ Weeks Out',color:'#fb923c',items:[
+      {key:'concept_photo',icon:'🎨',title:'Concept Photo Drop',desc:'Share a first look at the visual direction.',pts:4},
+      {key:'presave',icon:'💾',title:'Pre-Save Campaign',desc:'Drive pre-saves across streaming platforms.',pts:6},
+      {key:'cover_reveal',icon:'🖼️',title:'Cover Art Reveal',desc:'Official cover art reveal dropped on socials.',pts:3}
+    ]},
+    {label:'🔊 2+ Weeks Out',color:'#a78bfa',items:[
+      {key:'audio_snippet',icon:'🔊',title:'Audio Snippet',desc:'15-second teaser posted to Rookie.',pts:3},
+      {key:'lyric_preview',icon:'✍️',title:'Lyric Preview',desc:'Tease a standout lyric line on Y.',pts:2},
+      {key:'inspiration_playlist',icon:'🎵',title:'Inspiration Playlist',desc:'Drop the playlist that inspired this project.',pts:2},
+      {key:'listening_party',icon:'🎉',title:'Listening Party',desc:'Host a live listening event with fans.',pts:7}
+    ]}
+  ];
+
+  var windowsHTML='';
+  windows.forEach(function(w){
+    windowsHTML+='<div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:'+w.color+';margin:16px 0 8px;padding-left:2px">'+w.label+'</div>';
+    w.items.forEach(function(act){
+      var done=!!acts[act.key];
+      windowsHTML+='<div onclick="'+(done?'':'doPreReleaseAct('+songId+',\''+act.key+'\','+act.pts+')')+'" style="display:flex;align-items:flex-start;gap:12px;padding:13px 12px;background:'+(done?'var(--acc-bg)':'var(--card)')+';border:1.5px solid '+(done?'var(--acc)':'var(--bord)')+';border-radius:12px;margin-bottom:8px;cursor:'+(done?'default':'pointer')+';touch-action:manipulation">'
+        +'<div style="width:40px;height:40px;border-radius:10px;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">'+act.icon+'</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:2px">'+act.title+'</div>'
+        +'<div style="font-size:11.5px;color:var(--mut);line-height:1.4">'+act.desc+'</div>'
+        +'</div>'
+        +(done
+          ?'<div style="font-size:10px;font-weight:800;color:var(--acc);background:var(--acc-bg);border:1px solid var(--acc);border-radius:6px;padding:3px 8px;white-space:nowrap;align-self:center;flex-shrink:0">✓ DONE</div>'
+          :'<div style="font-size:11px;font-weight:800;color:var(--acc);background:var(--acc-bg);border:1px solid var(--acc);border-radius:6px;padding:3px 8px;white-space:nowrap;align-self:center;flex-shrink:0">+'+act.pts+' pts</div>'
+        )
+        +'</div>';
+    });
+  });
+
+  var html='<div style="padding:16px 16px 100px">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'
+    +'<button onclick="_closeOverlay(this)" style="background:none;border:none;font-size:24px;color:var(--acc);cursor:pointer;padding:0;line-height:1">←</button>'
+    +'<div style="flex:1"><div style="font-size:17px;font-weight:800;color:var(--txt);font-family:var(--fb)">'+song.title+'</div>'
+    +'<div style="font-size:11px;color:var(--mut)">Pre-Release Hub</div></div>'
+    +'<div style="font-size:13px;font-weight:800;color:var(--acc);background:var(--acc-bg);border:1px solid var(--acc);border-radius:8px;padding:4px 10px">'+mul+'</div>'
+    +'</div>'
+    // Momentum bar card
+    +'<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:14px 16px;margin-bottom:4px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    +'<div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--mut)">Fan Momentum</div>'
+    +'<div style="font-size:13px;font-weight:800;color:var(--acc)">'+pts+' pts</div>'
+    +'</div>'
+    +'<div style="position:relative;height:10px;border-radius:5px;background:var(--surf);overflow:hidden;margin-bottom:2px">'
+    +'<div style="height:100%;width:'+pct+'%;border-radius:5px;background:linear-gradient(90deg,var(--acc),var(--ti,#a78bfa))"></div>'
+    +'</div>'
+    +ticksHTML
+    +'</div>'
+    // Activity windows
+    +windowsHTML
+    +'</div>';
+
+  _insertOverlay(html);
+}
+
+function doPreReleaseAct(songId,actKey,pts){
+  var song=GAME.songs.find(function(s){return s.id===songId;});
+  if(!song) return;
+  if(!song.preReleaseActivities) song.preReleaseActivities={};
+  if(song.preReleaseActivities[actKey]) return;
+  song.preReleaseActivities[actKey]=true;
+  song.preReleasePts=(song.preReleasePts||0)+pts;
+  // Sync hype field for backward compat with release multiplier
+  var p=song.preReleasePts;
+  song.hype=p>=50?80:p>=30?60:p>=15?40:p>=5?20:0;
+  saveGame();
+  showToast('Activity complete! +'+pts+' momentum pts 🎉','green');
+  // Refresh hub
+  var ov=document.querySelector('body > div[data-app-overlay]');
+  if(ov) ov.remove();
+  showPreReleaseHub(songId);
+}
+
 function selectPromoOption(element, promoKey, songId){
   if(!window.currentPromoSong) window.currentPromoSong = {id: songId, selectedPromos: {}};
   if(!window.currentPromoSong.selectedPromos) window.currentPromoSong.selectedPromos = {};
@@ -9777,18 +9886,19 @@ function showSongDetails(songId){
       }).join('')
       +'<div style="border-top:1px solid var(--bord);margin-top:8px;padding-top:10px;font-size:11px;color:var(--mut)">Formula: avg skill ('+_ravg.toFixed(0)+') + tag bonus (+'+_rtag+') = <strong style="color:var(--txt)">'+(song.quality||0)+'/100</strong></div>'
       +'</div>';
-    // B. Pre-Release Campaign
-    var _rhype=song.hype||GAME.hype||0;
-    var _rmul=_rhype>=80?'1.4x':_rhype>=60?'1.3x':_rhype>=40?'1.15x':_rhype>=20?'1.0x':'0.9x';
-    var _rhc=_rhype>=60?'#2ed573':_rhype>=20?'var(--acc)':'#ff6b6b';
+    // B. Pre-Release Hub
+    var _rpts=song.preReleasePts||0;
+    var _rpct=Math.min(100,(_rpts/50)*100);
+    var _rmul=_rpts>=50?'1.4x':_rpts>=30?'1.3x':_rpts>=15?'1.15x':_rpts>=5?'1.0x':'0.9x';
+    var _ract=Object.keys(song.preReleaseActivities||{}).length;
     recordedExtrasHTML+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:13px;font-weight:800;color:var(--txt)">🚀 Pre-Release Campaign</div><div style="font-size:12px;font-weight:800;color:'+_rhc+'">'+_rmul+' release boost</div></div>'
-      +'<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Hype: '+_rhype+'/100</div>'
-      +'<div style="height:8px;background:var(--bord);border-radius:4px;overflow:hidden;margin-bottom:10px"><div style="width:'+Math.min(100,_rhype)+'%;height:100%;background:'+_rhc+';border-radius:4px"></div></div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +[['0.9x','Low'],['1.0x','Building'],['1.15x','Buzz'],['1.3x','Hot'],['1.4x','Viral']].map(function(m){var a=m[0]===_rmul;return '<div style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;'+(a?'background:'+_rhc+';color:#fff;':'background:var(--bord);color:var(--mut);')+'">'+m[0]+' '+m[1]+'</div>';}).join('')
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:13px;font-weight:800;color:var(--txt)">🎯 Pre-Release Hub</div><div style="font-size:12px;font-weight:800;color:var(--acc)">'+_rmul+' boost</div></div>'
+      +'<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+_rpts+' pts · '+_ract+' activit'+((_ract===1)?'y':'ies')+' completed</div>'
+      +'<div style="height:8px;background:var(--bord);border-radius:4px;overflow:hidden;margin-bottom:10px"><div style="width:'+_rpct+'%;height:100%;background:var(--acc);border-radius:4px"></div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+      +[['0.9x','Low',0],['1.0x','Building',5],['1.15x','Buzz',15],['1.3x','Hot',30],['1.4x','Viral',50]].map(function(m){var a=m[0]===_rmul;return '<div style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;'+(a?'background:var(--acc);color:var(--acc-txt);':'background:var(--bord);color:var(--mut);')+'">'+m[0]+' '+m[1]+'</div>';}).join('')
       +'</div>'
-      +'<button onclick="showPromoManager('+songId+')" style="width:100%;margin-top:12px;padding:11px;background:linear-gradient(135deg,var(--acc),#764ba2);color:var(--acc-txt);border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🎯 Start Promo Campaign</button>'
+      +'<button onclick="showPreReleaseHub('+songId+')" style="width:100%;padding:11px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🎯 Open Pre-Release Hub</button>'
       +'</div>';
     // C. Music Video
     if(song.mvId){
@@ -9957,17 +10067,18 @@ function showSongDetails(songId){
   // Pre-release campaign CTA (recorded)
   var _prcH='';
   if(isRecorded&&!isReleased){
-    var _prH=song.hype||GAME.hype||0;
-    var _prM=_prH>=80?'1.4x':_prH>=60?'1.3x':_prH>=40?'1.15x':_prH>=20?'1.0x':'0.9x';
-    _prcH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Pre-Release Campaign</div>'
-      +'<div class="sd-prc" onclick="showPromoManager('+songId+')">'
-      +'<div class="sd-prc-ico">🚀</div>'
-      +'<div class="sd-prc-inf"><b>Launch Pre-Release Campaign</b><span>Build fan momentum before release day. More momentum = higher chart peak on release.</span></div>'
+    var _prPts=song.preReleasePts||0;
+    var _prPct=Math.min(100,(_prPts/50)*100);
+    var _prM=_prPts>=50?'1.4x':_prPts>=30?'1.3x':_prPts>=15?'1.15x':_prPts>=5?'1.0x':'0.9x';
+    _prcH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Pre-Release Hub</div>'
+      +'<div class="sd-prc" onclick="showPreReleaseHub('+songId+')">'
+      +'<div class="sd-prc-ico">🎯</div>'
+      +'<div class="sd-prc-inf"><b>Build Fan Momentum</b><span>Complete activities to boost your release multiplier up to 1.4×.</span></div>'
       +'<span style="font-size:20px;color:var(--acc)">›</span></div>'
       +'<div style="margin-top:8px;background:var(--card);border:1px solid var(--bord);border-radius:10px;padding:10px 12px">'
-      +'<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:5px">Current momentum</div>'
-      +'<div style="height:7px;border-radius:4px;background:var(--surf);overflow:hidden;margin-bottom:5px"><div style="height:100%;width:'+Math.min(100,_prH)+'%;border-radius:4px;background:var(--acc)"></div></div>'
-      +'<div style="font-size:11.5px;color:var(--mut)">'+_prH+' pts · Multiplier at launch: '+_prM+'</div></div></div>';
+      +'<div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:5px">Momentum · '+_prPts+' pts</div>'
+      +'<div style="height:7px;border-radius:4px;background:var(--surf);overflow:hidden;margin-bottom:5px"><div style="height:100%;width:'+_prPct+'%;border-radius:4px;background:var(--acc)"></div></div>'
+      +'<div style="font-size:11.5px;color:var(--mut)">Multiplier at launch: <b>'+_prM+'</b></div></div></div>';
   }
 
   // Music Video (recorded pre-release)
@@ -30741,47 +30852,309 @@ function setReleaseType(songId,type){
 
 function showCoverSelection(songId){
   GAME.pendingReleaseSong=songId;
-  const song=GAME.songs.find(s=>s.id===songId);
-  const type=GAME.pendingReleaseType||song.releaseType||'single';
-  const songCount=GAME.pendingReleaseSongs?GAME.pendingReleaseSongs.length:1;
-  
-  const covers=['💿','🎵','🎤','🎧','🎸','🎹','🥁','🎺','🎻','🌟','💎','🔥','💙','💜','🖤','🤍','❤️','🌈','🌙','⭐','✨','🎬','📀','🎼'];
-  
-  const typeLabel={single:'Single',album:'Album',ep:'EP',deluxe:'Deluxe'}[type]||'Single';
-  
-  let html=`
-    <div style="text-align:center;margin-bottom:24px">
-      <div style="font-size:20px;font-weight:800;font-family:var(--fb);margin-bottom:8px">${GAME.pendingAlbumName||song.title}</div>
-      <div style="font-size:13px;color:var(--mut)">${typeLabel} · ${songCount} Song${songCount>1?'s':''}</div>
-    </div>
-    
-    ${song.coverImage?`
-    <div style="text-align:center;margin-bottom:24px">
-      <img src="${song.coverImage}" style="width:150px;height:150px;object-fit:cover;border-radius:12px;border:2px solid var(--acc)">
-    </div>
-    `:''}
-    
-    <div style="font-size:14px;font-weight:700;margin-bottom:12px;font-family:var(--fb)">Album Cover</div>
-    
-    <button class="ms-btn" onclick="uploadCustomCover()" style="margin-bottom:16px">📷 Upload from Gallery</button>
-    
-    <div style="font-size:13px;color:var(--mut);margin-bottom:12px;text-align:center">or choose emoji:</div>
-    
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px">`;
-  
-  covers.forEach(cover=>{
-    html+=`<div onclick="selectCover('${cover}')" style="aspect-ratio:1;background:var(--surf);border:2px solid ${!song.coverImage && song.cover===cover?'var(--acc)':'var(--bord)'};border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer">${cover}</div>`;
+  var song=GAME.songs.find(function(s){return s.id===songId;});
+  if(!song) return;
+  var type=GAME.pendingReleaseType||song.releaseType||'single';
+  var songCount=GAME.pendingReleaseSongs?GAME.pendingReleaseSongs.length:1;
+  var typeLabel={single:'Single',album:'Album',ep:'EP',deluxe:'Deluxe'}[type]||'Single';
+  var albumName=GAME.pendingAlbumName||song.title;
+
+  // Expose song id globally so rf* helpers can find it
+  window._rfSongId=songId;
+
+  // Color gradient themes for the vinyl disc default
+  var themes=[
+    {label:'Deep Purple',a:'#7c3aed',b:'#4f1d96'},
+    {label:'Night Blue',a:'#2563eb',b:'#1e3a8a'},
+    {label:'Forest',a:'#059669',b:'#064e3b'},
+    {label:'Amber',a:'#d97706',b:'#78350f'},
+    {label:'Crimson',a:'#dc2626',b:'#7f1d1d'}
+  ];
+  if(typeof song._rfTheme==='undefined') song._rfTheme=0;
+  if(!song.conceptImages) song.conceptImages=[];
+  var themeIdx=song._rfTheme||0;
+  var th=themes[themeIdx];
+
+  // ── helper: step dots (1-3) ──────────────────────────
+  function stepDots(active){
+    var d='<div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:20px">';
+    for(var i=1;i<=3;i++){
+      var isDone=i<active;
+      var isActive=i===active;
+      var label=isDone?'✓':String(i);
+      var bg=isDone||isActive?'var(--acc)':'var(--surf)';
+      var fg=isDone||isActive?'var(--acc-txt)':'var(--mut)';
+      var bd='2px solid '+(isDone||isActive?'var(--acc)':'var(--bord)');
+      var glow=isActive?';box-shadow:0 0 0 3px var(--acc-bg)':'';
+      d+='<div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:'+bg+';color:'+fg+';border:'+bd+glow+'">'+label+'</div>';
+      if(i<3) d+='<div style="flex:1;height:2px;background:'+(i<active?'var(--acc)':'var(--bord)')+'"></div>';
+    }
+    return d+'</div>';
+  }
+
+  // ── helper: cover square graphic ─────────────────────
+  function coverSq(small){
+    var sz=small?'80px':'160px';
+    var r=small?'10px':'16px';
+    if(song.coverImage){
+      return '<div style="width:'+sz+';height:'+sz+';border-radius:'+r+';overflow:hidden;margin:0 auto '+(small?'8px':'16px')+'">'
+        +'<img src="'+song.coverImage+'" style="width:100%;height:100%;object-fit:cover"></div>';
+    }
+    // CSS vinyl disc graphic
+    var discSz=small?70:140;
+    var centSz=small?28:50;
+    var holeSz=small?10:16;
+    return '<div style="width:'+sz+';height:'+sz+';border-radius:'+r+';background:linear-gradient(135deg,'+th.a+','+th.b+');display:flex;align-items:center;justify-content:center;margin:0 auto '+(small?'8px':'16px')+';overflow:hidden">'
+      +'<div style="width:'+discSz+'px;height:'+discSz+'px;border-radius:50%;background:conic-gradient(rgba(169,125,232,.6) 0deg,rgba(252,211,77,.5) 60deg,rgba(96,165,250,.5) 120deg,rgba(52,211,153,.5) 180deg,rgba(248,113,113,.5) 240deg,rgba(167,139,250,.5) 300deg,rgba(169,125,232,.6) 360deg);display:flex;align-items:center;justify-content:center">'
+      +'<div style="width:'+centSz+'px;height:'+centSz+'px;border-radius:50%;background:rgba(200,200,200,0.9);display:flex;align-items:center;justify-content:center">'
+      +'<div style="width:'+holeSz+'px;height:'+holeSz+'px;border-radius:50%;background:rgba(50,50,50,0.8)"></div>'
+      +'</div></div></div>';
+  }
+
+  // ── Screen 1: Cover Art ───────────────────────────────
+  var themeChips='';
+  if(!song.coverImage){
+    themes.forEach(function(t,i){
+      themeChips+='<div onclick="rfSetTheme('+i+')" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,'+t.a+','+t.b+');cursor:pointer;border:3px solid '+(i===themeIdx?'var(--txt)':'transparent')+'"></div>';
+    });
+    themeChips='<div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px">'+themeChips+'</div>';
+  }
+
+  var s1='<div id="rf-s1">'
+    +stepDots(1)
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">'
+    +'<button onclick="_closeOverlay(this)" style="background:none;border:none;font-size:22px;color:var(--acc);cursor:pointer;padding:0;touch-action:manipulation">←</button>'
+    +'<div style="font-size:15px;font-weight:800;color:var(--txt)">Cover Art</div>'
+    +'<div style="width:30px"></div></div>'
+    +coverSq(false)
+    +'<div style="font-size:15px;font-weight:800;font-family:var(--fb);color:var(--txt);text-align:center;margin-bottom:3px">'+albumName+'</div>'
+    +'<div style="font-size:12px;color:var(--mut);text-align:center;margin-bottom:16px">'+typeLabel+' · '+songCount+' Song'+(songCount>1?'s':'')+'</div>'
+    +themeChips
+    // Upload zone (hidden when image already uploaded)
+    +'<div id="rf-upload-zone" onclick="document.getElementById(\'rf-cover-input\').click()" style="display:'+(song.coverImage?'none':'block')+';border:1.5px dashed var(--acc);border-radius:12px;padding:14px;text-align:center;cursor:pointer;background:var(--acc-bg);margin-bottom:12px;touch-action:manipulation">'
+    +'<div style="font-size:13px;color:var(--acc);font-weight:700">📷 Upload from Gallery</div>'
+    +'<div style="font-size:11px;color:var(--mut);margin-top:3px">tap to upload · or pick a colour above</div>'
+    +'</div>'
+    +(song.coverImage?'<div style="text-align:center;margin-bottom:12px"><button onclick="rfClearCover()" style="background:none;border:1px solid var(--bord);border-radius:8px;padding:6px 16px;font-size:12px;color:var(--mut);cursor:pointer;font-family:var(--fb);touch-action:manipulation">Replace</button></div>':'')
+    +'<input type="file" id="rf-cover-input" accept="image/*" style="display:none" onchange="rfHandleCoverUpload(event)">'
+    +'<button onclick="rfGoTo(2)" style="width:100%;padding:14px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:var(--fb);touch-action:manipulation">Next →</button>'
+    +'</div>';
+
+  // ── Screen 2: Concept Photos ──────────────────────────
+  var slotsHTML='';
+  for(var si=0;si<3;si++){
+    var img=song.conceptImages[si]||'';
+    slotsHTML+='<div onclick="document.getElementById(\'rf-concept-input\').click()" style="aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--surf);border:1.5px dashed var(--bord);display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">'
+      +(img?'<img src="'+img+'" style="width:100%;height:100%;object-fit:cover">'
+           :'<div style="text-align:center;color:var(--mut)"><div style="font-size:22px;margin-bottom:4px">+</div><div style="font-size:10px">Photo '+(si+1)+'</div></div>')
+      +'</div>';
+  }
+
+  var s2='<div id="rf-s2" style="display:none">'
+    +stepDots(2)
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    +'<button onclick="rfGoTo(1)" style="background:none;border:none;font-size:22px;color:var(--acc);cursor:pointer;padding:0;touch-action:manipulation">←</button>'
+    +'<div style="font-size:15px;font-weight:800;color:var(--txt)">Concept Photos</div>'
+    +'<button onclick="rfGoTo(3)" style="background:none;border:none;font-size:13px;color:var(--mut);cursor:pointer;padding:4px 8px;touch-action:manipulation">Skip</button></div>'
+    +'<div style="font-size:12px;color:var(--mut);text-align:center;margin-bottom:14px">Optional · up to 3 photos</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">'+slotsHTML+'</div>'
+    +'<input type="file" id="rf-concept-input" accept="image/*" multiple style="display:none" onchange="rfHandleConceptUpload(event)">'
+    // Fan reactions preview panel
+    +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:14px;margin-bottom:16px">'
+    +'<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-bottom:10px">🎨 Fan reactions · preview</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'
+    +'<div style="font-size:12px;color:var(--txt);line-height:1.5">💜 <em>"omg the aesthetic is giving everything rn"</em></div>'
+    +'<div style="font-size:12px;color:var(--txt);line-height:1.5">🔥 <em>"era of the century is literally loading"</em></div>'
+    +'<div style="font-size:12px;color:var(--txt);line-height:1.5">✨ <em>"i have never been more ready for this"</em></div>'
+    +'</div></div>'
+    +'<button onclick="rfGoTo(3)" style="width:100%;padding:14px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:var(--fb);touch-action:manipulation">Next →</button>'
+    +'</div>';
+
+  // ── Screen 3: Review & Release ────────────────────────
+  var songIds=(GAME.pendingReleaseSongs&&GAME.pendingReleaseSongs.length>0)?GAME.pendingReleaseSongs:[songId];
+  var trackHTML='';
+  songIds.forEach(function(id,idx){
+    var s=GAME.songs.find(function(x){return x.id===id;});
+    if(!s) return;
+    var q=s.quality||0;
+    var qc=q>=80?'#2ed573':q>=60?'#ffd32a':q>=40?'var(--acc)':'#ff6b6b';
+    trackHTML+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bord)">'
+      +'<div style="font-size:12px;color:var(--mut);width:18px;text-align:center">'+(idx+1)+'</div>'
+      +'<div style="flex:1;font-size:13px;color:var(--txt)">'+s.title+'</div>'
+      +'<div style="font-size:11px;font-weight:700;color:'+qc+'">'+q+'</div>'
+      +'</div>';
   });
-  
-  html+=`</div>
-    <button class="ms-btn" onclick="confirmRelease()">Continue to Promotions →</button>
-    <div style="text-align:center;margin-top:12px">
-      <button onclick="closeMenu()" style="background:none;border:none;color:var(--mut);font-family:var(--fb);font-size:13px;padding:12px;cursor:pointer">Cancel</button>
-    </div>
-  `;
-  
-  openMenu('',html);
+
+  var hasConcept=song.conceptImages&&song.conceptImages.length>0;
+  // Blurred hero section
+  var heroInner=song.coverImage
+    ?'<img src="'+song.coverImage+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(20px);transform:scale(1.08)">'
+    :'<div style="position:absolute;inset:0;background:linear-gradient(135deg,'+th.a+','+th.b+')">'
+     +'<div style="width:100%;height:100%;background:conic-gradient(rgba(169,125,232,.4) 0deg,rgba(252,211,77,.3) 90deg,rgba(96,165,250,.3) 180deg,rgba(52,211,153,.3) 270deg,rgba(169,125,232,.4) 360deg);filter:blur(18px);transform:scale(1.08)"></div>'
+     +'</div>';
+
+  // Day picker chips (Mon–Sun)
+  var dayChips=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(d,i){
+    var wkd=i>=5;
+    return '<button onclick="rfSelectDay(this,'+i+')" style="flex:1;min-width:36px;padding:10px 2px;border-radius:10px;border:1.5px solid '+(wkd?'var(--acc)':'var(--bord)')+';background:'+(wkd?'var(--acc-bg)':'var(--surf)')+';color:'+(wkd?'var(--acc)':'var(--txt)')+';font-size:11px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">'+d+'</button>';
+  }).join('');
+
+  var s3='<div id="rf-s3" style="display:none">'
+    +stepDots(3)
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">'
+    +'<button onclick="rfGoTo(2)" style="background:none;border:none;font-size:22px;color:var(--acc);cursor:pointer;padding:0;touch-action:manipulation">←</button>'
+    +'<div style="font-size:15px;font-weight:800;color:var(--txt)">Review &amp; Release</div>'
+    +'<div style="width:30px"></div></div>'
+    // Blurred hero
+    +'<div style="position:relative;height:230px;overflow:hidden;margin:0 -16px 20px">'
+    +heroInner
+    +'<div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 35%,var(--bg) 100%)"></div>'
+    +'<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">'
+    +coverSq(false)
+    +'</div>'
+    +'</div>'
+    // Title + type
+    +'<div style="text-align:center;margin-bottom:18px">'
+    +'<div style="font-size:22px;font-weight:800;font-family:Georgia,serif;color:var(--txt);margin-bottom:4px">'+albumName+'</div>'
+    +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--mut)">'+typeLabel+' · '+songCount+' Track'+(songCount>1?'s':'')+'</div>'
+    +'</div>'
+    // Concept banner
+    +'<div style="background:var(--surf);border:1px solid '+(hasConcept?'var(--acc)':'var(--bord)')+';border-radius:10px;padding:10px 12px;margin-bottom:14px;display:flex;align-items:center;gap:8px">'
+    +'<div style="font-size:16px">🎨</div>'
+    +'<div style="font-size:12px;font-weight:700;color:'+(hasConcept?'var(--acc)':'var(--mut)')+'">'+( hasConcept?'Concept photos added ✓':'No concept photos · skip is fine')+'</div>'
+    +'</div>'
+    // Tracklist
+    +'<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-bottom:6px">Tracklist</div>'
+    +trackHTML+'</div>'
+    // Timing card
+    +'<div id="rf-timing-card" onclick="rfToggleSchedule()" style="background:var(--surf);border:1.5px solid var(--bord);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;touch-action:manipulation">'
+    +'<div><div style="font-size:13px;font-weight:700;color:var(--txt)">📅 Schedule for a specific day</div>'
+    +'<div style="font-size:11px;color:var(--mut);margin-top:2px">tap to choose release day</div></div>'
+    +'<div style="font-size:18px;color:var(--mut)">›</div></div>'
+    // Day picker (initially hidden)
+    +'<div id="rf-day-picker" style="display:none;margin-bottom:14px">'
+    +'<div style="display:flex;gap:5px;flex-wrap:nowrap">'+dayChips+'</div>'
+    +'<div style="font-size:11px;color:var(--mut);margin-top:8px;text-align:center">💡 Weekend drops often outperform weekdays</div>'
+    +'</div>'
+    // Primary release button
+    +'<button onclick="rfReleaseNow('+songId+')" style="width:100%;padding:15px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:var(--fb);margin-bottom:10px;touch-action:manipulation">🚀 Release Now</button>'
+    +'<button onclick="rfToggleSchedule()" style="width:100%;padding:13px;background:none;border:1.5px solid var(--bord);border-radius:10px;font-size:14px;font-weight:700;color:var(--txt);cursor:pointer;font-family:var(--fb);touch-action:manipulation">📅 Schedule Release</button>'
+    +'</div>';
+
+  var html='<div style="padding:16px 16px 100px">'+s1+s2+s3+'</div>';
+  _insertOverlay(html);
+
+  // Restore screen after re-render (set by rfGoTo / rfSetTheme etc.)
+  var screen=window._rfScreen||1;
+  if(screen>1) rfGoTo(screen);
 }
+
+// ── Release flow helpers ───────────────────────────────
+function rfGoTo(n){
+  [1,2,3].forEach(function(i){
+    var el=document.getElementById('rf-s'+i);
+    if(el) el.style.display=(i===n?'block':'none');
+  });
+  window._rfScreen=n;
+}
+
+function rfSetTheme(idx){
+  var song=GAME.songs.find(function(s){return s.id===window._rfSongId;});
+  if(!song) return;
+  song._rfTheme=idx;
+  window._rfScreen=1;
+  var ov=document.querySelector('body > div[data-app-overlay]');
+  if(ov) ov.remove();
+  showCoverSelection(window._rfSongId);
+}
+
+function rfClearCover(){
+  var song=GAME.songs.find(function(s){return s.id===window._rfSongId;});
+  if(!song) return;
+  song.coverImage=null;
+  window._rfScreen=1;
+  var ov=document.querySelector('body > div[data-app-overlay]');
+  if(ov) ov.remove();
+  showCoverSelection(window._rfSongId);
+}
+
+function rfHandleCoverUpload(evt){
+  var file=evt.target.files&&evt.target.files[0];
+  if(!file) return;
+  var song=GAME.songs.find(function(s){return s.id===window._rfSongId;});
+  if(!song) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    song.coverImage=e.target.result;
+    song.cover=null;
+    window._rfScreen=1;
+    var ov=document.querySelector('body > div[data-app-overlay]');
+    if(ov) ov.remove();
+    showCoverSelection(window._rfSongId);
+  };
+  reader.readAsDataURL(file);
+}
+
+function rfHandleConceptUpload(evt){
+  var files=evt.target.files;
+  if(!files||!files.length) return;
+  var song=GAME.songs.find(function(s){return s.id===window._rfSongId;});
+  if(!song) return;
+  var arr=Array.from(files).slice(0,3);
+  if(files.length>3) showToast('Only the first 3 photos were used.','blue');
+  var results=new Array(arr.length);
+  var count=0;
+  arr.forEach(function(f,i){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      results[i]=e.target.result;
+      count++;
+      if(count===arr.length){
+        song.conceptImages=results;
+        window._rfScreen=2;
+        var ov=document.querySelector('body > div[data-app-overlay]');
+        if(ov) ov.remove();
+        showCoverSelection(window._rfSongId);
+      }
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
+function rfToggleSchedule(){
+  var picker=document.getElementById('rf-day-picker');
+  var card=document.getElementById('rf-timing-card');
+  if(!picker) return;
+  var showing=picker.style.display!=='none';
+  picker.style.display=showing?'none':'block';
+  if(card) card.style.display=showing?'flex':'none';
+}
+
+function rfSelectDay(el,dowIdx){
+  // dowIdx: 0=Mon,...,5=Sat,6=Sun (from the chip row)
+  // Convert to JS Date.getDay(): 0=Sun,1=Mon,...,6=Sat
+  var jsDow=dowIdx===6?0:dowIdx+1;
+  var curDay=GAME.day||1;
+  var origin=new Date(2017,0,1).getTime();
+  var targetDay=curDay+1;
+  for(var i=1;i<=7;i++){
+    var d=curDay+i;
+    var realDate=new Date(origin+(d-1)*86400000);
+    if(realDate.getDay()===jsDow){targetDay=d;break;}
+  }
+  window._rfScreen=1;
+  var ov=document.querySelector('body > div[data-app-overlay]');
+  if(ov) ov.remove();
+  doScheduleRelease(targetDay);
+}
+
+function rfReleaseNow(songId){
+  GAME._releaseNow=true;
+  var ov=document.querySelector('body > div[data-app-overlay]');
+  if(ov) ov.remove();
+  setTimeout(function(){showDistributionStep(songId);},80);
+}
+// ─────────────────────────────────────────────────────
 
 function selectCover(cover){
   const songId=GAME.pendingReleaseSong || (GAME.pendingReleaseSongs && GAME.pendingReleaseSongs[0]);
