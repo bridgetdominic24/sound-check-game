@@ -9542,11 +9542,16 @@ function showSongDetails(songId){
         }).join('');
       // iMusic: purchases row (separate from streaming)
       if(iMusicSales>0){
-        statsHTML+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;padding:8px;background:rgba(232,180,76,.07);border-radius:8px;margin-top:6px">'
+        // iMusic keeps 30%; iMusicRev is already the artist's 70% net
+        var _iMusicGross=(iMusicRev/0.70);
+        statsHTML+='<div style="display:flex;flex-direction:column;gap:2px;padding:8px;background:rgba(232,180,76,.07);border-radius:8px;margin-top:6px">'
+          +'<div style="display:flex;align-items:center;gap:8px">'
           +'<span style="font-size:13px">🎶</span>'
           +'<span style="font-size:12px;color:var(--mut);flex:1">iMusic <span style="background:rgba(232,180,76,.15);color:var(--acc);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;letter-spacing:.5px">Purchases</span></span>'
           +'<span style="font-size:12px;font-weight:700;color:var(--acc)">'+iMusicSales.toLocaleString()+' downloads</span>'
-          +(iMusicRev>0?'<span style="font-size:11px;color:var(--mut)">$'+iMusicRev.toFixed(2)+'</span>':'')
+          +(iMusicRev>0?'<span style="font-size:11px;color:var(--mut)">$'+iMusicRev.toFixed(2)+' net</span>':'')
+          +'</div>'
+          +(iMusicRev>0?'<div style="font-size:10px;color:var(--mut);padding-left:21px">Gross $'+_iMusicGross.toFixed(2)+' · iMusic kept 30% ($'+(_iMusicGross-iMusicRev).toFixed(2)+')</div>':'')
           +'</div>';
       }
       statsHTML+='</div>';
@@ -39886,12 +39891,14 @@ function _processDailyStreams(){
 
     if(_exclActive && _excl === 'imusic'){
       // ── iMusic purchase-only exclusivity: ALL activity → purchases, no streaming ──
+      // iMusic keeps 30% of each sale (same as real Apple Music/iTunes store cut)
       var _iMusicPrice = _distrib.iMusicPrice || song.iMusicPrice || 0.99;
+      var _iMusicNet = _iMusicPrice * 0.70; // artist receives 70% after iMusic's 30% cut
       song.iMusic_sales   = (song.iMusic_sales||0)   + dailyNew;
-      song.iMusic_revenue = (song.iMusic_revenue||0) + dailyNew * _iMusicPrice;
+      song.iMusic_revenue = (song.iMusic_revenue||0) + dailyNew * _iMusicNet;
       // Superfan: higher loyalty gain during purchase exclusivity
       GAME.fanLoyalty = Math.min(100, (GAME.fanLoyalty||0) + Math.ceil(dailyNew * 0.05));
-      totalRev += dailyNew * _iMusicPrice * _royMult;
+      totalRev += dailyNew * _iMusicNet * _royMult;
 
     } else if(_exclActive && _excl !== 'all'){
       // ── Streaming platform exclusivity ──────────────────────────────────────
@@ -39938,7 +39945,8 @@ function _processDailyStreams(){
       song.platforms.soundcloud = (song.platforms.soundcloud||0) + Math.floor(dailyNew*_sc2/_tot2);
       // iMusic: track purchase units separately (legacy platforms.itunes untouched for backward compat)
       var _iMusicPrice2  = _distrib.iMusicPrice || song.iMusicPrice || 0.99;
-      var _iMusicRev2    = _itPurchases * _iMusicPrice2;
+      // iMusic keeps 30% — artist earns 70% of the listed price
+      var _iMusicRev2    = _itPurchases * _iMusicPrice2 * 0.70;
       song.iMusic_sales   = (song.iMusic_sales||0)   + _itPurchases;
       song.iMusic_revenue = (song.iMusic_revenue||0) + _iMusicRev2;
       // Purchases increase fan loyalty
