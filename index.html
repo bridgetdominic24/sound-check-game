@@ -6490,6 +6490,7 @@ function renderSongs(){
         ?`<span style="font-size:11px;color:var(--mut)">by ${_collabNames}</span> ${song.title}${featBadge}`
         :`${song.title}${featBadge}`;
       const streams=song.streams||0;
+      const wkStreams=_gs.weeklyStreams||song.weeklyStreams||0;
       const padding=isSingle?'0 0':'0 0';
 
       html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px ${padding};${!isSingle&&!isLast?'border-bottom:0.5px solid var(--bord)':''};cursor:pointer" onclick="songOptions(${song.id})">
@@ -6497,7 +6498,11 @@ function renderSongs(){
           <div style="font-size:14px;font-weight:500;color:var(--txt)">${_titleLine}</div>
           <div style="font-size:12px;color:var(--mut)">${song.subgenre||song.genre} · ${song.lengthTotal?Math.floor(song.lengthTotal/60)+':'+String(song.lengthTotal%60).padStart(2,'0'):'3:00'} · Quality ${song.quality}/100${_payInfo}</div>
         </div>
-        <div style="text-align:right;font-size:13px;color:var(--mut)">${streams.toLocaleString()}</div>
+        <div style="text-align:right;flex-shrink:0;margin-left:8px">
+          <div style="font-size:13px;font-weight:700;color:var(--txt)">${wkStreams.toLocaleString()}</div>
+          <div style="font-size:10px;color:var(--mut)">this wk</div>
+          <div style="font-size:10px;color:var(--mut)">${streams.toLocaleString()} total</div>
+        </div>
       </div>`;
     });
     
@@ -32799,8 +32804,7 @@ function openCollabEmailView(req){
   var timeStr=new Date(req.created_at).toLocaleTimeString();
   var note=req.note||req.message||'';
 
-  var html='<div id="collabEmailModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:210000;overflow-y:auto" onclick="if(event.target===this)this.remove()">'
-    +'<div style="background:var(--bg);min-height:100%;max-width:600px;margin:0 auto;padding-bottom:80px">'
+  var html='<div style="background:var(--bg);min-height:100%;padding-bottom:80px">'
     // Header bar
     +'<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--bord);background:var(--surf)">'
     +'<button onclick="document.getElementById(\'collabEmailModal\').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--mut);padding:2px 6px">←</button>'
@@ -32856,9 +32860,16 @@ function openCollabEmailView(req){
       +(roundNum<2?'<button onclick="openCollabCounterSheet(JSON.parse(decodeURIComponent(\''+reqJson+'\')))" style="flex:1;padding:12px;background:#ffa502;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--fb)">↔ Counter</button>':'')
       +'<button onclick="respondCollab(\''+req.id+'\',\'decline\');document.getElementById(\'collabEmailModal\').remove()" style="flex:1;padding:12px;background:#dc3545;color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--fb)">✗ Decline</button>'
       +'</div>':'')
-    +'</div></div>';
+    +'</div>';
 
-  document.body.insertAdjacentHTML('beforeend',html);
+  var _phone=document.getElementById('phone');
+  var _modal=document.createElement('div');
+  _modal.id='collabEmailModal';
+  if(_phone) _modal.className=_phone.className;
+  _modal.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.72);z-index:210000;overflow-y:auto';
+  _modal.addEventListener('click',function(e){if(e.target===_modal)_modal.remove();});
+  _modal.innerHTML=html;
+  document.body.appendChild(_modal);
 }
 
 // ── COUNTER SHEET (Task 8) ──────────────────────────────────────────
@@ -32869,8 +32880,7 @@ function openCollabCounterSheet(req){
 
   var currentPay=req.payment_summary||(req.offered_fee?'$'+(req.offered_fee||0).toLocaleString()+(req.royalty_pct?' + '+req.royalty_pct+'%':''):'—');
 
-  var html='<div id="collabCounterSheet" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:220000;display:flex;flex-direction:column;justify-content:flex-end" onclick="if(event.target===this)this.remove()">'
-    +'<div style="background:var(--bg);border-radius:16px 16px 0 0;padding:0 0 40px;max-height:85vh;overflow-y:auto">'
+  var html='<div style="background:var(--bg);border-radius:16px 16px 0 0;padding:0 0 40px;max-height:85vh;overflow-y:auto">'
     // Handle bar
     +'<div style="display:flex;justify-content:center;padding:12px"><div style="width:40px;height:4px;background:var(--bord);border-radius:2px"></div></div>'
     // Round badge
@@ -32896,12 +32906,19 @@ function openCollabCounterSheet(req){
     // Buttons
     +'<button onclick="csSubmitCounter(\''+req.id+'\')" style="width:100%;padding:14px;background:#ffa502;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb);margin-bottom:10px">Send Counter →</button>'
     +'<button onclick="document.getElementById(\'collabCounterSheet\').remove()" style="width:100%;padding:12px;background:none;color:var(--mut);border:1.5px solid var(--bord);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--fb)">Cancel</button>'
-    +'</div></div></div>';
+    +'</div></div>';
 
   window._csPayType='flat';
   window._csRoyalty=req.royalty_pct||35;
   window._csMixRoyalty=35;
-  document.body.insertAdjacentHTML('beforeend',html);
+  var _csPhone=document.getElementById('phone');
+  var _csSheet=document.createElement('div');
+  _csSheet.id='collabCounterSheet';
+  if(_csPhone) _csSheet.className=_csPhone.className;
+  _csSheet.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:220000;display:flex;flex-direction:column;justify-content:flex-end';
+  _csSheet.addEventListener('click',function(e){if(e.target===_csSheet)_csSheet.remove();});
+  _csSheet.innerHTML=html;
+  document.body.appendChild(_csSheet);
 }
 function csSelectPayType(t){
   window._csPayType=t;
