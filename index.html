@@ -9965,8 +9965,7 @@ function showSongDetails(songId){
     _aH+='<button class="sd-sab sd-sab-s" onclick="editSongName('+songId+')">✏ Edit Name</button>';
     _aH+='<button class="sd-sab sd-sab-d" onclick="deleteSong('+songId+')">🗑 Delete Song</button>';
   } else if(isReleased){
-    // Released — sticky promo btn handles promote; just show edit
-    _aH+='<button class="sd-sab sd-sab-s" onclick="editSongName('+songId+')">✏ Edit Name</button>';
+    // Released — song name is locked; sticky promo btn handles promote
   }
   _aH+='</div>';
 
@@ -10221,7 +10220,8 @@ function deleteSong(songId){
 function editSongName(songId){
   const song = GAME.songs.find(s => s.id === songId);
   if(!song) return;
-  
+  if(song.released){ showToast("Song names can't be changed after release","error"); return; }
+
   const newName = prompt('Enter new song name:', song.title);
   if(!newName || newName.trim() === '') return;
   
