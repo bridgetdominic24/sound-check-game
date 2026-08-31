@@ -36747,6 +36747,18 @@ function _milestoneFire(mkey, a, mOpts){
 // but NOT on dedup, cap, or moderation hits (no article = no effect).
 async function _fireArticleTrigger(opts){
   if(!opts || !opts.triggerKey || !opts.onSuccess) return;
+
+  // VELOUR GATE — Velour never covers unsigned artists (CLAUDE.md: locked rule).
+  // Individual callers also gate this, but this acts as a hard safety net so a
+  // future trigger can't accidentally send a Velour article for an unsigned player.
+  if(opts.outlet && opts.outlet.toLowerCase() === 'velour'){
+    var _isSigned = (GAME && (GAME.signedLabel || GAME.ownedLabel));
+    if(!_isSigned){
+      console.warn('[Article] Velour blocked — player is unsigned (triggerKey: '+opts.triggerKey+')');
+      return;
+    }
+  }
+
   var EDGE = 'https://pvxrciebegirmrrrzkor.supabase.co/functions/v1/generate-article';
 
   try {
