@@ -30561,6 +30561,139 @@ function getConceptFanReactions(song){
   ];
 }
 
+// ══════════════════════════════════════════════════════
+// DISTRIBUTION STEP — platform selection + exclusivity
+// Opens between showReleaseReview and proceedToPromotions
+// ══════════════════════════════════════════════════════
+function showDistributionStep(songId){
+  var song = GAME.songs.find(function(s){ return s.id === songId; });
+  if(!song){ return; }
+
+  var _prev = song.distribution || {};
+  // State lives on window so inline onclick strings can mutate it
+  window._dist = {
+    songId: songId,
+    platforms: (_prev.platforms && _prev.platforms.length) ? _prev.platforms.slice()
+               : ['spotify','apple','youtube','amazon','soundcloud','imusic'],
+    exclusivity: _prev.exclusivity || 'all',
+    iMusicPrice: _prev.iMusicPrice || song.iMusicPrice || 0.99,
+  };
+
+  var PMAP = [
+    {id:'spotify',    name:'Loopify',       type:'Streaming',    emoji:'💚'},
+    {id:'apple',      name:'Orange Music',  type:'Streaming',    emoji:'🟠'},
+    {id:'amazon',     name:'Sahara',        type:'Streaming',    emoji:'🌊'},
+    {id:'soundcloud', name:'SoundPuff',     type:'Streaming',    emoji:'☁️'},
+    {id:'youtube',    name:'YTM',           type:'Video + Audio',emoji:'📺'},
+    {id:'imusic',     name:'iMusic',        type:'Purchases',    emoji:'🎵'},
+  ];
+  var EMAP = [
+    {id:'all',       icon:'🌐', label:'All platforms simultaneously',
+     desc:'No exclusivity — best reach from day one.'},
+    {id:'loopify',   icon:'💚', label:'Loopify exclusive — 48 hrs',
+     desc:'Loopify editorial placement +20%. Only Loopify for 2 game days.'},
+    {id:'orange',    icon:'🟠', label:'Orange Music exclusive — 48 hrs',
+     desc:'Prestige signal. Orange editorial +25%. 2 game days.'},
+    {id:'soundpuff', icon:'☁️', label:'SoundPuff first — 72 hrs',
+     desc:'Undertone coverage +30% + authenticity bonus. 3 game days.'},
+    {id:'imusic',    icon:'🎵', label:'iMusic purchase-only — 1 week',
+     desc:'No streaming for 7 game days. Max download revenue. Buyers become superfans.'},
+  ];
+
+  window._distBuild = function(){
+    var d = window._dist;
+    var platRows = '';
+    for(var pi=0;pi<PMAP.length;pi++){
+      var p = PMAP[pi];
+      var on = d.platforms.indexOf(p.id) !== -1;
+      var isIM = p.id === 'imusic';
+      var rowR = on && isIM ? '10px 10px 0 0' : '10px';
+      var rowMB = on && isIM ? '0' : '8px';
+      platRows += '<div onclick="window._distToggle(\''+p.id+'\')" style="display:flex;align-items:center;gap:12px;padding:12px;background:'+(on?'var(--acc-bg)':'var(--surf)')+';border:1.5px solid '+(on?'var(--acc)':'var(--bord)')+';border-radius:'+rowR+';margin-bottom:'+rowMB+';cursor:pointer;touch-action:manipulation">'
+        + '<div style="font-size:22px">'+p.emoji+'</div>'
+        + '<div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--txt)">'+p.name+'</div>'
+        + '<div style="font-size:11px;color:var(--mut)">'+p.type+'</div></div>'
+        + '<div style="width:40px;height:24px;border-radius:12px;background:'+(on?'var(--acc)':'rgba(128,128,128,0.3)')+';position:relative;flex-shrink:0">'
+        + '<div style="position:absolute;top:4px;left:'+(on?'18px':'4px')+';width:16px;height:16px;border-radius:50%;background:#fff"></div>'
+        + '</div></div>';
+      if(on && isIM){
+        var prBtns = '';
+        ['0.99','1.29','1.49'].forEach(function(pr){
+          var sel = parseFloat(d.iMusicPrice).toFixed(2) === pr;
+          prBtns += '<button onclick="event.stopPropagation();window._dist.iMusicPrice='+pr+';window._distRedraw()" style="flex:1;padding:8px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;border:1.5px solid '+(sel?'var(--acc)':'var(--bord)')+';background:'+(sel?'var(--acc)':'var(--bg)')+';color:'+(sel?'var(--acc-txt)':'var(--txt)')+'">$'+pr+'</button>';
+        });
+        platRows += '<div style="padding:8px 12px 12px;background:var(--surf);border:1px solid var(--bord);border-top:none;border-radius:0 0 10px 10px;margin-bottom:8px">'
+          + '<div style="font-size:10px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Price per download</div>'
+          + '<div style="display:flex;gap:6px">'+prBtns+'</div></div>';
+      }
+    }
+
+    var exclRows = '';
+    for(var ei=0;ei<EMAP.length;ei++){
+      var opt = EMAP[ei];
+      var sel = d.exclusivity === opt.id;
+      exclRows += '<div onclick="window._dist.exclusivity=\''+opt.id+'\';window._distRedraw()" style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:'+(sel?'var(--acc-bg)':'var(--surf)')+';border:1.5px solid '+(sel?'var(--acc)':'var(--bord)')+';border-radius:10px;margin-bottom:8px;cursor:pointer;touch-action:manipulation">'
+        + '<div style="font-size:18px;margin-top:1px">'+opt.icon+'</div>'
+        + '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:'+(sel?'var(--acc)':'var(--txt)')+'">'+opt.label+'</div>'
+        + '<div style="font-size:11px;color:var(--mut);margin-top:2px">'+opt.desc+'</div></div>'
+        + '<div style="width:18px;height:18px;border-radius:50%;border:2px solid '+(sel?'var(--acc)':'var(--bord)')+';background:'+(sel?'var(--acc)':'transparent')+';flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center">'
+        + (sel?'<div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>':'')+'</div></div>';
+    }
+
+    return '<div style="padding:16px 16px 120px">'
+      + '<div style="font-size:18px;font-weight:800;color:var(--txt);margin-bottom:4px">📡 Distribution</div>'
+      + '<div style="font-size:13px;color:var(--mut);margin-bottom:20px">Choose where your music lives and whether to launch with an exclusive window.</div>'
+      + '<div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:10px">Platforms</div>'
+      + platRows
+      + '<div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin:20px 0 10px">Exclusivity <span style="font-size:10px;font-weight:500;letter-spacing:0;text-transform:none">(optional — select one)</span></div>'
+      + exclRows
+      + '<div style="position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--bord);padding:12px 16px;z-index:200001">'
+      + '<button onclick="window._distConfirm()" style="width:100%;padding:14px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:var(--fb);touch-action:manipulation;margin-bottom:8px">🚀 Confirm &amp; Release</button>'
+      + '<button onclick="_closeOverlay(this)" style="width:100%;padding:8px;background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;font-family:var(--fb);touch-action:manipulation">← Back</button>'
+      + '</div></div>';
+  };
+
+  window._distToggle = function(platId){
+    var idx = window._dist.platforms.indexOf(platId);
+    if(idx === -1) window._dist.platforms.push(platId);
+    else window._dist.platforms.splice(idx, 1);
+    window._distRedraw();
+  };
+
+  window._distRedraw = function(){
+    var el = document.querySelector('body > div[data-app-overlay]');
+    if(el) el.innerHTML = window._distBuild();
+    // Re-apply sticky fix from _insertOverlay
+    if(el) el.querySelectorAll('[style*="position:fixed"][style*="bottom:0"]').forEach(function(f){
+      f.style.position='sticky'; f.style.bottom='0'; f.style.left=''; f.style.right=''; f.style.width='100%';
+    });
+  };
+
+  window._distConfirm = function(){
+    var d = window._dist;
+    var s = GAME.songs.find(function(x){ return x.id === d.songId; });
+    if(!s) return;
+    if(!d.platforms.length){ alert('Select at least one platform.'); return; }
+    // Calc exclusivity end game-day
+    var durMap = {loopify:2, orange:2, soundpuff:3, imusic:7};
+    var durDays = durMap[d.exclusivity] || 0;
+    var endDay = durDays > 0 ? ((GAME.day||1) + durDays) : null;
+    s.distribution = {
+      platforms: d.platforms.slice(),
+      exclusivity: d.exclusivity,
+      exclusivityDuration: durDays,
+      exclusivityEndDay: endDay,
+      iMusicPrice: parseFloat(d.iMusicPrice) || 0.99,
+    };
+    s.iMusicPrice = s.distribution.iMusicPrice; // backward compat
+    var overlay = document.querySelector('body > div[data-app-overlay]');
+    if(overlay) overlay.remove();
+    proceedToPromotions();
+  };
+
+  _insertOverlay(window._distBuild());
+}
+
 function showReleaseReview(){
   // Fix: Check if array is empty OR doesn't exist
   const songIds=(GAME.pendingReleaseSongs && GAME.pendingReleaseSongs.length>0) ? GAME.pendingReleaseSongs : [GAME.pendingReleaseSong];
@@ -30616,15 +30749,7 @@ function showReleaseReview(){
         </div>`
     }
 
-    <div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:14px;margin-bottom:16px">
-      <div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin-bottom:10px">🎶 iMusic Price</div>
-      <div style="display:flex;gap:8px">
-        ${['0.99','1.29','1.49'].map(p=>`<button id="imusic-price-${p.replace('.','_')}" onclick="(function(){var s=GAME.songs&&GAME.songs.find(function(x){return x.id===(GAME.pendingReleaseSongs&&GAME.pendingReleaseSongs[0]||GAME.pendingReleaseSong);});if(s)s.iMusicPrice=parseFloat('${p}');['0.99','1.29','1.49'].forEach(function(v){var b=document.getElementById('imusic-price-'+v.replace('.','_'));if(b){b.style.background=v==='${p}'?'var(--acc)':'var(--surf)';b.style.color=v==='${p}'?'var(--acc-txt)':'var(--txt)';b.style.borderColor=v==='${p}'?'var(--acc)':'var(--bord)';}});})();" style="flex:1;padding:10px 6px;border:1.5px solid ${(mainSong.iMusicPrice||0.99).toFixed(2)===p?'var(--acc)':'var(--bord)'};border-radius:8px;background:${(mainSong.iMusicPrice||0.99).toFixed(2)===p?'var(--acc)':'var(--surf)'};color:${(mainSong.iMusicPrice||0.99).toFixed(2)===p?'var(--acc-txt)':'var(--txt)'};font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation">$${p}</button>`).join('')}
-      </div>
-      <div style="font-size:11px;color:var(--mut);margin-top:8px">Per download on iMusic. Streaming revenue on other platforms is unaffected.</div>
-    </div>
-
-    <button class="ms-btn" onclick="GAME._releaseNow=true;proceedToPromotions()" style="margin-bottom:10px">🚀 Release Now →</button>
+    <button class="ms-btn" onclick="GAME._releaseNow=true;closeMenu();setTimeout(function(){showDistributionStep(${mainSong.id});},80);" style="margin-bottom:10px">🚀 Release Now →</button>
     <button onclick="GAME._releaseNow=false;showConceptUpload()" style="width:100%;padding:14px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;font-size:15px;font-weight:700;color:var(--txt);cursor:pointer;touch-action:manipulation">📅 Schedule Release</button>
   </div>`;
   openMenu('',html);
@@ -39016,42 +39141,88 @@ function _processDailyStreams(){
     const dailyNew = calculateDailySongStreams(song);
     if(dailyNew <= 0) return;
 
-    // Calculate platform split first so iMusic can be separated before updating stream counts
+    // ── Distribution: exclusivity + platform filtering ──────────────────────
+    var _distrib = song.distribution || {};
+    var _enabledPlats = (_distrib.platforms && _distrib.platforms.length) ? _distrib.platforms
+                        : ['spotify','apple','youtube','amazon','soundcloud','imusic'];
+    var _excl = _distrib.exclusivity || 'all';
+    var _exclActive = false;
+    if(_excl !== 'all' && _distrib.exclusivityEndDay){
+      _exclActive = (GAME.day||1) <= _distrib.exclusivityEndDay;
+    }
+
+    // Platform init
     if(!song.platforms) song.platforms = {spotify:0,apple:0,youtube:0,amazon:0,soundcloud:0,itunes:0};
-    var _rv2=function(base,spread){return Math.max(0.01,base+(Math.random()-0.5)*spread);};
-    var _sp2=_rv2(0.42,0.04),_ap2=_rv2(0.25,0.03),_yt2=_rv2(0.15,0.03),_am2=_rv2(0.06,0.02),_sc2=_rv2(0.05,0.02),_it2=_rv2(0.07,0.02);
-    var _tot2=_sp2+_ap2+_yt2+_am2+_sc2+_it2;
 
-    // iMusic is a PURCHASE platform — separate its share from streaming counts
-    var _itPurchases=Math.floor(dailyNew*_it2/_tot2);
-    var _streamingNew=dailyNew-_itPurchases;
-
-    song.streams = (song.streams||0) + _streamingNew;
-    song.weeklyStreams = (song.weeklyStreams||0) + _streamingNew;
-    totalNewStreams += _streamingNew;
-
-    // Distribute to regions using total activity (iMusic purchases also drive regional fans)
+    // Distribute to regions using total activity (runs regardless of exclusivity)
     if(typeof distributeStreamsToRegions === 'function'){
       distributeStreamsToRegions(song, dailyNew);
     }
 
-    // Streaming platform counts (Loopify, Orange, Yourtube, Sahara, SoundPuff)
-    song.platforms.spotify    = (song.platforms.spotify||0)     + Math.floor(dailyNew*_sp2/_tot2);
-    song.platforms.apple      = (song.platforms.apple||0)       + Math.floor(dailyNew*_ap2/_tot2);
-    song.platforms.youtube    = (song.platforms.youtube||0)     + Math.floor(dailyNew*_yt2/_tot2);
-    song.platforms.amazon     = (song.platforms.amazon||0)      + Math.floor(dailyNew*_am2/_tot2);
-    song.platforms.soundcloud = (song.platforms.soundcloud||0)  + Math.floor(dailyNew*_sc2/_tot2);
-    // iMusic: track purchase units separately (legacy platforms.itunes untouched for backward compat)
-    song.iMusic_sales   = (song.iMusic_sales||0)   + _itPurchases;
-    var _iMusicPrice    = song.iMusicPrice || 0.99;
-    var _iMusicRev      = _itPurchases * _iMusicPrice;
-    song.iMusic_revenue = (song.iMusic_revenue||0) + _iMusicRev;
-    // Purchases increase fan loyalty
-    if(_itPurchases > 0) GAME.fanLoyalty = Math.min(100, (GAME.fanLoyalty||0) + Math.ceil(_itPurchases*0.01));
+    if(_exclActive && _excl === 'imusic'){
+      // ── iMusic purchase-only exclusivity: ALL activity → purchases, no streaming ──
+      var _iMusicPrice = _distrib.iMusicPrice || song.iMusicPrice || 0.99;
+      song.iMusic_sales   = (song.iMusic_sales||0)   + dailyNew;
+      song.iMusic_revenue = (song.iMusic_revenue||0) + dailyNew * _iMusicPrice;
+      // Superfan: higher loyalty gain during purchase exclusivity
+      GAME.fanLoyalty = Math.min(100, (GAME.fanLoyalty||0) + Math.ceil(dailyNew * 0.05));
+      totalRev += dailyNew * _iMusicPrice;
 
-    // Revenue: streaming platforms + iMusic purchase revenue
-    const rev = Math.floor(dailyNew*_sp2/_tot2)*0.003 + Math.floor(dailyNew*_ap2/_tot2)*0.007 + Math.floor(dailyNew*_yt2/_tot2)*0.001 + Math.floor(dailyNew*(_am2+_sc2)/_tot2)*0.004 + _iMusicRev;
-    totalRev += rev;
+    } else if(_exclActive && _excl !== 'all'){
+      // ── Streaming platform exclusivity ──────────────────────────────────────
+      // Bonus multipliers per platform
+      var _bonusMap = {loopify:1.20, orange:1.25, soundpuff:1.30};
+      var _exclBonus = _bonusMap[_excl] || 1.0;
+      var _platKeyMap = {loopify:'spotify', orange:'apple', soundpuff:'soundcloud'};
+      var _exclKey = _platKeyMap[_excl] || 'spotify';
+      var _bonused = Math.floor(dailyNew * _exclBonus);
+      song.streams      = (song.streams||0)      + _bonused;
+      song.weeklyStreams = (song.weeklyStreams||0) + _bonused;
+      totalNewStreams   += _bonused;
+      song.platforms[_exclKey] = (song.platforms[_exclKey]||0) + _bonused;
+      // Revenue rate for exclusive platform
+      var _exclRateMap = {spotify:0.003, apple:0.007, soundcloud:0.004};
+      totalRev += _bonused * (_exclRateMap[_exclKey] || 0.003);
+
+    } else {
+      // ── Normal multi-platform distribution ──────────────────────────────────
+      var _rv2=function(base,spread){return Math.max(0.01,base+(Math.random()-0.5)*spread);};
+      // Zero out disabled platforms
+      var _sp2 = _enabledPlats.indexOf('spotify')    !== -1 ? _rv2(0.42,0.04) : 0;
+      var _ap2 = _enabledPlats.indexOf('apple')      !== -1 ? _rv2(0.25,0.03) : 0;
+      var _yt2 = _enabledPlats.indexOf('youtube')    !== -1 ? _rv2(0.15,0.03) : 0;
+      var _am2 = _enabledPlats.indexOf('amazon')     !== -1 ? _rv2(0.06,0.02) : 0;
+      var _sc2 = _enabledPlats.indexOf('soundcloud') !== -1 ? _rv2(0.05,0.02) : 0;
+      var _it2 = _enabledPlats.indexOf('imusic')     !== -1 ? _rv2(0.07,0.02) : 0;
+      var _tot2 = _sp2+_ap2+_yt2+_am2+_sc2+_it2;
+      if(_tot2 <= 0) return; // all platforms disabled
+
+      // iMusic is a PURCHASE platform — separate its share from streaming counts
+      var _itPurchases = Math.floor(dailyNew*_it2/_tot2);
+      var _streamingNew = dailyNew - _itPurchases;
+
+      song.streams      = (song.streams||0)      + _streamingNew;
+      song.weeklyStreams = (song.weeklyStreams||0) + _streamingNew;
+      totalNewStreams   += _streamingNew;
+
+      // Streaming platform counts (Loopify, Orange, YTM, Sahara, SoundPuff)
+      song.platforms.spotify    = (song.platforms.spotify||0)    + Math.floor(dailyNew*_sp2/_tot2);
+      song.platforms.apple      = (song.platforms.apple||0)      + Math.floor(dailyNew*_ap2/_tot2);
+      song.platforms.youtube    = (song.platforms.youtube||0)    + Math.floor(dailyNew*_yt2/_tot2);
+      song.platforms.amazon     = (song.platforms.amazon||0)     + Math.floor(dailyNew*_am2/_tot2);
+      song.platforms.soundcloud = (song.platforms.soundcloud||0) + Math.floor(dailyNew*_sc2/_tot2);
+      // iMusic: track purchase units separately (legacy platforms.itunes untouched for backward compat)
+      var _iMusicPrice2  = _distrib.iMusicPrice || song.iMusicPrice || 0.99;
+      var _iMusicRev2    = _itPurchases * _iMusicPrice2;
+      song.iMusic_sales   = (song.iMusic_sales||0)   + _itPurchases;
+      song.iMusic_revenue = (song.iMusic_revenue||0) + _iMusicRev2;
+      // Purchases increase fan loyalty
+      if(_itPurchases > 0) GAME.fanLoyalty = Math.min(100, (GAME.fanLoyalty||0) + Math.ceil(_itPurchases*0.01));
+
+      // Revenue: streaming platforms + iMusic purchase revenue
+      const rev = Math.floor(dailyNew*_sp2/_tot2)*0.003 + Math.floor(dailyNew*_ap2/_tot2)*0.007 + Math.floor(dailyNew*_yt2/_tot2)*0.001 + Math.floor(dailyNew*(_am2+_sc2)/_tot2)*0.004 + _iMusicRev2;
+      totalRev += rev;
+    }
 
     // Fan gain from streams — 1% of daily streams convert to new fans
     const fanGain = Math.floor(dailyNew * 0.01);
