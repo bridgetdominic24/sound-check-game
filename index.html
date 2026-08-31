@@ -9187,144 +9187,140 @@ function showPreReleaseHub(songId){
 
 function openPreReleaseHub(song){
   if(!song) return;
-  // Ensure preRelease exists
   if(!song.preRelease) song.preRelease={enabled:false,releaseWeek:null,hypePoints:0,weeklyActivity:[],activitiesCompleted:[],consistencyBonus:false,fanMomentum:0.9};
   var pr=song.preRelease;
   pr.enabled=true;
-
   updateFanMomentum(song);
 
   var hp=pr.hypePoints||0;
   var fm=pr.fanMomentum||0.9;
-  // Bar fill: map 0.9–1.4 range to 0–100%
-  var fmPct=Math.round(((fm-0.9)/0.5)*100);
-  var mulLabel=fm===1.4?'1.4×':fm===1.3?'1.3×':fm===1.15?'1.15×':fm===1.0?'1.0×':fm===0.95?'0.95×':'0.9×';
+  var fmPct=Math.min(100,Math.round(((fm-0.9)/0.5)*100));
+  var mulLabel=fm>=1.4?'1.4x':fm>=1.3?'1.3x':fm>=1.15?'1.15x':fm>=1.0?'1.0x':'0.9x';
 
   var curWeek=GAME.week||1;
   var minReleaseWeek=curWeek+2;
   var releaseWeek=pr.releaseWeek;
-  var weeksTill=releaseWeek?Math.max(0,releaseWeek-curWeek):99;
+  var weeksTill=releaseWeek?Math.max(0,releaseWeek-curWeek):null;
 
-  // Active filter tab (stored on window)
-  var activeFilter=window._prhFilter||'all';
+  // ── Top bar ───────────────────────────────────────────
+  var topbar='<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surf);border-bottom:1px solid var(--bord);flex-shrink:0">'
+    +'<button onclick="_closeOverlay(this)" style="background:none;border:none;font-size:22px;color:var(--txt);cursor:pointer;padding:0;line-height:1;touch-action:manipulation">←</button>'
+    +'<div style="flex:1"><div style="font-size:15px;font-weight:800;color:var(--txt)">Pre-Release Hub</div>'
+    +'<div style="font-size:10.5px;color:var(--mut)">'+song.title+(releaseWeek?' &bull; dropping Week '+releaseWeek:'')+'</div></div>'
+    +'</div>';
 
-  // ── Release date strip ───────────────────────────────
-  var dateStripHTML;
+  // ── Ticks: which ones are hit ─────────────────────────
+  var ticks=[[0,'0.9x'],[5,'1.0x'],[15,'1.15x'],[30,'1.3x'],[50,'1.4x']];
+  var ticksHTML='<div style="display:flex;justify-content:space-between;margin-top:5px">';
+  ticks.forEach(function(t){
+    var hit=hp>=t[0];
+    ticksHTML+='<span style="font-size:8.5px;font-weight:700;color:'+(hit?'#4cc98a':'var(--mut)')+'">'+t[0]+'→'+t[1]+'</span>';
+  });
+  ticksHTML+='</div>';
+
+  // ── Release week pill ─────────────────────────────────
+  var weekPill;
   if(releaseWeek){
-    dateStripHTML='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">'
-      +'<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);font-weight:700;margin-bottom:2px">Release Week</div>'
-      +'<div style="font-size:16px;font-weight:800;color:var(--txt)">Week '+releaseWeek+'</div>'
-      +'<div style="font-size:12px;color:var(--mut);margin-top:1px">'+weeksTill+' week'+(weeksTill!==1?'s':'')+' away</div></div>'
-      +'<button onclick="prhSetReleaseWeek('+song.id+',null)" style="background:none;border:1px solid var(--bord);border-radius:8px;padding:5px 10px;font-size:11px;color:var(--mut);cursor:pointer;font-family:var(--fb)">Change</button>'
+    weekPill='<div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;margin-top:7px;font-size:12px">'
+      +'<span>📅</span>'
+      +'<span style="flex:1;color:var(--mut)">Release week</span>'
+      +'<b style="color:var(--txt)">'+(weeksTill===0?'This week!':weeksTill+' game week'+(weeksTill!==1?'s':'')+' away')+'</b>'
+      +'<button onclick="prhSetReleaseWeek('+song.id+',null)" style="background:none;border:none;font-size:11px;color:var(--mut);cursor:pointer;padding:0;font-family:var(--fb);touch-action:manipulation">change</button>'
       +'</div>';
   } else {
-    // Week picker
-    dateStripHTML='<div style="background:var(--acc-bg);border:1px solid var(--acc);border-radius:12px;padding:12px 14px;margin-bottom:14px">'
-      +'<div style="font-size:12px;font-weight:700;color:var(--acc);margin-bottom:8px">📅 Set your release week</div>'
-      +'<div style="display:flex;align-items:center;gap:10px">'
-      +'<button onclick="prhAdjustWeek('+song.id+',-1)" style="width:32px;height:32px;border-radius:50%;background:var(--surf);border:1.5px solid var(--bord);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--txt);touch-action:manipulation">−</button>'
-      +'<div id="prh-week-pick" style="flex:1;text-align:center;font-size:17px;font-weight:800;color:var(--txt)">Week '+(window._prhPickedWeek||minReleaseWeek)+'</div>'
-      +'<button onclick="prhAdjustWeek('+song.id+',1)" style="width:32px;height:32px;border-radius:50%;background:var(--surf);border:1.5px solid var(--bord);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--txt);touch-action:manipulation">+</button>'
+    // Week picker pill
+    weekPill='<div style="background:var(--acc-bg);border:1px solid var(--acc);border-radius:10px;padding:10px 12px;margin-top:7px">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--acc);margin-bottom:7px">📅 Set your release week first</div>'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+      +'<button onclick="prhAdjustWeek('+song.id+',-1)" style="width:30px;height:30px;border-radius:50%;background:var(--surf);border:1.5px solid var(--bord);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--txt);touch-action:manipulation;flex-shrink:0">−</button>'
+      +'<div id="prh-week-pick" style="flex:1;text-align:center;font-size:16px;font-weight:800;color:var(--txt)">Week '+(window._prhPickedWeek||minReleaseWeek)+'</div>'
+      +'<button onclick="prhAdjustWeek('+song.id+',1)" style="width:30px;height:30px;border-radius:50%;background:var(--surf);border:1.5px solid var(--bord);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--txt);touch-action:manipulation;flex-shrink:0">+</button>'
       +'</div>'
-      +'<div style="font-size:11px;color:var(--mut);margin-top:5px;text-align:center">Minimum: Week '+(minReleaseWeek)+' (2+ weeks from now)</div>'
-      +'<button onclick="prhSetReleaseWeek('+song.id+',null)" style="width:100%;margin-top:10px;padding:10px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">Confirm Week</button>'
+      +'<button onclick="prhSetReleaseWeek('+song.id+',null)" style="width:100%;padding:9px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">Confirm Week</button>'
       +'</div>';
   }
 
-  // ── Fan momentum bar ─────────────────────────────────
-  var momentumHTML='<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:14px 16px;margin-bottom:14px">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
-    +'<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--mut)">Fan Momentum</div>'
-    +'<div style="font-size:13px;font-weight:800;color:var(--acc)">'+mulLabel+'</div>'
+  // ── Fixed momentum header ─────────────────────────────
+  var mhdr='<div style="padding:12px 16px;border-bottom:1px solid var(--bord);background:var(--surf);flex-shrink:0">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:7px">'
+    +'<div><div style="font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--mut)">Fan Momentum</div>'
+    +'<div style="font-size:10.5px;color:var(--mut);margin-top:2px">'+hp+' pts'+(pr.consistencyBonus?' &bull; consistency bonus ✨':'')+'</div></div>'
+    +'<div style="text-align:right"><div style="font-size:22px;font-weight:900;color:var(--acc)">'+mulLabel+'</div>'
+    +'<div style="font-size:10.5px;color:var(--mut)">at launch</div></div>'
     +'</div>'
-    +'<div style="position:relative;height:10px;border-radius:5px;background:var(--surf);overflow:hidden;margin-bottom:4px">'
-    +'<div style="height:100%;width:'+fmPct+'%;border-radius:5px;background:linear-gradient(90deg,var(--acc),var(--bord))"></div>'
+    +'<div style="height:8px;border-radius:4px;background:var(--card);border:1px solid var(--bord);overflow:hidden;margin-bottom:2px">'
+    +'<div style="height:100%;width:'+fmPct+'%;border-radius:4px;background:linear-gradient(90deg,var(--acc),var(--acc-txt))"></div>'
     +'</div>'
-    +'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mut);margin-bottom:6px">'
-    +'<span>Cold Drop</span><span>Hot Release</span>'
-    +'</div>'
-    +'<div style="font-size:11.5px;color:var(--mut)">'+hp+' hype point'+(hp!==1?'s':'')+' accumulated'
-    +(pr.consistencyBonus?'&nbsp;&nbsp;<span style="font-size:10px;color:var(--acc);font-weight:700">✨ Consistency bonus active</span>':'')
-    +'</div>'
+    +ticksHTML
+    +weekPill
     +'</div>';
 
-  // ── Filter tabs ──────────────────────────────────────
-  var filters=[['all','All'],['6','6+ Weeks'],['4','4 Weeks'],['2','2 Weeks']];
-  var tabsHTML='<div style="display:flex;gap:0;border-bottom:2px solid var(--bord);margin-bottom:14px">';
-  filters.forEach(function(f){
-    var on=activeFilter===f[0];
-    tabsHTML+='<button onclick="prhSetFilter(\''+f[0]+'\','+song.id+')" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid '+(on?'var(--acc)':'transparent')+';margin-bottom:-2px;font-size:12px;font-weight:'+(on?'700':'500')+';color:'+(on?'var(--acc)':'var(--mut)')+';cursor:pointer;touch-action:manipulation;font-family:var(--fb)">'+f[1]+'</button>';
-  });
-  tabsHTML+='</div>';
-
-  // ── Activity cards ───────────────────────────────────
+  // ── Activity sections (grouped by phase) ──────────────
+  var phases=[
+    {weeks:6,label:'📅  6+ Weeks Out',color:'#4cc98a',bg:'rgba(76,201,138,.08)',badge:'Unlocked'},
+    {weeks:4,label:'📷  4+ Weeks Out',color:'var(--acc)',bg:'rgba(232,180,76,.08)',badge:'Unlocked'},
+    {weeks:2,label:'🔊  2+ Weeks Out',color:'var(--acc)',bg:'var(--acc-bg)',badge:'Unlocked'},
+  ];
   var cardsHTML='';
-  PRERELEASE_ACTIVITIES.forEach(function(act){
-    // Filter
-    if(activeFilter!=='all'&&String(act.weeksRequired)!==activeFilter) return;
-
-    var status=activityAvailable(act,song);
-    var isDone=status==='done';
-    var isLocked=status==='locked';
-    var needsPub=status==='needs_publicist';
-    var isAvail=status==='available';
-
-    var cardBg=isDone?'var(--acc-bg)':'var(--card)';
-    var cardBd=isDone?'var(--acc)':'var(--bord)';
-    var cardOp=isLocked||needsPub?'opacity:0.5;':'';
-
-    var badge='';
-    if(isDone) badge='<div style="font-size:10px;font-weight:800;color:var(--acc);background:var(--acc-bg);border:1px solid var(--acc);border-radius:6px;padding:3px 8px;white-space:nowrap;flex-shrink:0">✓ Done</div>';
-    else if(isLocked) badge='<div style="font-size:10px;font-weight:700;color:var(--mut);background:var(--surf);border:1px solid var(--bord);border-radius:6px;padding:3px 8px;white-space:nowrap;flex-shrink:0">🔒 '+act.weeksRequired+'+ wks</div>';
-    else if(needsPub) badge='<div style="font-size:10px;font-weight:700;color:var(--mut);background:var(--surf);border:1px solid var(--bord);border-radius:6px;padding:3px 8px;white-space:nowrap;flex-shrink:0">Need publicist</div>';
-    else badge='<div style="font-size:10px;font-weight:800;color:var(--acc);background:var(--acc-bg);border:1px solid var(--acc);border-radius:6px;padding:3px 8px;white-space:nowrap;flex-shrink:0">+'+act.hypePoints+' hype</div>';
-
-    cardsHTML+='<div style="background:'+cardBg+';border:1.5px solid '+cardBd+';border-radius:12px;padding:14px;margin-bottom:10px;'+cardOp+'">'
-      +'<div style="display:flex;align-items:flex-start;gap:12px">'
-      +'<div style="width:40px;height:40px;border-radius:10px;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">'+act.icon+'</div>'
-      +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:1px">'+act.label+'</div>'
-      +'<div style="font-size:11px;color:var(--mut);margin-bottom:4px">'+act.sublabel+'</div>'
-      +'<div style="font-size:11.5px;color:var(--txt);line-height:1.4;margin-bottom:4px">'+act.description+'</div>'
-      +(act.cost>0?'<div style="font-size:11px;color:var(--mut)">Cost: $'+act.cost.toLocaleString()+'</div>':'')
-      +(act.energyCost>0?'<div style="font-size:11px;color:var(--mut)">Energy: −'+act.energyCost+'</div>':'')
-      +(isDone?'<div style="font-size:11px;font-weight:700;color:var(--acc);margin-top:4px">+'+act.hypePoints+' hype pts earned ✓</div>':'')
-      +'</div>'
-      +badge
-      +'</div>'
-      +(isAvail?'<button onclick="prhStartActivity('+song.id+',\''+act.id+'\')" style="width:100%;margin-top:10px;padding:10px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">'+(act.action?'Open →':'Start')+'</button>':'')
+  phases.forEach(function(phase){
+    var phaseActs=PRERELEASE_ACTIVITIES.filter(function(a){return a.weeksRequired===phase.weeks;});
+    if(!phaseActs.length) return;
+    // Phase header
+    cardsHTML+='<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 8px">'
+      +'<div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:'+phase.color+'">'+phase.label+'</div>'
+      +'<div style="font-size:9px;font-weight:700;background:'+phase.bg+';color:'+phase.color+';border-radius:4px;padding:2px 8px">'+phase.badge+'</div>'
       +'</div>';
+    phaseActs.forEach(function(act){
+      var status=activityAvailable(act,song);
+      var isDone=status==='done';
+      var isLocked=status==='locked';
+      var needsPub=status==='needs_publicist';
+      var isAvail=status==='available';
+
+      // Card style matching blueprint .ac classes
+      var cardStyle='background:var(--card);border:1px solid var(--bord);border-radius:12px;margin-bottom:7px;display:flex;align-items:center;gap:11px;padding:11px 12px;position:relative;overflow:hidden;';
+      if(isDone) cardStyle='background:var(--card);border:1px solid rgba(76,201,138,.35);border-radius:12px;margin-bottom:7px;display:flex;align-items:center;gap:11px;padding:11px 12px;position:relative;overflow:hidden;';
+      if(isLocked||needsPub) cardStyle+='opacity:.42;';
+
+      // Points badge (right side)
+      var ptBadge='';
+      if(isDone) ptBadge='<div style="font-size:11px;font-weight:900;color:#4cc98a;background:rgba(76,201,138,.1);padding:1px 6px;border-radius:4px;flex-shrink:0">OK</div>';
+      else if(isLocked) ptBadge='<div style="font-size:10px;font-weight:800;color:var(--mut);flex-shrink:0">'+act.weeksRequired+' wks</div>';
+      else if(needsPub) ptBadge='<div style="font-size:10px;font-weight:700;color:var(--mut);flex-shrink:0">publicist</div>';
+      else ptBadge='<div style="font-size:10px;font-weight:800;color:'+phase.color+';background:'+phase.bg+';padding:2px 7px;border-radius:4px;flex-shrink:0">+'+act.hypePoints+' pts</div>';
+
+      // Icon background
+      var icoBg=isDone?'rgba(76,201,138,.1)':phase.bg;
+
+      var costLine='';
+      if(act.cost>0) costLine+=' &bull; $'+act.cost.toLocaleString();
+      if(act.energyCost>0) costLine+=' &bull; ⚡'+act.energyCost;
+
+      cardsHTML+='<div style="'+cardStyle+'"'+(isAvail?' onclick="prhStartActivity('+song.id+',\''+act.id+'\')"':'')+(!isAvail&&!isDone?' style="'+cardStyle+'"':'')+'>'
+        +'<div style="width:40px;height:40px;border-radius:10px;background:'+icoBg+';display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">'+act.icon+'</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:13px;font-weight:700;color:var(--txt);display:block;margin-bottom:2px">'+act.label+(act.sublabel?' &mdash; <span style="font-weight:400;color:var(--mut)">'+act.sublabel+'</span>':'')+'</div>'
+        +'<div style="font-size:11px;color:var(--mut)">'+act.description+(costLine?costLine:'')+'</div>'
+        +'</div>'
+        +ptBadge
+        +'</div>';
+    });
   });
 
-  // ── Proceed button (sticky footer) ──────────────────
+  // ── Sticky footer ─────────────────────────────────────
   var canRelease=!!releaseWeek;
-  var footerHTML='<div style="position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--bord);padding:12px 16px">'
-    +'<button onclick="'+(canRelease?'prhProceedToRelease('+song.id+')':'showToast(\'Set a release week first!\',\'blue\')')+'" style="width:100%;padding:14px;background:'+(canRelease?'var(--acc)':'var(--surf)')+';color:'+(canRelease?'var(--acc-txt)':'var(--mut)')+';border:1.5px solid '+(canRelease?'var(--acc)':'var(--bord)')+';border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:var(--fb);touch-action:manipulation">'
-    +'Release Now → <span style="font-size:12px;font-weight:500;opacity:0.85">Fan Momentum: '+mulLabel+'</span>'
+  var footerHTML='<div style="padding:12px 16px;border-top:1px solid var(--bord);background:var(--surf);flex-shrink:0">'
+    +'<button onclick="'+(canRelease?'prhProceedToRelease('+song.id+')':'showToast(\'Set a release week first!\',\'blue\')')+'" style="width:100%;padding:14px;background:'+(canRelease?'var(--acc)':'var(--card)')+';color:'+(canRelease?'var(--acc-txt)':'var(--mut)')+';border:1.5px solid '+(canRelease?'var(--acc)':'var(--bord)')+';border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:var(--fb);touch-action:manipulation">'
+    +(canRelease?'Release Now → <span style="font-size:12px;font-weight:500;opacity:.85">'+mulLabel+' launch multiplier</span>':'Set a release week above to continue')
     +'</button></div>';
 
-  var html='<div id="preReleaseHubOverlay" style="display:flex;flex-direction:column;height:100%">'
-    +'<div style="flex:1;overflow-y:auto;padding:16px 16px 0">'
-    // Header
-    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
-    +'<button onclick="_closeOverlay(this)" style="background:none;border:none;font-size:24px;color:var(--acc);cursor:pointer;padding:0;line-height:1;touch-action:manipulation">←</button>'
-    +'<div style="flex:1">'
-    +'<div style="font-size:17px;font-weight:800;color:var(--txt);font-family:var(--fb)">'+song.title+'</div>'
-    +'<div style="font-size:11px;color:var(--mut)">Pre-Release Hub</div>'
-    +'</div>'
-    +(song.coverImage?'<img src="'+song.coverImage+'" style="width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0">'
-      :'<div style="width:40px;height:40px;border-radius:8px;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎵</div>')
-    +'</div>'
-    // Release date
-    +dateStripHTML
-    // Fan momentum
-    +momentumHTML
-    // Filter tabs
-    +tabsHTML
-    // Activity cards
+  var html='<div style="display:flex;flex-direction:column;height:100%;background:var(--bg)">'
+    +topbar
+    +mhdr
+    +'<div style="flex:1;overflow-y:auto;padding:0 16px 16px">'
     +cardsHTML
+    +'<div style="height:8px"></div>'
     +'</div>'
-    // Sticky footer
     +footerHTML
     +'</div>';
 
