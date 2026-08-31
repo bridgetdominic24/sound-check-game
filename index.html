@@ -9451,6 +9451,139 @@ function showSongDetails(songId){
     actionsHTML='<button onclick="showPromoManager('+songId+')" style="width:100%;padding:14px;background:linear-gradient(135deg,var(--acc),#764ba2);color:var(--acc-txt);border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🎯 Promote This Song</button>';
   }
 
+  // ── HELPER ──────────────────────────────────────────────────────────────────
+  var _fmtN=function(n){if(n>=1e9)return (n/1e9).toFixed(1)+'B';if(n>=1e6)return (n/1e6).toFixed(1)+'M';if(n>=1e3)return (n/1e3).toFixed(1)+'K';return String(n);};
+
+  // ── QUICK STATS BAR (released only — 4 boxes below status badge) ────────────
+  var quickStatsBarHTML='';
+  if(isReleased){
+    var _qs_total=song.streams||0;
+    var _qs_split=song.collaborators&&song.collaborators.length>0?1/(song.collaborators.length+1):(1-(song.collabRevenueSplit||0));
+    var _qs_rev=(_qs_total*0.004*_qs_split).toFixed(0);
+    var _qs_peak=song.peakPosition?'#'+song.peakPosition:'—';
+    var _qs_weeks=song.weeksOnChart||0;
+    quickStatsBarHTML='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">'
+      +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:15px;font-weight:800;color:var(--acc)">'+_fmtN(_qs_total)+'</div><div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-top:2px">Streams</div></div>'
+      +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:15px;font-weight:800;color:#2ed573">$'+_qs_rev+'</div><div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-top:2px">Revenue</div></div>'
+      +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:15px;font-weight:800;color:var(--txt)">'+_qs_peak+'</div><div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-top:2px">Peak</div></div>'
+      +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:15px;font-weight:800;color:var(--txt)">'+_qs_weeks+'</div><div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin-top:2px">Wks Chart</div></div>'
+      +'</div>';
+  }
+
+  // ── RECORDED (pre-release) EXTRAS ─────────────────────────────────────────
+  var recordedExtrasHTML='';
+  if(isRecorded&&!isReleased){
+    var _rw=GAME.skills.writing||0,_rv=GAME.skills.singing||GAME.skills.vocals||0,_rp=GAME.skills.production||0;
+    var _ravg=(_rw+_rv+_rp)/3;
+    var _rtag=(song.topic?3:0)+(song.subgenre?4:0);
+    // A. Quality Breakdown
+    recordedExtrasHTML+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
+      +'<div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:12px">⭐ Quality Breakdown</div>'
+      +[['✍️ Writing',_rw],['🎤 Singing',_rv],['🎛️ Production',_rp]].map(function(sk){
+        var pct=Math.min(100,Math.round(sk[1]));
+        return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-size:12px;color:var(--txt);font-weight:600">'+sk[0]+'</span><span style="font-size:12px;color:var(--mut)">'+sk[1].toFixed(0)+' pts → +'+Math.round(sk[1]/3)+' quality</span></div><div style="height:6px;background:var(--bord);border-radius:3px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:var(--acc);border-radius:3px"></div></div></div>';
+      }).join('')
+      +'<div style="border-top:1px solid var(--bord);margin-top:8px;padding-top:10px;font-size:11px;color:var(--mut)">Formula: avg skill ('+_ravg.toFixed(0)+') + tag bonus (+'+_rtag+') = <strong style="color:var(--txt)">'+(song.quality||0)+'/100</strong></div>'
+      +'</div>';
+    // B. Pre-Release Campaign
+    var _rhype=song.hype||GAME.hype||0;
+    var _rmul=_rhype>=80?'1.4x':_rhype>=60?'1.3x':_rhype>=40?'1.15x':_rhype>=20?'1.0x':'0.9x';
+    var _rhc=_rhype>=60?'#2ed573':_rhype>=20?'var(--acc)':'#ff6b6b';
+    recordedExtrasHTML+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:13px;font-weight:800;color:var(--txt)">🚀 Pre-Release Campaign</div><div style="font-size:12px;font-weight:800;color:'+_rhc+'">'+_rmul+' release boost</div></div>'
+      +'<div style="font-size:11px;color:var(--mut);margin-bottom:8px">Hype: '+_rhype+'/100</div>'
+      +'<div style="height:8px;background:var(--bord);border-radius:4px;overflow:hidden;margin-bottom:10px"><div style="width:'+Math.min(100,_rhype)+'%;height:100%;background:'+_rhc+';border-radius:4px"></div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +[['0.9x','Low'],['1.0x','Building'],['1.15x','Buzz'],['1.3x','Hot'],['1.4x','Viral']].map(function(m){var a=m[0]===_rmul;return '<div style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;'+(a?'background:'+_rhc+';color:#fff;':'background:var(--bord);color:var(--mut);')+'">'+m[0]+' '+m[1]+'</div>';}).join('')
+      +'</div>'
+      +'<button onclick="showPromoManager('+songId+')" style="width:100%;margin-top:12px;padding:11px;background:linear-gradient(135deg,var(--acc),#764ba2);color:var(--acc-txt);border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--fb);touch-action:manipulation">🎯 Start Promo Campaign</button>'
+      +'</div>';
+    // C. Music Video
+    if(song.mvId){
+      recordedExtrasHTML+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
+        +'<div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:12px">🎬 Music Video</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+        +'<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--acc)">'+(song.mvViews||0).toLocaleString()+'</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">YTM Views</div></div>'
+        +'<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--txt)">'+(song.mvChartPosition?'#'+song.mvChartPosition:'—')+'</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">Chart Pos</div></div>'
+        +'</div>'
+        +'<div style="font-size:11px;color:var(--mut);margin-bottom:4px">Watch-time: '+(song.mvWatchTimePct||0)+'%</div>'
+        +'<div style="height:6px;background:var(--bord);border-radius:3px;overflow:hidden"><div style="width:'+Math.min(100,song.mvWatchTimePct||0)+'%;height:100%;background:#a29bfe;border-radius:3px"></div></div>'
+        +'</div>';
+    } else {
+      recordedExtrasHTML+='<div style="border:2px dashed var(--bord);border-radius:12px;padding:16px;margin-bottom:14px;text-align:center">'
+        +'<div style="font-size:20px;margin-bottom:6px">🎬</div>'
+        +'<div style="font-size:13px;font-weight:700;color:var(--mut);margin-bottom:4px">No MV planned yet</div>'
+        +'<div style="font-size:11px;color:var(--mut);margin-bottom:10px">A music video boosts Yourtube streams and chart visibility.</div>'
+        +'<button onclick="showToast(\'Music video upload coming soon!\',\'blue\')" style="padding:8px 18px;background:var(--surf);border:1.5px solid var(--bord);color:var(--txt);border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--fb)">+ Add Music Video</button>'
+        +'</div>';
+    }
+  }
+
+  // ── RELEASED EXTRAS (B–F) ──────────────────────────────────────────────────
+  var releasedExtrasHTML='';
+  if(isReleased){
+    // B. Regional Chart Positions
+    var _rcPos=song.loopifyChartPos||null,_raPos=song.africaChartPos||null,_rePos=song.europeChartPos||null,_rymPos=song.mvChartPosition||null;
+    if(_rcPos||_raPos||_rePos||_rymPos){
+      releasedExtrasHTML+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
+        +'<div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:12px">🗺️ Regional Chart Positions</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+        +(_rcPos?'<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--acc)">#'+_rcPos+'</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">🔁 Loopify</div></div>':'')
+        +(_raPos?'<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--txt)">'+(_raPos===1?'🔥 ':'')+'#'+_raPos+'</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">Africa</div></div>':'')
+        +(_rePos?'<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--txt)">#'+_rePos+'</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">Europe</div></div>':'')
+        +(_rymPos?'<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--txt)">#'+_rymPos+'</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">▶️ YTM</div></div>':'')
+        +'</div></div>';
+    }
+    // C. iMusic Downloads (separate card, distinct from stream platforms)
+    var _iSales=song.iMusic_sales||0;
+    if(_iSales>0){
+      releasedExtrasHTML+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
+        +'<div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:12px">🎶 iMusic Downloads</div>'
+        +'<div style="display:flex;align-items:center;justify-content:space-between">'
+        +'<div><span style="background:#ff6b6b22;color:#ff6b6b;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;letter-spacing:1px">PURCHASES</span>'
+        +'<div style="font-size:20px;font-weight:800;color:var(--txt);margin-top:4px">'+_iSales.toLocaleString()+' sold</div></div>'
+        +'<div style="text-align:right"><div style="font-size:18px;font-weight:800;color:#2ed573">$'+(_iSales*1.29).toFixed(0)+'</div><div style="font-size:10px;color:var(--mut)">download revenue</div></div>'
+        +'</div></div>';
+    }
+    // D. MV Stats (released)
+    if(song.mvId){
+      releasedExtrasHTML+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
+        +'<div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:12px">🎬 Music Video Stats</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+        +'<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--acc)">'+(song.mvViews||0).toLocaleString()+'</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">YTM Views</div></div>'
+        +'<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--txt)">'+(song.mvChartPosition?'#'+song.mvChartPosition:'—')+'</div><div style="font-size:10px;color:var(--mut);text-transform:uppercase">Chart Position</div></div>'
+        +'</div>'
+        +'<div style="font-size:11px;color:var(--mut);margin-bottom:4px">Watch-time retention: '+(song.mvWatchTimePct||0)+'%</div>'
+        +'<div style="height:6px;background:var(--bord);border-radius:3px;overflow:hidden"><div style="width:'+Math.min(100,song.mvWatchTimePct||0)+'%;height:100%;background:#a29bfe;border-radius:3px"></div></div>'
+        +'</div>';
+    }
+    // E. Active Promo campaigns
+    var _promoList=song.activePromo||[];
+    if(_promoList.length>0){
+      var _pIcons={social:'📱',radio:'📻',playlist:'🎧',pr:'📰',billboard:'🌆'};
+      releasedExtrasHTML+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
+        +'<div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:10px">🎯 Active Campaigns</div>'
+        +_promoList.map(function(promo){
+          var ic=_pIcons[promo.type]||'🎯';
+          var sc=promo.status==='active'?'#2ed573':promo.status==='pending'?'var(--acc)':'var(--mut)';
+          return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bord)"><span style="font-size:16px">'+ic+'</span><span style="flex:1;font-size:12px;color:var(--txt);font-weight:600">'+(promo.name||promo.type||'Campaign')+'</span><span style="font-size:11px;font-weight:700;color:'+sc+';">'+(promo.status||'active').toUpperCase()+'</span></div>';
+        }).join('')
+        +'</div>';
+    }
+    // F. Press Coverage
+    var _arts=song.pressArticles||[];
+    if(_arts.length>0){
+      var _oc={VELOUR:'#d4af37',CHARTWELL:'#667eea','ROOM SERVICE':'#ff6b6b',UNDERTONE:'#2ed573',AIRTIME:'#ff9800'};
+      releasedExtrasHTML+='<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
+        +'<div style="font-size:13px;font-weight:800;color:var(--txt);margin-bottom:10px">📰 Press Coverage</div>'
+        +_arts.slice(0,5).map(function(art){
+          var c=_oc[art.outlet]||'var(--mut)';
+          return '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--bord)"><span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;background:'+c+'22;color:'+c+';white-space:nowrap">'+(art.outlet||'Press')+'</span><div style="flex:1"><div style="font-size:12px;color:var(--txt);font-weight:600">'+(art.title||'Untitled')+'</div><div style="font-size:10px;color:var(--mut)">Week '+(art.week||'?')+'</div></div></div>';
+        }).join('')
+        +'</div>';
+    }
+  }
+
   var html='<div style="max-width:500px;margin:0 auto;padding:16px">'
     // Back button
     +'<button id="sdBackBtn" style="background:var(--surf);border:1.5px solid var(--bord);color:var(--txt);border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer;margin-bottom:16px;touch-action:manipulation" onclick="_closeOverlay(this)">←</button>'
@@ -9469,6 +9602,7 @@ function showSongDetails(songId){
     +(isReleased && releaseDateStr?'<span style="font-size:12px;color:var(--mut)">· Released '+releaseDateStr+'</span>':'')
     +(!isReleased && song.scheduledReleaseDate?'<span style="font-size:12px;color:var(--acc)">📅 Drops '+song.scheduledReleaseDate+'</span>':'')
     +'</div></div>'
+    +quickStatsBarHTML
     // Song info card
     +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:14px">'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
@@ -9480,7 +9614,7 @@ function showSongDetails(songId){
     +(isReleased && releaseDateStr?'<div><div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Released</div><div style="font-size:14px;font-weight:600;color:var(--txt)">'+releaseDateStr+'</div></div>':'')
     +(!isReleased && song.scheduledReleaseDate?'<div><div style="font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--acc);margin-bottom:4px">📅 Drops</div><div style="font-size:14px;font-weight:600;color:var(--acc)">'+song.scheduledReleaseDate+'</div></div>':'')
     +'</div></div>'
-    +collabHTML+conceptHTML+lyricsCardHTML+statsHTML+actionsHTML
+    +collabHTML+conceptHTML+lyricsCardHTML+statsHTML+recordedExtrasHTML+releasedExtrasHTML+actionsHTML
     +(!isReleased?'<button onclick="deleteSong('+songId+')" style="width:100%;padding:12px;background:none;border:2px solid #f44336;color:#f44336;border-radius:10px;cursor:pointer;font-family:var(--fb);font-size:14px;margin-top:8px">🗑️ Delete Song</button>':'')
     +'</div></div>';
 
@@ -18593,9 +18727,6 @@ function updateSongQualityPredictor(){
   if(topic) baseQuality += 3;
   if(subgenre) baseQuality += 4;
   
-  // Add some variance (±5)
-  baseQuality += Math.floor(Math.random() * 11) - 5;
-  
   // Cap at 100, minimum 5
   const quality = Math.min(100, Math.max(5, baseQuality));
   
@@ -18725,11 +18856,10 @@ function finishSong(topic, subgenre, title, minutes, seconds){
   GAME.inspiration -= 30;
   markDirty();
   
-  // Quality now depends on skills (writing + singing + production)
+  // Quality is fully deterministic: skill average + tag bonuses
   const avgSkill=((GAME.skills.writing||0)+(GAME.skills.singing||GAME.skills.vocals||0)+(GAME.skills.production||0))/3;
-  const skillContribution = avgSkill * 0.8;
-  const luckContribution = Math.random() * 20;
-  const quality=Math.min(100, Math.floor(skillContribution + luckContribution));
+  const tagBonus = (topic ? 3 : 0) + (subgenre ? 4 : 0);
+  const quality=Math.min(100, Math.floor(avgSkill + tagBonus));
   
   const song={
     id:Date.now(),
