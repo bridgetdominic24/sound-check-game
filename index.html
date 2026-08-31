@@ -11221,7 +11221,8 @@ function goToSleepInternal(){
         let viralMultiplier=1;
         if(Math.random()<0.02)viralMultiplier=Math.floor(Math.random()*90)+10;
         const weeklyStreams=baseStreams*viralMultiplier;
-        let weeklyRevenue=weeklyStreams*0.01;
+        // Blended rate across all 5 platforms (~$0.004/stream weighted average)
+        let weeklyRevenue=weeklyStreams*0.004;
         if(GAME.recordLabel){
           const yourCut=weeklyRevenue*(GAME.recordLabel.streamRoyalty/100);
           if(GAME.recordLabel.recoupment && GAME.recordLabel.advanceRecouped<GAME.recordLabel.advance){
@@ -13468,8 +13469,8 @@ function simulateWorldWeek() {
       
       // Pay royalties for released collab songs
       if(song.isCollab && song.released && song.royaltyPercent > 0){
-        // Calculate weekly streaming revenue ($0.01 per stream - same as player songs)
-        const revenuePerStream = 0.01;
+        // Blended streaming rate (~$0.004/stream weighted across all platforms)
+        const revenuePerStream = 0.004;
         const weeklyRevenue = song.streams * revenuePerStream;
         const royaltyPayment = weeklyRevenue * (song.royaltyPercent / 100);
         
@@ -13649,8 +13650,8 @@ async function nextDay(){
         release.streams+=weeklyStreams;
         totalStreamsGenerated += weeklyStreams;
         
-        // Add streaming revenue ($0.01 per stream) with label royalty split
-        let weeklyRevenue=weeklyStreams*0.01;
+        // Blended streaming revenue (~$0.004/stream weighted across all platforms)
+        let weeklyRevenue=weeklyStreams*0.004;
         
         // If signed to label, they take their cut
         if(GAME.recordLabel){
@@ -29917,8 +29918,8 @@ function showPlatformDetails(platform){
           }
         });
         
-        const earnings=(totalStreams*0.01).toFixed(2);
-        
+        const earnings=(totalStreams*0.004).toFixed(2);
+
         let statsText='';
         if(weeksSinceRelease<1){
           statsText='Check after 1 week';
@@ -29959,7 +29960,7 @@ function showReleaseStats(releaseId,platform){
     }
   });
   
-  const totalEarnings=(totalStreams*0.01).toFixed(2);
+  const totalEarnings=(totalStreams*0.004).toFixed(2);
   const releaseType=release.type==='single'?'Single':(release.type==='ep'||release.type==='EP'?'EP':'Album');
   
   // Get cover from first song in release
@@ -30393,9 +30394,11 @@ function showSongStats(songId){
       {key:'itunes',name:'iTunes',icon:'📻',color:'#ef5466'}
     ];
     
+    // Per-platform streaming rates (artist net after platform cut)
+    var _platRates={spotify:0.003,apple:0.007,youtube:0.001,amazon:0.004,soundcloud:0.004,itunes:0};
     platforms.forEach(p=>{
       const streams=song.platforms[p.key];
-      const earnings=(streams*0.01).toFixed(2);
+      const earnings=(streams*(_platRates[p.key]||0.003)).toFixed(2);
       html+=`<div class="menu-item">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div style="display:flex;gap:12px;align-items:center">
@@ -40151,7 +40154,8 @@ function processSongStreamsDaily(){
     song.streams = (song.streams||0) + daily;
     song.weeklyStreams = (song.weeklyStreams||0) + daily;
     distributeStreamsToRegions(song, daily);
-    let revenue = daily * 0.01;
+    // Blended streaming rate (~$0.004/stream weighted across all platforms)
+    let revenue = daily * 0.004;
     if(song.royalty_pct > 0) revenue = revenue * (song.royalty_pct/100);
     else if(song.collabRevenueSplit) revenue = revenue * (1 - song.collabRevenueSplit);
     totalRevenue += revenue;
