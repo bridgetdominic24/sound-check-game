@@ -8085,6 +8085,21 @@ async function getAllChartsData(){
         realSong.chartPosition = song.position;
         realSong.lastChartPosition = prevPosition;
 
+        // Increment weeksOnChart and update peakPosition once per game week.
+        // Guard with _chartedWeek so opening the chart twice in the same week
+        // doesn't double-count.
+        if(realSong._chartedWeek !== GAME.week){
+          realSong._chartedWeek = GAME.week;
+          if(prevPosition !== null){
+            realSong.weeksOnChart = (realSong.weeksOnChart || 1) + 1;
+          } else {
+            realSong.weeksOnChart = 1; // chart debut this week
+          }
+          if(!realSong.peakPosition || song.position < realSong.peakPosition){
+            realSong.peakPosition = song.position;
+          }
+        }
+
         if(!GAME._notifiedChartPositions) GAME._notifiedChartPositions = {};
         const notifKey = realSong.id + '-' + song.position;
 
@@ -8105,12 +8120,17 @@ async function getAllChartsData(){
     }
   });
 
-  // Save new global snapshot (keyed by song name) for next chart open
-  GAME._globalChartSnapshot = {};
-  allSongs.forEach(song => {
-    const snapshotKey = song.name || (song.title + ' - ' + song.artist);
-    GAME._globalChartSnapshot[snapshotKey] = song.position;
-  });
+  // Save new global snapshot (keyed by song name) — only once per game week so
+  // opening the chart multiple times in the same week doesn't corrupt movement
+  // arrows (second open would see current positions as "last week" and show ➖).
+  if((GAME._globalChartSnapshotWeek || 0) < GAME.week){
+    GAME._globalChartSnapshotWeek = GAME.week;
+    GAME._globalChartSnapshot = {};
+    allSongs.forEach(song => {
+      const snapshotKey = song.name || (song.title + ' - ' + song.artist);
+      GAME._globalChartSnapshot[snapshotKey] = song.position;
+    });
+  }
 
   // NOW store this week's chart data (AFTER positions are assigned!) — single player only
   if(GAME_MODE === 'single'){
