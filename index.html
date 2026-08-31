@@ -107,6 +107,11 @@ input[type=range].age-range{-webkit-appearance:none;width:100%;height:4px;backgr
 .home-stats{padding:20px 16px;background:var(--acc-bg);border-bottom:1px solid var(--bord)}
 .stats-title{font-size:18px;font-weight:800;margin-bottom:12px;font-family:var(--fb);color:var(--txt)}
 .stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.career-direction-section{padding:12px 16px;margin-bottom:4px}
+.cd-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:6px;font-weight:700}
+.cd-bar{height:10px;border-radius:5px;background:linear-gradient(90deg,#7c3aed,#e0daea,#f59e0b);position:relative;margin-bottom:4px}
+.cd-marker{position:absolute;top:-3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);border:2px solid #7c3aed;transition:left 0.3s ease}
+.cd-label{font-size:12px;color:var(--mut);text-align:center}
 .stat-box{background:var(--surf);border:1.5px solid var(--bord);padding:14px;border-radius:12px;backdrop-filter:blur(10px);box-shadow:0 2px 12px rgba(0,0,0,0.05);transition:transform 0.2s ease,box-shadow 0.2s ease}
 .stat-box:active{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.08)}
 .stat-icon{font-size:24px;margin-bottom:4px}
@@ -938,6 +943,19 @@ function emergencySkip() {
     </div>
   </div>
   
+  <!-- CAREER DIRECTION — Commercial/Authentic Axis -->
+  <div class="career-direction-section">
+    <div style="font-size:13px;font-weight:700;color:var(--mut);letter-spacing:0.5px;margin-bottom:10px;text-transform:uppercase;padding-top:12px;border-top:1px solid var(--bord)">Career Direction</div>
+    <div class="cd-labels">
+      <span>Authentic</span>
+      <span>Commercial</span>
+    </div>
+    <div class="cd-bar">
+      <div class="cd-marker" id="cdMarker" style="left:calc(50% - 8px)"></div>
+    </div>
+    <div class="cd-label" id="cdLabel">Balanced</div>
+  </div>
+
   <!-- MULTIPLAYER: Week Countdown Timer -->
   <!-- Notifications Section -->
   <div style="padding:0 16px;margin-bottom:16px">
@@ -3899,12 +3917,15 @@ async function loadCloudSave(){
         };
       }
       
+      // Initialize commercial/authentic axis for old saves
+      GAME.commercialAxis = GAME.commercialAxis ?? 50;
+
       // Clean up completed/corrupted tours
       cleanupTours();
-      
+
       // Recalculate stream totals from platforms
       recalculateAllStreams();
-      
+
       console.log('Loaded from cloud!');
       updateStats(); // Update UI after loading
       updateToursList(); // Display active tours
@@ -4692,8 +4713,54 @@ function createFreshGame(){
   industryRep: 5.0,
   blacklists: [],
   ownedLabel: null,
+  // Commercial/Authentic axis (0 = fully authentic, 50 = balanced, 100 = fully commercial)
+  commercialAxis: 50,
   };
 }
+// ── COMMERCIAL/AUTHENTIC AXIS ──────────────────────────────────────────────────
+// Hidden 0–100 number on GAME.commercialAxis (0=fully authentic, 100=fully commercial).
+// Players never see the raw number — only getAxisLabel() text and the spectrum bar.
+
+function nudgeAxis(direction, amount) {
+  // direction: 'commercial' or 'authentic'  |  amount: 1–10
+  if (GAME.commercialAxis == null) GAME.commercialAxis = 50;
+  if (direction === 'commercial') {
+    GAME.commercialAxis = Math.min(100, GAME.commercialAxis + amount);
+  } else {
+    GAME.commercialAxis = Math.max(0, GAME.commercialAxis - amount);
+  }
+  // Update the bar on the homepage if it's visible
+  updateCareerDirectionBar();
+}
+
+function getAxisLabel() {
+  const a = GAME && GAME.commercialAxis != null ? GAME.commercialAxis : 50;
+  if (a >= 80) return 'Very Commercial';
+  if (a >= 65) return 'Commercial Leaning';
+  if (a >= 55) return 'Slightly Commercial';
+  if (a >= 45) return 'Balanced';
+  if (a >= 35) return 'Slightly Authentic';
+  if (a >= 20) return 'Authentic Leaning';
+  return 'Deeply Authentic';
+}
+
+function updateCareerDirectionBar() {
+  var bar = document.getElementById('cdMarker');
+  var lbl = document.getElementById('cdLabel');
+  if (!bar || !lbl || !GAME) return;
+  var axis = GAME.commercialAxis != null ? GAME.commercialAxis : 50;
+  bar.style.left = 'calc(' + axis + '% - 8px)';
+  lbl.textContent = getAxisLabel();
+}
+
+// Fandom composition ratio (used by fandoms system, Wave 3).
+// Returns superfan ratio: 0.15 (fully commercial) → 0.65 (fully authentic).
+function getSuperfanRatio() {
+  var axis = GAME && GAME.commercialAxis != null ? GAME.commercialAxis : 50;
+  return 0.4 - ((axis - 50) / 50) * 0.25;
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 // ACHIEVEMENT DEFINITIONS - 24 achievements from easy to hard
 const ACHIEVEMENTS=[
   {id:'first_name',name:'Identity',desc:'Choose your artist name',icon:'✍️'},
@@ -8291,6 +8358,14 @@ async function getAllChartsData(){
           } else if(prevPosition !== null && song.position < prevPosition){
             addNotification('📈 Climbing the charts!', `"${realSong.title}" climbed to #${song.position} (up from #${prevPosition})`, 'chart');
             GAME._notifiedChartPositions[notifKey] = true;
+          } else if(prevPosition !== null && song.position > prevPosition){
+            // Chart drop — stress scales with commercial axis
+            // Commercial artists feel chart drops harder; authentic artists are less affected
+            var _dropAxis = GAME.commercialAxis != null ? GAME.commercialAxis : 50;
+            var _dropMultiplier = _dropAxis >= 65 ? 1.6 : _dropAxis <= 35 ? 0.6 : 1.0;
+            var _baseStress = 3;
+            var _dropStress = Math.round(_baseStress * _dropMultiplier);
+            GAME.stress = Math.min(100, Math.max(0, (GAME.stress || 0) + _dropStress));
           }
           if(song.position === 1 && prevPosition !== 1){
             addNotification('🏆 #1 on the charts!', `"${realSong.title}" just hit #1 on the Global Top 40!`, 'chart');
@@ -9242,6 +9317,13 @@ function launchPromoCampaign(songId){
 
     song.campaigns.push(campaign);
     launchedPromos.push(promo.name);
+
+    // Axis nudges based on promo type
+    if (promoKey === 'grassroots') nudgeAxis('authentic', 3);
+    else if (promoKey === 'teaser') nudgeAxis('authentic', 2);
+    else if (promoKey.startsWith('billboard_')) nudgeAxis('commercial', 2);
+    // Heavy Targeted Ads: any promo with budget >= $10K/wk
+    else if (budget >= 10000 && (promoKey.includes('social') || promoKey.includes('ads') || promoKey.includes('targeted'))) nudgeAxis('commercial', 2);
   });
 
   GAME._dirty = true;
@@ -10985,7 +11067,10 @@ function updateStats(){
   
   // Check for new achievements
   checkAchievements();
-  
+
+  // Update Career Direction bar on homepage
+  updateCareerDirectionBar();
+
   // Convert emojis to SVG for Modern theme
   if(S.theme==='modern'){
     convertEmojisToSVG();
@@ -19415,7 +19500,10 @@ function finishSong(topic, subgenre, title, minutes, seconds){
   };
   
   GAME.songs.push(song);
-  
+
+  // Axis: writing your own song = authentic nudge (A&R sourcing would add commercial nudge when built)
+  nudgeAxis('authentic', 3);
+
   closeMenu();
   updateStats();
   updateMusicStats();
@@ -31519,6 +31607,8 @@ function updatePromo(region,budgetIndex){
 
 function skipPromos(songId){
   GAME.pendingPromos={};
+  // Quick release (no promo) = commercial nudge
+  nudgeAxis('commercial', 2);
   closeMenu();
   releaseSingle(songId);
 }
@@ -37994,6 +38084,16 @@ async function _fireArticleTrigger(opts){
     var _isSigned = (GAME && (GAME.signedLabel || GAME.ownedLabel));
     if(!_isSigned){
       console.warn('[Article] Velour blocked — player is unsigned (triggerKey: '+opts.triggerKey+')');
+      return;
+    }
+  }
+
+  // UNDERTONE GATE — Undertone won't cover artists who are too commercial (axis > 65).
+  // They are an indie discovery outlet; a heavily commercial artist no longer fits their voice.
+  if(opts.outlet && opts.outlet.toLowerCase() === 'undertone'){
+    var _axis = GAME && GAME.commercialAxis != null ? GAME.commercialAxis : 50;
+    if(_axis > 65){
+      console.warn('[Article] Undertone blocked — axis too commercial (' + _axis + ') for triggerKey: ' + opts.triggerKey);
       return;
     }
   }
