@@ -40137,12 +40137,37 @@ async function initServerTime(){
   }
 }
 
+// Periodically re-fetch the server day to catch up if the realtime
+// connection dropped silently (avoids stale "Sunday" when server is on Tuesday)
+let _lastServerSync = 0;
+async function _syncServerDay(){
+  if(!supabase || !globalTimer) return;
+  try {
+    const { data } = await supabase.from('global_timer').select('current_day').eq('id','main').single();
+    if(!data) return;
+    const serverDay = data.current_day || 1;
+    if(serverDay > (globalTimer.currentDay||0)){
+      console.log('[Timer] Re-sync: server is on day', serverDay, 'local was', globalTimer.currentDay);
+      globalTimer.currentDay = serverDay;
+      GAME.day = serverDay;
+      GAME.week = Math.ceil(serverDay / 7);
+      _onDayAdvanced(serverDay);
+    }
+  } catch(e){ /* silent */ }
+}
+
 function updateServerTime(){
   if(GAME_MODE !== 'multi') return;
   if(!globalTimer) return;
 
   const now = Date.now();
   const timeLeft = DAY_MS - (now % DAY_MS);
+
+  // Re-sync with Supabase every 5 minutes to recover from dropped realtime connections
+  if(now - _lastServerSync > 5 * 60 * 1000){
+    _lastServerSync = now;
+    _syncServerDay();
+  }
 
   // Client-side advance — first client to notice the 2-hour block has passed
   // increments current_day by 1. Uses a conditional update so stale local
