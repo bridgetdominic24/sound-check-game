@@ -31507,8 +31507,8 @@ function showSingleSongPicker(){
 }
 
 function showMultiSongPicker(type){
-  // Albums/EPs can include both unreleased and previously released songs
-  const recorded=GAME.songs.filter(s=>s.recorded);
+  // Albums/EPs can include both unreleased recorded songs AND previously released songs
+  const recorded=GAME.songs.filter(s=>s.recorded||s.released);
   if(!GAME.pendingReleaseSongs)GAME.pendingReleaseSongs=[];
   
   const limits={ep:{min:3,max:6},album:{min:7,max:20},deluxe:{min:10,max:30}};
