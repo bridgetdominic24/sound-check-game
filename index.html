@@ -31507,7 +31507,8 @@ function showSingleSongPicker(){
 }
 
 function showMultiSongPicker(type){
-  const recorded=GAME.songs.filter(s=>s.recorded&&!s.released);
+  // Albums/EPs can include both unreleased and previously released songs
+  const recorded=GAME.songs.filter(s=>s.recorded);
   if(!GAME.pendingReleaseSongs)GAME.pendingReleaseSongs=[];
   
   const limits={ep:{min:3,max:6},album:{min:7,max:20},deluxe:{min:10,max:30}};
@@ -31522,13 +31523,14 @@ function showMultiSongPicker(type){
   recorded.forEach(song=>{
     const isSelected=GAME.pendingReleaseSongs.includes(song.id);
     const index=GAME.pendingReleaseSongs.indexOf(song.id);
+    const alreadyReleased=!!song.released;
     html+=`<div class="menu-item" onclick="toggleSongInAlbum(${song.id},'${type}')" style="background:${isSelected?'var(--surf)':'transparent'}">
       <div style="display:flex;gap:12px;align-items:center">
         <div style="width:32px;height:32px;border-radius:50%;background:${isSelected?'var(--acc)':'var(--bord)'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700">${isSelected?index+1:'+'}</div>
         ${getCoverHTML(song,'40px')}
         <div style="flex:1">
           <div class="menu-item-title">${song.title}</div>
-          <div class="menu-item-sub">Quality ${song.quality}/100</div>
+          <div class="menu-item-sub">Quality ${song.quality}/100${alreadyReleased?' · <span style="color:var(--acc)">Released</span>':''}</div>
         </div>
       </div>
     </div>`;
