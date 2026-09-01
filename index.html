@@ -31499,27 +31499,28 @@ function showSingleSongPicker(){
 }
 
 function showMultiSongPicker(type){
-  const recorded=GAME.songs.filter(s=>s.recorded&&!s.released);
+  const recorded=GAME.songs.filter(s=>s.recorded||s.released);
   if(!GAME.pendingReleaseSongs)GAME.pendingReleaseSongs=[];
-  
+
   const limits={ep:{min:3,max:6},album:{min:7,max:20},deluxe:{min:10,max:30}};
   const limit=limits[type];
   const selected=GAME.pendingReleaseSongs.length;
-  
+
   let html=`<div style="padding:16px">
     <div style="font-size:14px;font-weight:700;margin-bottom:8px">${type.toUpperCase()}</div>
     <div style="font-size:12px;color:var(--mut);margin-bottom:16px">Select ${limit.min}-${limit.max} songs · ${selected} selected</div>
     <div class="menu-list">`;
-  
+
   recorded.forEach(song=>{
     const isSelected=GAME.pendingReleaseSongs.includes(song.id);
     const index=GAME.pendingReleaseSongs.indexOf(song.id);
+    const releasedBadge=song.released?'<span style="font-size:10px;font-weight:700;background:#2ed573;color:white;padding:2px 6px;border-radius:10px;margin-left:6px">OUT</span>':'';
     html+=`<div class="menu-item" onclick="toggleSongInAlbum(${song.id},'${type}')" style="background:${isSelected?'var(--surf)':'transparent'}">
       <div style="display:flex;gap:12px;align-items:center">
         <div style="width:32px;height:32px;border-radius:50%;background:${isSelected?'var(--acc)':'var(--bord)'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700">${isSelected?index+1:'+'}</div>
         ${getCoverHTML(song,'40px')}
         <div style="flex:1">
-          <div class="menu-item-title">${song.title}</div>
+          <div class="menu-item-title">${song.title}${releasedBadge}</div>
           <div class="menu-item-sub">Quality ${song.quality}/100</div>
         </div>
       </div>
