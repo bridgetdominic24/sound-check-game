@@ -4917,13 +4917,17 @@ function updateMusicTrends(){
     }
     
     GAME.activeTrends.push(newTrend);
-    
-    // Add to home notifications (no duration shown)
-    const msg = newTrend.type === 'subgenre' 
-      ? `${newTrend.emoji} ${newTrend.value} is trending! ${newTrend.multiplier}x streams`
-      : `${newTrend.emoji} ${newTrend.desc} are popping off! ${newTrend.multiplier}x streams`;
-    
-    addNotification('Trending Now', msg, 'trend');
+
+    // Add to home notifications — once per trend (keyed by start week + value)
+    var _trendNotifKey = 'trend_'+newTrend.value+'_w'+(newTrend.startWeek||0);
+    if(!GAME._notifFiredDay) GAME._notifFiredDay = {};
+    if(!GAME._notifFiredDay[_trendNotifKey]){
+      GAME._notifFiredDay[_trendNotifKey] = true;
+      const msg = newTrend.type === 'subgenre'
+        ? `${newTrend.emoji} ${newTrend.value} is trending! ${newTrend.multiplier}x streams`
+        : `${newTrend.emoji} ${newTrend.desc} are popping off! ${newTrend.multiplier}x streams`;
+      addNotification('Trending Now', msg, 'trend');
+    }
   }
 }
 
@@ -5156,14 +5160,19 @@ function processSkillDecay(){
       _syncPerformanceSkill();
       markDirty();
 
-      // Notify the player that a skill is slipping
+      // Notify the player that a skill is slipping (once per decay day per skill)
       const cfg2 = SKILL_CONFIG[skillKey];
-      addNotification(
-        cfg2.icon + ' ' + cfg2.label + ' is getting rusty',
-        'You haven\'t practiced ' + cfg2.label.toLowerCase() + ' in a while. Do a ' +
-        (skillKey === 'writing' ? 'writing session' : 'vocal warmup or rehearsal') + ' to keep it sharp.',
-        'skill_decay'
-      );
+      var _sdKey = 'skilldecay_'+skillKey+'_d'+today;
+      if(!GAME._notifFiredDay) GAME._notifFiredDay = {};
+      if(!GAME._notifFiredDay[_sdKey]){
+        GAME._notifFiredDay[_sdKey] = true;
+        addNotification(
+          cfg2.icon + ' ' + cfg2.label + ' is getting rusty',
+          'You haven\'t practiced ' + cfg2.label.toLowerCase() + ' in a while. Do a ' +
+          (skillKey === 'writing' ? 'writing session' : 'vocal warmup or rehearsal') + ' to keep it sharp.',
+          'skill_decay'
+        );
+      }
     }
   });
 }
@@ -40373,6 +40382,24 @@ function checkDailyEconomy(){
     GAME.financeHistory.push(_fw);
   }
 
+  // ── Notification dedup guard (per game-day) ──────────────────
+  // Prevents the same day's notifications from firing twice if checkDailyEconomy
+  // is called more than once for the same GAME.day (e.g. catch-up runs, UI refresh).
+  var _curDay = GAME.day || 1;
+  if(!GAME._notifFiredDay) GAME._notifFiredDay = {};
+  function _oncePerDay(key, fn){
+    var k = key + '_d' + _curDay;
+    if(GAME._notifFiredDay[k]) return;
+    GAME._notifFiredDay[k] = true;
+    fn();
+  }
+  // Prune old keys to avoid unbounded growth (keep last 14 days)
+  var _pruneBefore = _curDay - 14;
+  Object.keys(GAME._notifFiredDay).forEach(function(k){
+    var m = k.match(/_d(\d+)$/);
+    if(m && parseInt(m[1]) < _pruneBefore) delete GAME._notifFiredDay[k];
+  });
+
   // ── JOB PAY (weekly on payday) ──────────────────────────────────
   if(GAME.job){
     if(GAME.jobEnergy > 0){
@@ -40392,11 +40419,11 @@ function checkDailyEconomy(){
         if(tips > 0){
           GAME.money += tips;
           _fw.tipsPay = (_fw.tipsPay||0) + tips;
-          if(Math.random() < 0.3) addNotification('☕ Tips!','Got $'+tips+' in tips today.','job');
+          _oncePerDay('tips', function(){ if(Math.random() < 0.3) addNotification('☕ Tips!','Got $'+tips+' in tips today.','job'); });
         }
       }
 
-      addNotification('💰 Payday!',''+(GAME.jobName||'Job')+' — $'+(GAME.jobPay).toLocaleString()+' this week.','job');
+      _oncePerDay('payday', function(){ addNotification('💰 Payday!',''+(GAME.jobName||'Job')+' — $'+(GAME.jobPay).toLocaleString()+' this week.','job'); });
     }
     if(GAME.jobStressAmt > 0 && Math.random() < 0.6){
       var stressBase = GAME.jobStressAmt || 5;
@@ -40411,7 +40438,7 @@ function checkDailyEconomy(){
   if(info.dow === 0 && GAME.housing && GAME.housing.rent > 0){
     GAME.money = Math.max(0, (GAME.money||0) - GAME.housing.rent);
     _fw.rent = (_fw.rent||0) + GAME.housing.rent;
-    addNotification('🏠 Rent Due','$'+(GAME.housing.rent).toLocaleString()+' deducted for rent.','finance');
+    _oncePerDay('rent', function(){ addNotification('🏠 Rent Due','$'+(GAME.housing.rent).toLocaleString()+' deducted for rent.','finance'); });
   }
 
   // ── PENTHOUSE REP BONUS (weekly) ──────────────────────────────
