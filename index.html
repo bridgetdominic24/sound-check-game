@@ -9847,6 +9847,10 @@ function openInterviewScheduler(song) {
     var inf       = dayInfo(day);
 
     if (!GAME.scheduledActivities) GAME.scheduledActivities = [];
+    // Remove any existing scheduled interview for the same song to prevent duplicates
+    GAME.scheduledActivities = GAME.scheduledActivities.filter(function(ex){
+      return !(ex.type === 'interview' && ex.songId === (song2 ? song2.id : null) && ex.status === 'scheduled');
+    });
     GAME.scheduledActivities.push({
       id:          'interview_'+Date.now(),
       type:        'interview',
@@ -23521,7 +23525,8 @@ function processScheduledActivities(currentDay){
   GAME.scheduledActivities.forEach(function(a){
     if(a.status !== 'scheduled') return;
     // Support both targetDay (new) and week (old saves)
-    var matches = a.targetDay ? a.targetDay === currentDay : a.week === Math.ceil(currentDay/7);
+    // For week-based activities (no targetDay), fire only on the last day of that week
+    var matches = a.targetDay ? a.targetDay === currentDay : (a.week === Math.ceil(currentDay/7) && currentDay % 7 === 0);
     if(!matches) return;
 
     a.status = 'completed';
@@ -23529,7 +23534,7 @@ function processScheduledActivities(currentDay){
     if(a.energyCost > 0){
       if(GAME.energy < a.energyCost){
         a.status = 'missed';
-        addNotification(a.icon+' '+a.name+' missed', 'Not enough energy when the time came.', 'training');
+        addNotification((a.icon||'📅')+' '+(a.name||a.outletName||a.type||'Activity')+' missed', 'Not enough energy when the time came.', 'training');
         return;
       }
       GAME.energy = Math.max(0, (GAME.energy||120) - a.energyCost);
@@ -23555,7 +23560,7 @@ function processScheduledActivities(currentDay){
     else if(fx.stressDelta > 2) msg += '\n😤 It was intense.';
     if(fx.energyDelta > 3) msg += '\n⚡ Feeling energised!';
 
-    addNotification(a.icon+' '+a.name, msg, 'training');
+    addNotification((a.icon||'📅')+' '+(a.name||a.outletName||a.type||'Activity'), msg, 'training');
     markDirty();
   });
 }
@@ -23679,11 +23684,14 @@ function _getEventsForDay(dayNum){
   });
   // Scheduled activities — show pending AND completed
   if(GAME.scheduledActivities) GAME.scheduledActivities.forEach(function(a){
-    if(a.targetDay === dayNum || (a.week && a.week === Math.ceil(dayNum/7))){
+    // Show on specific day (targetDay), or for old week-based activities on last day of that week only
+    var actDay = a.targetDay ? a.targetDay : (a.week ? a.week * 7 : null);
+    if(actDay === dayNum){
       var done = a.status === 'completed';
+      var actLabel = a.name || a.outletName || a.type || 'Activity';
       evts.push({
         icon: done ? '✅' : (a.icon||'📅'),
-        label: (a.name||a.type||'Activity') + (done ? ' ✓' : ''),
+        label: actLabel + (done ? ' ✓' : ''),
         color: done ? '#636e72' : '#a29bfe',
         type: a.type||'training'
       });
