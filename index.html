@@ -9541,8 +9541,216 @@ function _insertOverlay(html){
 
 
 function _closeOverlay(el){var p=el;while(p&&p.parentElement&&p.parentElement!==document.body){p=p.parentElement;}if(p&&p.parentElement===document.body)p.remove();}
+
+function openPreReleaseHub(song) {
+  if (!song) return;
+
+  // Ensure preRelease object exists on song
+  if (!song.preRelease) {
+    song.preRelease = {
+      enabled: true,
+      releaseWeek: null,
+      hypePoints: 0,
+      weeklyActivity: [],
+      activitiesCompleted: [],
+      consistencyBonus: false,
+      fanMomentum: 0.9,
+    };
+  }
+  song.preRelease.enabled = true;
+
+  // Fan momentum calculation
+  function calcMomentum(pts, consistency) {
+    if (pts === 0)  return 0.9;
+    if (pts < 5)    return 0.95;
+    if (pts < 15)   return 1.0;
+    if (pts < 30)   return 1.15;
+    if (pts < 50)   return 1.3;
+    return consistency ? 1.4 : 1.3;
+  }
+
+  var weeks = [...new Set(song.preRelease.weeklyActivity || [])];
+  song.preRelease.consistencyBonus = weeks.length >= 3;
+  song.preRelease.fanMomentum = calcMomentum(
+    song.preRelease.hypePoints || 0,
+    song.preRelease.consistencyBonus
+  );
+
+  var pts     = song.preRelease.hypePoints || 0;
+  var mult    = song.preRelease.fanMomentum;
+  var done    = song.preRelease.activitiesCompleted || [];
+  var relWeek = song.preRelease.releaseWeek;
+  var curWeek = GAME.week || 0;
+  var weeksOut = relWeek ? Math.max(0, relWeek - curWeek) : 99;
+
+  // Bar fill %: scale 0 pts = 0%, 50 pts = 100%
+  var barPct = Math.min(100, Math.round((pts / 50) * 100));
+
+  // Momentum label
+  var multLabel = mult <= 0.9  ? 'Cold Drop — 0.9×'
+                : mult <= 1.0  ? 'Getting warm — 1.0×'
+                : mult <= 1.15 ? 'Building — 1.15×'
+                : mult <= 1.3  ? 'Hot — 1.3×'
+                : 'Peak Momentum — 1.4×';
+
+  function isDone(id)   { return done.includes(id); }
+  function isLocked(id) {
+    var req = { morning_wave:6, press_preview:6, fan_contest:6, merch_preorder:6,
+                exclusive_interview:6, presave:4, billboard_reservation:4,
+                concept_photo:4, mv_teaser:4, social_countdown:2,
+                listening_party:2, audio_snippet:2, lyric_preview:2 };
+    return weeksOut < (req[id] || 0);
+  }
+  function actStatus(id) {
+    if (isDone(id))   return 'done';
+    if (isLocked(id)) return 'locked';
+    return 'available';
+  }
+  function cardCls(id) {
+    var s = actStatus(id);
+    return s === 'done' ? 'prc-act prc-done' : s === 'locked' ? 'prc-act prc-locked' : 'prc-act';
+  }
+  function badge(id) {
+    if (isDone(id))   return '<span class="prc-badge prc-b-done">✓ Done</span>';
+    if (isLocked(id)) return '<span class="prc-badge prc-b-lock">🔒 Locked</span>';
+    return '';
+  }
+  function doAct(id, cost, energy, hpts, label) {
+    if (actStatus(id) !== 'available') return;
+    if (cost > 0 && GAME.money < cost) {
+      _showToast('Not enough money for ' + label);
+      return;
+    }
+    if (energy > 0 && GAME.energy < energy) {
+      _showToast('Not enough energy for ' + label);
+      return;
+    }
+    if (cost > 0)   GAME.money  -= cost;
+    if (energy > 0) GAME.energy -= energy;
+    song.preRelease.activitiesCompleted.push(id);
+    song.preRelease.hypePoints = (song.preRelease.hypePoints || 0) + hpts;
+    song.preRelease.weeklyActivity.push(GAME.week || 0);
+    saveGame();
+    openPreReleaseHub(song); // re-render
+    _showToast('+' + hpts + ' hype pts — ' + label + ' done!');
+  }
+
+  var ACTIVITIES = [
+    // id, label, sublabel, icon, cost, energy, pts, weeksReq
+    ['morning_wave',        'Talk Show — Morning Wave',  'Mainstream reach · $2,500',           '🌞', 2500, 20, 6, 6],
+    ['press_preview',       'Press Preview',             'Early listen for outlets · energy',   '📰', 0,    15, 4, 6],
+    ['fan_contest',         'Fan Contest',               'Fan art, covers, theories · free',    '🏆', 0,    10, 3, 6],
+    ['merch_preorder',      'Merch Pre-Order',           'Production cost · loyal fans',        '👕', 1200, 10, 4, 6],
+    ['exclusive_interview', 'Exclusive Interview',       'One outlet gets first access · free', '🎙', 0,    0,  5, 6],
+    ['presave',             'Pre-Save Campaign',         '+0.18× day-1 velocity · $1,500',      '💾', 1500, 15, 6, 4],
+    ['billboard_reservation','Billboard Reservation',   'Goes live on release day',             '🏙', 2500, 5,  4, 4],
+    ['concept_photo',       'Concept Photo Drop',        'Pentagram post · free',               '📸', 0,    10, 4, 4],
+    ['mv_teaser',           'MV Filming Teaser',         'BTS clip · Rookie · free',            '🎬', 0,    10, 3, 4],
+    ['social_countdown',    'Social Countdown (7 days)', 'Daily posts · consistency bonus',     '📅', 0,    10, 8, 2],
+    ['listening_party',     'Listening Party',           'Online (free) or venue ($1,500)',     '🎧', 0,    20, 7, 2],
+    ['audio_snippet',       'Audio Snippet',             '15-sec clip · Rookie · free',         '🔊', 0,    8,  3, 2],
+    ['lyric_preview',       'Lyric Preview',             'Text art · Y · free',                 '✍', 0,    5,  2, 2],
+  ];
+
+  function actCards() {
+    var sections = [
+      { label: '📅 6+ Weeks Out', ids: ['morning_wave','press_preview','fan_contest','merch_preorder','exclusive_interview'] },
+      { label: '📷 4+ Weeks Out', ids: ['presave','billboard_reservation','concept_photo','mv_teaser'] },
+      { label: '🔊 2+ Weeks Out', ids: ['social_countdown','listening_party','audio_snippet','lyric_preview'] },
+    ];
+    var html = '';
+    for (var i = 0; i < sections.length; i++) {
+      var sec = sections[i];
+      html += '<div class="prc-sec-lbl">' + sec.label + '</div>';
+      for (var j = 0; j < sec.ids.length; j++) {
+        var id = sec.ids[j];
+        var a = ACTIVITIES.find(function(x){ return x[0] === id; });
+        if (!a) continue;
+        var lbl = a[1], sub = a[2], ico = a[3], cost = a[4], energy = a[5], hpts = a[6];
+        var status = actStatus(id);
+        var costStr = cost > 0 ? '$' + cost.toLocaleString() : energy > 0 ? '⚡' + energy + ' energy' : 'Free';
+        var clickStr = status === 'available'
+          ? 'onclick="window._prcDoAct(\'' + id + '\',' + cost + ',' + energy + ',' + hpts + ',\'' + lbl.replace(/'/g,"\\'") + '\')"'
+          : '';
+        html += '<div class="' + cardCls(id) + '" ' + clickStr + '>'
+          + '<div class="prc-ico">' + ico + '</div>'
+          + '<div class="prc-cinf"><b>' + lbl + '</b><span>' + sub + ' &bull; ' + costStr + '</span></div>'
+          + '<div class="prc-right">' + badge(id)
+          + (status === 'available' ? '<span class="prc-pts">+' + hpts + ' pts</span>' : '')
+          + '</div></div>';
+      }
+    }
+    return html;
+  }
+
+  var relWeekDisplay = relWeek
+    ? 'Week ' + relWeek + ' &bull; ' + weeksOut + ' week' + (weeksOut !== 1 ? 's' : '') + ' away'
+    : 'No release date set';
+
+  var html = '<div id="preReleaseHubOverlay" style="position:fixed;inset:0;z-index:200000;background:var(--bg);display:flex;flex-direction:column;overflow:hidden">'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surf);border-bottom:1px solid var(--bord)">'
+    + '<button onclick="document.getElementById(\'preReleaseHubOverlay\').remove()" style="font-size:18px;color:var(--mut);background:none;border:none;cursor:pointer">&#8592;</button>'
+    + '<div style="flex:1"><div style="font-size:15px;font-weight:800">Pre-Release Hub</div>'
+    + '<div style="font-size:11px;color:var(--mut)">' + (song.name || song.title || 'Untitled') + '</div></div>'
+    + '</div>'
+    // Momentum bar
+    + '<div style="background:var(--surf);padding:12px 16px;border-bottom:1px solid var(--bord)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+    + '<div><div style="font-size:9.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--mut)">Fan Momentum</div>'
+    + '<div style="font-size:11px;color:var(--mut)">' + pts + ' pts' + (song.preRelease.consistencyBonus ? ' &bull; ✨ Consistency bonus active' : '') + '</div></div>'
+    + '<div style="text-align:right"><div style="font-size:22px;font-weight:900;color:var(--era-light,var(--acc))">' + mult + '×</div>'
+    + '<div style="font-size:10.5px;color:var(--mut)">at launch</div></div></div>'
+    + '<div style="height:8px;border-radius:4px;background:var(--card);overflow:hidden;margin-bottom:5px">'
+    + '<div style="height:100%;width:' + barPct + '%;border-radius:4px;background:linear-gradient(90deg,var(--acc),var(--acc-bg,var(--acc)));transition:width .3s"></div></div>'
+    + '<div style="font-size:11px;color:var(--mut);display:flex;justify-content:space-between">'
+    + '<span>Cold Drop 0.9×</span><span>' + multLabel + '</span><span>Peak 1.4×</span></div>'
+    + '<div style="margin-top:8px;padding:7px 10px;background:rgba(124,79,224,.07);border:1px solid rgba(124,79,224,.15);border-radius:8px;font-size:11.5px;color:var(--mut)">'
+    + '📅 ' + relWeekDisplay + '</div></div>'
+    // Scrollable activity list
+    + '<div style="flex:1;overflow-y:auto;padding:10px 16px 20px">' + actCards() + '</div>'
+    // Sticky footer
+    + '<div style="padding:12px 16px;border-top:1px solid var(--bord);background:var(--surf)">'
+    + '<button onclick="document.getElementById(\'preReleaseHubOverlay\').remove()" '
+    + 'style="width:100%;background:var(--acc);color:#fff;border-radius:12px;font-size:14px;font-weight:800;padding:12px;border:none;cursor:pointer">'
+    + '🚀 Proceed to Release &bull; ' + mult + '× Fan Momentum</button></div>'
+    + '</div>';
+
+  // Inject styles if not already present
+  if (!document.getElementById('prc-style')) {
+    var style = document.createElement('style');
+    style.id = 'prc-style';
+    style.textContent = [
+      '.prc-act { background:var(--card); border:1px solid var(--bord); border-radius:12px; padding:10px 12px; margin-bottom:7px; display:flex; align-items:center; gap:10px; cursor:pointer; }',
+      '.prc-act:active { opacity:.8; }',
+      '.prc-done { opacity:.55; cursor:default; }',
+      '.prc-locked { opacity:.45; cursor:default; }',
+      '.prc-ico { font-size:22px; flex:none; width:30px; text-align:center; }',
+      '.prc-cinf { flex:1; }',
+      '.prc-cinf b { font-size:13px; font-weight:700; display:block; margin-bottom:1px; }',
+      '.prc-cinf span { font-size:11px; color:var(--mut); }',
+      '.prc-right { display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex:none; }',
+      '.prc-badge { font-size:10px; font-weight:800; border-radius:5px; padding:2px 7px; }',
+      '.prc-b-done { background:rgba(76,201,138,.1); color:var(--green,#4cc98a); }',
+      '.prc-b-lock { background:rgba(139,145,160,.1); color:var(--mut); }',
+      '.prc-pts { font-size:12px; font-weight:800; color:var(--acc); }',
+      '.prc-sec-lbl { font-size:10px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--mut); margin:12px 0 6px; }',
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  // Wire up act handler globally
+  window._prcDoAct = function(id, cost, energy, hpts, label) {
+    doAct(id, cost, energy, hpts, label);
+  };
+
+  var existing = document.getElementById('preReleaseHubOverlay');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
 function showSongDetails(songId){
   var song=GAME.songs.find(function(s){return s.id===songId;});
+  window._sdSong = song;
   if(!song) return;
   var isReleased=song.released, isRecorded=song.recorded, isWritten=song.written;
   // isInProg is true for both regular in-progress songs AND collab songs currently being written
@@ -9960,7 +10168,7 @@ function showSongDetails(songId){
     var _prH=song.hype||GAME.hype||0;
     var _prM=_prH>=80?'1.4x':_prH>=60?'1.3x':_prH>=40?'1.15x':_prH>=20?'1.0x':'0.9x';
     _prcH='<div class="sd-sec" style="padding-top:0"><div class="sd-sh">Pre-Release Campaign</div>'
-      +'<div class="sd-prc" onclick="showPromoManager('+songId+')">'
+      +'<div class="sd-prc" onclick="openPreReleaseHub(window._sdSong)">'
       +'<div class="sd-prc-ico">🚀</div>'
       +'<div class="sd-prc-inf"><b>Launch Pre-Release Campaign</b><span>Build fan momentum before release day. More momentum = higher chart peak on release.</span></div>'
       +'<span style="font-size:20px;color:var(--acc)">›</span></div>'
