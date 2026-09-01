@@ -32209,44 +32209,96 @@ function proceedToPromotions(){
   showPromotionOptions(songId);
 }
 
-function showScheduleReleasePicker(){
+// Calendar state for schedule picker (persists while menu is open)
+var _calYear = 0, _calMonth = 0;
+
+function showScheduleReleasePicker(yearOverride, monthOverride){
   const songIds=(GAME.pendingReleaseSongs && GAME.pendingReleaseSongs.length>0) ? GAME.pendingReleaseSongs : [GAME.pendingReleaseSong];
   const mainSong = GAME.songs.find(s=>s.id===songIds[0]);
   if(!mainSong) return;
 
   const curDay = GAME.day || 1;
   const origin = new Date(2017, 0, 1).getTime();
+  const todayReal = new Date(origin + (curDay - 1) * 86400000);
+
+  // Init calendar to current month (or passed override)
+  if(yearOverride !== undefined){ _calYear = yearOverride; _calMonth = monthOverride; }
+  else if(!_calYear){ _calYear = todayReal.getFullYear(); _calMonth = todayReal.getMonth(); }
+
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const shortDays = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
-  var html = '<div style="padding:20px 16px 80px">'
-    + '<div style="font-size:18px;font-weight:800;color:var(--txt);margin-bottom:6px">📅 Schedule Release</div>'
-    + '<div style="font-size:13px;color:var(--mut);margin-bottom:20px">"'+mainSong.title+'" will drop automatically on the chosen day.</div>';
+  // First/last day of displayed month
+  const firstOfMonth = new Date(_calYear, _calMonth, 1);
+  const daysInMonth = new Date(_calYear, _calMonth + 1, 0).getDate();
+  const startDow = firstOfMonth.getDay(); // 0=Sun
 
-  // Show next 30 days as options, grouped by week
-  var currentGroupWeek = -1;
-  for(var d = curDay + 1; d <= curDay + 30; d++){
-    var realDate = new Date(origin + (d-1)*86400000);
-    var wk = Math.ceil(d/7);
-    if(wk !== currentGroupWeek){
-      if(currentGroupWeek !== -1) html += '</div>';
-      currentGroupWeek = wk;
-      var weekLabel = wk === Math.ceil(curDay/7)+1 ? 'Next week' : 'Week of ' + months[realDate.getMonth()] + ' ' + realDate.getDate();
-      html += '<div style="font-size:11px;font-weight:700;color:var(--mut);letter-spacing:0.5px;text-transform:uppercase;margin:14px 0 8px">' + weekLabel + '</div><div style="display:flex;flex-direction:column;gap:6px">';
-    }
-    var dow = realDate.getDay();
-    var dateLabel = dayNames[dow] + ', ' + months[realDate.getMonth()] + ' ' + realDate.getDate() + ', ' + realDate.getFullYear();
-    var isWeekend = dow === 0 || dow === 5 || dow === 6;
-    html += '<button onclick="doScheduleRelease('+d+')" '
-      + 'style="width:100%;padding:12px 14px;background:var(--surf);border:1.5px solid '+(isWeekend?'var(--acc)':'var(--bord)')+';border-radius:10px;text-align:left;cursor:pointer;touch-action:manipulation;display:flex;justify-content:space-between;align-items:center">'
-      + '<span style="font-size:14px;font-weight:600;color:var(--txt)">'+dateLabel+'</span>'
-      + (isWeekend ? '<span style="font-size:10px;background:var(--acc);color:var(--acc-txt);padding:2px 8px;border-radius:6px;font-weight:700">WEEKEND</span>' : '')
-      + '</button>';
+  // Nav: can only go back to current month
+  const isCurrentMonth = (_calYear === todayReal.getFullYear() && _calMonth === todayReal.getMonth());
+
+  // Build prev/next year+month
+  var prevY = _calYear, prevM = _calMonth - 1; if(prevM < 0){ prevM = 11; prevY--; }
+  var nextY = _calYear, nextM = _calMonth + 1; if(nextM > 11){ nextM = 0; nextY++; }
+
+  // Helper: game day for a given calendar date (or null if in the past/today)
+  function gameDayFor(calDate){
+    var diff = Math.round((calDate.getTime() - origin) / 86400000) + 1;
+    return diff > curDay ? diff : null;
   }
-  if(currentGroupWeek !== -1) html += '</div>';
-  html += '<div style="font-size:11px;color:var(--mut);margin-top:12px;text-align:center">💡 Weekend releases often perform better</div></div>';
 
-  openMenu('📅 Schedule Release', html);
+  // Build calendar grid
+  var gridCells = '';
+  // Day-of-week headers
+  shortDays.forEach(function(d, i){
+    var isWe = i === 0 || i === 6 || i === 5;
+    gridCells += '<div style="font-size:10px;font-weight:700;text-align:center;color:'+(isWe?'var(--acc)':'var(--mut)')+'">'+d+'</div>';
+  });
+  // Empty cells before first of month
+  for(var i = 0; i < startDow; i++) gridCells += '<div></div>';
+  // Day cells
+  for(var day = 1; day <= daysInMonth; day++){
+    var cellDate = new Date(_calYear, _calMonth, day);
+    var gDay = gameDayFor(cellDate);
+    var dow = cellDate.getDay();
+    var isWknd = dow === 0 || dow === 5 || dow === 6;
+    var isPast = gDay === null;
+    var cellStyle, cellClick;
+    if(isPast){
+      cellStyle = 'opacity:.3;cursor:default;background:transparent;border:none;';
+      cellClick = '';
+    } else if(isWknd){
+      cellStyle = 'background:var(--acc);color:var(--acc-txt);font-weight:700;cursor:pointer;border:none;border-radius:8px;';
+      cellClick = 'onclick="doScheduleRelease('+gDay+')"';
+    } else {
+      cellStyle = 'background:var(--surf);color:var(--txt);font-weight:600;cursor:pointer;border:1px solid var(--bord);border-radius:8px;';
+      cellClick = 'onclick="doScheduleRelease('+gDay+')"';
+    }
+    gridCells += '<button '+cellClick+' style="'+cellStyle+'padding:8px 0;font-size:13px;width:100%;touch-action:manipulation">'+day+'</button>';
+  }
+
+  var html = '<div style="padding:16px 16px 80px">'
+    // Title
+    + '<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:2px">📅 Schedule Release</div>'
+    + '<div style="font-size:12px;color:var(--mut);margin-bottom:16px">"'+mainSong.title+'" drops automatically on the day you pick.</div>'
+    // Month nav
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+    + (isCurrentMonth
+        ? '<div style="width:36px"></div>'
+        : '<button onclick="showScheduleReleasePicker('+prevY+','+prevM+')" style="width:36px;height:36px;border-radius:50%;background:var(--surf);border:1px solid var(--bord);font-size:18px;cursor:pointer;color:var(--txt);display:flex;align-items:center;justify-content:center">‹</button>')
+    + '<div style="font-size:16px;font-weight:800;color:var(--txt)">'+months[_calMonth]+' '+_calYear+'</div>'
+    + '<button onclick="showScheduleReleasePicker('+nextY+','+nextM+')" style="width:36px;height:36px;border-radius:50%;background:var(--surf);border:1px solid var(--bord);font-size:18px;cursor:pointer;color:var(--txt);display:flex;align-items:center;justify-content:center">›</button>'
+    + '</div>'
+    // Grid
+    + '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:14px">'
+    + gridCells
+    + '</div>'
+    // Legend
+    + '<div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mut)">'
+    + '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--acc)"></span> Weekend (better performance)'
+    + '</div>'
+    + '</div>';
+
+  openMenu('', html);
 }
 
 function doScheduleRelease(targetDay){
