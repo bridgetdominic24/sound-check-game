@@ -23611,7 +23611,7 @@ function _calendarGetEvents(week){
     if(inThisWeek){
       var info = a.targetDay ? dayInfo(a.targetDay) : null;
       var dayLabel = info ? ' · '+info.dayName : '';
-      evts.push({icon:a.icon||'📅',label:a.name+dayLabel+(a.cost>0?' — $'+a.cost.toLocaleString():''),color:'#a29bfe',type:'training',id:a.id});
+      evts.push({icon:a.icon||'📅',label:(a.name||a.type||'Activity')+dayLabel+(a.cost>0?' — $'+a.cost.toLocaleString():''),color:'#a29bfe',type:'training',id:a.id});
     }
   });
   return evts;
@@ -23652,17 +23652,17 @@ function _getEventsForDay(dayNum){
     var payEvery = GAME.jobBiweekly ? 14 : 7;
     var isPayday = daysSinceHired > 0 && daysSinceHired % payEvery === 0;
     if(isPayday){
-      evts.push({icon:'💰', label:GAME.jobName+' +$'+(GAME.jobPay).toLocaleString(), color:'#2ed573', type:'job'});
+      evts.push({icon:'💰', label:(GAME.jobName||'Job')+' +$'+(GAME.jobPay).toLocaleString(), color:'#2ed573', type:'job'});
     }
   }
   // Song releases — show both scheduled AND already-released on their release day
   if(GAME.songs) GAME.songs.forEach(function(s){
-    const onThisDay = s.scheduledReleaseDay === dayNum || s.releaseDay === dayNum;
+    var onThisDay = s.scheduledReleaseDay === dayNum || s.releaseDay === dayNum;
     if(onThisDay){
-      const released = s.released;
+      var released = s.released;
       evts.push({
         icon: released ? '✅' : '🎵',
-        label: '"'+(s.title||'Untitled')+'"' + (released ? ' (out)' : ' (scheduled)'),
+        label: '"'+(s.title||s.name||'Untitled')+'"' + (released ? ' (out)' : ' (scheduled)'),
         color: released ? '#2ed573' : '#667eea',
         type: 'release'
       });
@@ -23671,12 +23671,12 @@ function _getEventsForDay(dayNum){
   // Scheduled activities — show pending AND completed
   if(GAME.scheduledActivities) GAME.scheduledActivities.forEach(function(a){
     if(a.targetDay === dayNum || (a.week && a.week === Math.ceil(dayNum/7))){
-      const done = a.status === 'completed';
+      var done = a.status === 'completed';
       evts.push({
         icon: done ? '✅' : (a.icon||'📅'),
-        label: a.name + (done ? ' ✓' : ''),
+        label: (a.name||a.type||'Activity') + (done ? ' ✓' : ''),
         color: done ? '#636e72' : '#a29bfe',
-        type: 'training'
+        type: a.type||'training'
       });
     }
   });
