@@ -4753,6 +4753,14 @@ function updateCareerDirectionBar() {
   lbl.textContent = getAxisLabel();
 }
 
+// Called from the interview mini-game for each answer the player picks.
+// lean: 'commercial' | 'authentic' | 'neutral'
+function applyInterviewAxisNudge(lean) {
+  if (lean === 'commercial') nudgeAxis('commercial', 2);
+  else if (lean === 'authentic') nudgeAxis('authentic', 2);
+  // neutral = no change
+}
+
 // Fandom composition ratio (used by fandoms system, Wave 3).
 // Returns superfan ratio: 0.15 (fully commercial) → 0.65 (fully authentic).
 function getSuperfanRatio() {
@@ -9321,9 +9329,12 @@ function launchPromoCampaign(songId){
     // Axis nudges based on promo type
     if (promoKey === 'grassroots') nudgeAxis('authentic', 3);
     else if (promoKey === 'teaser') nudgeAxis('authentic', 2);
+    else if (promoKey === 'street_mural' || promoKey === 'mural') nudgeAxis('authentic', 3);
+    else if (promoKey === 'podcast' || promoKey === 'podcast_circuit') nudgeAxis('authentic', 2);
     else if (promoKey.startsWith('billboard_')) nudgeAxis('commercial', 2);
     // Heavy Targeted Ads: any promo with budget >= $10K/wk
     else if (budget >= 10000 && (promoKey.includes('social') || promoKey.includes('ads') || promoKey.includes('targeted'))) nudgeAxis('commercial', 2);
+    // TODO: nudgeAxis('commercial', 4) when brand deal / endorsement acceptance is implemented
   });
 
   GAME._dirty = true;
@@ -9542,6 +9553,650 @@ function _insertOverlay(html){
 
 function _closeOverlay(el){var p=el;while(p&&p.parentElement&&p.parentElement!==document.body){p=p.parentElement;}if(p&&p.parentElement===document.body)p.remove();}
 
+// ─── INTERVIEW MINI-GAME ─────────────────────────────────────────────────────
+// 4-screen flow: Schedule → Calendar Confirmation → Live Q&A → Result
+// Launched from Pre-Release Hub "Exclusive Interview" activity.
+
+var INTERVIEW_QUESTIONS = {
+  origin: [
+    "How did you actually get into music? What started it?",
+    "Was there a moment you knew this was going to be your life, or did it creep up on you?",
+    "What did people around you say when you told them you were serious about music?",
+    "What's the version of your story you don't usually tell in interviews?",
+    "If you hadn't made it in music, what do you think you'd be doing?",
+    "Did you ever almost quit? What kept you going?",
+    "Who was the first person outside your family to actually believe in you?",
+    "What's the worst job you had before music started paying?",
+  ],
+  creative: [
+    "Walk me through what making a song actually looks like for you. Start to finish.",
+    "Do you need to be in a specific mood to create, or can you work through anything?",
+    "What do you do when you're stuck creatively? What actually works?",
+    "Do you write from personal experience, or is it more like playing a character?",
+    "What's the gap between the song in your head and what ends up recorded?",
+    "When do you know a song is done? Or do you just have to let it go?",
+    "Do you listen to your own music for pleasure?",
+    "What's something you've tried creatively that completely failed?",
+  ],
+  current_song: [
+    "Tell me about {songName}. What was going on when you made it?",
+    "{songName} feels different from your earlier work. Was that intentional?",
+    "What do you want people to feel when they hear {songName}?",
+    "Is there a line in {songName} that means more to you than people realize?",
+    "Did {songName} turn out the way you imagined it, or did it become something else?",
+    "What's the story behind the name {songName}?",
+  ],
+  success: [
+    "You've got {fanCount} fans now. Does that number mean anything to you?",
+    "Has success changed how you approach making music?",
+    "How do you handle it when something you worked hard on just doesn't land?",
+    "What does failure look like for you? Define it.",
+    "What's the most surprising thing about where you are in your career right now?",
+    "Is there a version of success you're chasing that you haven't admitted publicly?",
+  ],
+  collabs: [
+    "How do you decide who to collaborate with? What's the filter?",
+    "Have you ever said no to a collab you wish you'd said yes to?",
+    "Is there someone you'd collaborate with that would genuinely surprise people?",
+    "What does a collab need to be for it to feel worth it beyond the stream numbers?",
+    "When you feature someone, who really controls the direction of the song?",
+  ],
+  industry: [
+    "What's your honest take on streaming? Good deal or bad deal for artists?",
+    "What do you think the music industry gets completely wrong about artists?",
+    "Do you think about the algorithm when you're creating? Be honest.",
+    "What's the difference between being strategic and being a sellout?",
+    "Do you ever feel pressure to release faster than you're actually ready to?",
+    "Are there compromises in your career that you regret?",
+    "How do you think about money as an artist? Creative constraint or just fuel?",
+  ],
+  fans: [
+    "What's your relationship with your fans actually like? Beyond the surface.",
+    "Does knowing what your fans expect change what you make?",
+    "What do you think your fans misunderstand about you?",
+    "When fans know every word at a show, what does that feel like in the moment?",
+    "Have you ever made a decision about your music based on fan reaction?",
+    "What do you wish you could tell your fanbase that you haven't said publicly?",
+  ],
+  social: [
+    "What's your actual relationship with social media right now?",
+    "Have you ever posted something and immediately regretted it?",
+    "Do you read the comments? Actually?",
+    "What do you think gets completely misread about you online?",
+    "Do you think artists have a responsibility to be online, or is it just a tool?",
+    "How do you separate the noise from the signal when it comes to online feedback?",
+  ],
+  personal: [
+    "What do you do to actually switch off? What works?",
+    "What are you genuinely bad at outside of music?",
+    "If you had a week with no obligations at all, what would you do?",
+    "What's the most grounding thing in your life right now?",
+    "Where do you feel most like yourself — not as a performer, just as a person?",
+    "What keeps you up at night? Doesn't have to be music-related.",
+  ],
+  provocative: [
+    "How far are you from the artist who does everything right commercially and is completely hollow?",
+    "What would you do that you're currently not doing if you genuinely didn't care what anyone thought?",
+    "What's the most honest thing you've ever said publicly about your own music?",
+    "Is there something you've been praised for that you actually think is weak work?",
+    "What would a truly honest artist bio say?",
+    "When you hear your music in a TV show or commercial, what do you actually feel?",
+  ],
+};
+
+function _iqFill(q, ctx) {
+  return q
+    .replace(/{artistName}/g, ctx.artistName || 'you')
+    .replace(/{songName}/g,   ctx.songName   || 'your latest song')
+    .replace(/{genre}/g,      ctx.genre      || 'your genre')
+    .replace(/{fanCount}/g,   ctx.fanCount   || 'your fans')
+    .replace(/{collabPartner}/g, ctx.collabPartner || 'your collaborator')
+    .replace(/{labelName}/g,  ctx.labelName  || 'your label');
+}
+
+function _iqPick(outlet, ctx) {
+  var weights = {
+    undertone:    { origin:2, creative:3, current_song:2, provocative:2, fans:1, personal:1, industry:1, social:1, success:1, collabs:1 },
+    chartwell:    { success:3, industry:3, current_song:2, collabs:2, origin:1, creative:1, fans:1, social:1, personal:0, provocative:1 },
+    room_service: { provocative:3, personal:3, social:2, fans:2, success:2, collabs:2, origin:1, current_song:1, creative:0, industry:1 },
+  }[outlet] || { origin:2, creative:2, current_song:2, success:2, fans:1, industry:1, personal:1, provocative:1 };
+
+  var pool = [];
+  for (var cat in weights) {
+    var w = weights[cat];
+    for (var i = 0; i < w; i++) pool.push(cat);
+  }
+  pool.sort(function(){ return Math.random() - 0.5; });
+
+  var selected = [], used = {};
+  for (var j = 0; j < pool.length && selected.length < 8; j++) {
+    var cat = pool[j];
+    if ((used[cat]||0) >= 2) continue;
+    var qs = (INTERVIEW_QUESTIONS[cat]||[]).filter(function(q){
+      if (q.includes('{collabPartner}') && !ctx.collabPartner) return false;
+      if (q.includes('{labelName}')    && !ctx.labelName)    return false;
+      return true;
+    });
+    if (!qs.length) continue;
+    var q = qs[Math.floor(Math.random() * qs.length)];
+    selected.push({ category: cat, text: _iqFill(q, ctx) });
+    used[cat] = (used[cat]||0) + 1;
+  }
+  return selected;
+}
+
+// Fallback answer sets used when AI call is unavailable
+var _IQ_FALLBACKS = {
+  commercial: [
+    "I think strategically about these things. This is a business as much as it is an art form.",
+    "My team and I talked a lot about this. We wanted to position it in a way that made sense for where we are.",
+    "Honestly? The market was moving in that direction and I moved with it. That's just how you stay relevant.",
+    "There's no shame in knowing your audience. That's not selling out — that's communication.",
+  ],
+  authentic: [
+    "I stopped pretending I had it all figured out, and the music got better instantly.",
+    "I just made what felt true to me at the time. That's the only filter I trust.",
+    "I'm not going to lie — some of it came from a really difficult place. I think that's why it connects.",
+    "I had to tune a lot of noise out and just ask myself what I actually wanted to say.",
+  ],
+  neutral: [
+    "It was a combination of things, honestly. Good timing, good people, being in the right headspace.",
+    "I try not to overthink the why. I focus on making the best thing I can with what I have.",
+    "There's no single answer. Lots of small decisions that added up to this.",
+    "It depends on the day you ask me. Sometimes I have a clear answer, sometimes I really don't.",
+  ],
+};
+
+function _iqFallbackSet() {
+  var c = _IQ_FALLBACKS.commercial.slice().sort(function(){ return Math.random()-.5; });
+  var a = _IQ_FALLBACKS.authentic.slice().sort(function(){ return Math.random()-.5; });
+  var n = _IQ_FALLBACKS.neutral.slice().sort(function(){ return Math.random()-.5; });
+  return [
+    { text: a[0], lean: 'authentic' },
+    { text: c[0], lean: 'commercial' },
+    { text: n[0], lean: 'neutral' },
+    { text: c[1]||c[0], lean: 'commercial' },
+  ].sort(function(){ return Math.random()-.5; });
+}
+
+// ─── SCREEN 1: SCHEDULE ──────────────────────────────────────────────────────
+
+function openInterviewScheduler(song) {
+  if (!song) { _showToast('No song selected'); return; }
+
+  var OUTLETS = [
+    { id:'undertone',     label:'Undertone',    ico:'📰', desc:'Indie credibility · authentic lean · free',     bg:'rgba(22,163,74,.08)',   bord:'rgba(22,163,74,.22)' },
+    { id:'chartwell',    label:'Chartwell',    ico:'🎤', desc:'Industry focus · data-driven · neutral coverage',bg:'rgba(124,58,237,.08)',  bord:'rgba(124,58,237,.2)' },
+    { id:'room_service', label:'Room Service', ico:'✨', desc:'Tabloid · high hype ceiling · high risk',        bg:'rgba(220,38,38,.07)',   bord:'rgba(220,38,38,.18)' },
+  ];
+
+  window._ivOutlet   = 'undertone';
+  window._ivDay      = (GAME.day||1) + 2;
+  window._ivSong     = song;
+
+  function effectLine(o) {
+    if (o==='undertone')    return 'Hype +35&ndash;50 &bull; article published &bull; fans +1&ndash;2%';
+    if (o==='chartwell')   return 'Hype +25&ndash;40 &bull; rep +0.2 &bull; article published';
+    if (o==='room_service') return 'Hype +45&ndash;75 &bull; high variance &bull; unpredictable coverage';
+    return '';
+  }
+
+  function outletCards() {
+    return OUTLETS.map(function(o) {
+      var sel = o.id === window._ivOutlet;
+      return '<div class="iv-oc" data-oid="'+o.id+'" onclick="window._ivSelOutlet(\''+o.id+'\')" '
+        + 'style="background:'+(sel?'rgba(124,58,237,.05)':'var(--surf)')+';border:1.5px solid '+(sel?'var(--acc)':o.bord)+';'
+        + 'border-radius:12px;padding:11px 12px;margin:0 14px 7px;cursor:pointer;display:flex;align-items:center;gap:10px">'
+        + '<div style="width:38px;height:38px;border-radius:9px;background:'+o.bg+';display:flex;align-items:center;justify-content:center;font-size:20px;flex:none">'+o.ico+'</div>'
+        + '<div style="flex:1"><b style="font-size:13px;font-weight:700;display:block;margin-bottom:1px">'+o.label+'</b>'
+        + '<span style="font-size:11.5px;color:var(--mut)">'+o.desc+'</span></div>'
+        + (sel?'<span style="color:var(--acc);font-size:15px">&#10003;</span>':'')
+        + '</div>';
+    }).join('');
+  }
+
+  function dayGrid() {
+    var curDay = GAME.day||1;
+    var html = '';
+    for (var d = curDay+1; d <= curDay+14; d++) {
+      var inf = dayInfo(d);
+      var sel = d === window._ivDay;
+      html += '<button onclick="window._ivSelDay('+d+')" '
+        + 'style="flex:1;min-width:60px;padding:7px 4px;border-radius:8px;'
+        + 'border:1.5px solid '+(sel?'var(--acc)':'var(--bord)')+';'
+        + 'background:'+(sel?'var(--acc)':'var(--surf)')+';'
+        + 'color:'+(sel?'#fff':'var(--txt)')+';'
+        + 'font-size:11px;font-weight:700;cursor:pointer;text-align:center;line-height:1.4">'
+        + inf.dayName.slice(0,3)+'<br><span style="font-size:9.5px;opacity:.65">Wk '+inf.week+'</span>'
+        + '</button>';
+    }
+    return html;
+  }
+
+  var closeBtn = 'document.querySelector(\'[data-app-overlay]\').remove()';
+  var html = '<div style="display:flex;flex-direction:column;height:100%;overflow:hidden">'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surf);border-bottom:1px solid var(--bord);flex:none">'
+    + '<button onclick="'+closeBtn+'" style="font-size:18px;color:var(--mut);background:none;border:none;cursor:pointer;padding:2px 6px">&#8592;</button>'
+    + '<div style="flex:1">'
+    + '<div style="font-size:15px;font-weight:800">Exclusive Interview</div>'
+    + '<div style="font-size:11px;color:var(--mut)">Book a press slot &bull; '+(song.name||song.title||'your song')+'</div>'
+    + '</div></div>'
+
+    + '<div style="flex:1;overflow-y:auto;padding:10px 0 12px">'
+    + '<div style="padding:8px 14px 4px;font-size:9.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--mut)">Choose outlet</div>'
+    + '<div id="iv-oc-wrap">'+outletCards()+'</div>'
+
+    + '<div style="padding:10px 14px 6px;font-size:9.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--mut)">Pick a date</div>'
+    + '<div id="iv-day-wrap" style="display:flex;flex-wrap:wrap;gap:5px;padding:0 14px 8px">'+dayGrid()+'</div>'
+
+    + '<div style="padding:0 14px 5px;font-size:9.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--mut)">What to expect</div>'
+    + '<div style="margin:0 14px;background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--txt);line-height:1.8">'
+    + '&#10022; 8 questions &bull; your answers shape the article<br>'
+    + '&#10022; <span id="iv-eff-line">'+effectLine('undertone')+'</span><br>'
+    + '&#10022; Answers nudge your Commercial / Authentic axis'
+    + '</div>'
+    + '</div>'
+
+    + '<div style="padding:12px 16px;border-top:1px solid var(--bord);background:var(--surf);flex:none">'
+    + '<button onclick="window._ivBook()" style="width:100%;background:var(--acc);color:#fff;border-radius:12px;font-size:13.5px;font-weight:800;padding:12px;border:none;cursor:pointer">&#128197; Book Interview</button>'
+    + '</div>'
+    + '</div>';
+
+  window._ivSelOutlet = function(oid) {
+    window._ivOutlet = oid;
+    document.querySelectorAll('.iv-oc').forEach(function(card) {
+      var o2 = OUTLETS.find(function(x){ return x.id===card.getAttribute('data-oid'); });
+      var isSel = card.getAttribute('data-oid') === oid;
+      card.style.background  = isSel ? 'rgba(124,58,237,.05)' : 'var(--surf)';
+      card.style.border      = '1.5px solid '+(isSel ? 'var(--acc)' : (o2?o2.bord:'var(--bord)'));
+      var chk = card.querySelector('span.iv-chk');
+      if (isSel && !chk) { var s=document.createElement('span'); s.className='iv-chk'; s.style.cssText='color:var(--acc);font-size:15px'; s.innerHTML='&#10003;'; card.appendChild(s); }
+      else if (!isSel && chk) chk.remove();
+    });
+    var el = document.getElementById('iv-eff-line');
+    if (el) el.innerHTML = effectLine(oid);
+  };
+
+  window._ivSelDay = function(d) {
+    window._ivDay = d;
+    var curDay = GAME.day||1;
+    var btns = document.querySelectorAll('#iv-day-wrap button');
+    btns.forEach(function(btn, i) {
+      var bd = curDay+1+i;
+      var sel = bd === d;
+      btn.style.border     = '1.5px solid '+(sel?'var(--acc)':'var(--bord)');
+      btn.style.background = sel?'var(--acc)':'var(--surf)';
+      btn.style.color      = sel?'#fff':'var(--txt)';
+    });
+  };
+
+  window._ivBook = function() {
+    var outlet    = window._ivOutlet || 'undertone';
+    var day       = window._ivDay    || ((GAME.day||1)+2);
+    var song2     = window._ivSong;
+    var outletObj = OUTLETS.find(function(o){ return o.id===outlet; }) || OUTLETS[0];
+    var inf       = dayInfo(day);
+
+    if (!GAME.scheduledActivities) GAME.scheduledActivities = [];
+    GAME.scheduledActivities.push({
+      id:          'interview_'+Date.now(),
+      type:        'interview',
+      outlet:      outlet,
+      outletName:  outletObj.label,
+      songId:      song2 ? (song2.id||null) : null,
+      songName:    song2 ? (song2.name||song2.title||'your song') : 'your song',
+      targetDay:   day,
+      week:        inf.week,
+      status:      'scheduled',
+      scheduledAt: GAME.day||1,
+    });
+
+    // Mark activity done in pre-release hub
+    if (song2 && song2.preRelease) {
+      if (!song2.preRelease.activitiesCompleted) song2.preRelease.activitiesCompleted = [];
+      if (!song2.preRelease.activitiesCompleted.includes('exclusive_interview')) {
+        song2.preRelease.activitiesCompleted.push('exclusive_interview');
+        song2.preRelease.hypePoints = (song2.preRelease.hypePoints||0) + 5;
+      }
+    }
+    saveGame();
+    _ivShowConfirmation(song2, outletObj, outlet, day, inf);
+  };
+
+  _insertOverlay(html);
+}
+
+// ─── SCREEN 2: CONFIRMATION ──────────────────────────────────────────────────
+
+function _ivShowConfirmation(song, outletObj, outlet, day, inf) {
+  var oIco     = outletObj ? outletObj.ico : '🎤';
+  var oLabel   = outletObj ? outletObj.label : outlet;
+  var closeBtn = 'document.querySelector(\'[data-app-overlay]\').remove()';
+
+  var upcoming = (GAME.scheduledActivities||[])
+    .filter(function(a){ return a.status==='scheduled'; })
+    .sort(function(a,b){ return (a.targetDay||0)-(b.targetDay||0); })
+    .slice(0,3);
+
+  var upcomingHTML = upcoming.length ? upcoming.map(function(a) {
+    var di  = dayInfo(a.targetDay);
+    var ico = a.type==='interview' ? '🎤' : (a.icon||'📅');
+    return '<div style="background:var(--surf);border:1px solid var(--bord);border-radius:9px;padding:9px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">'
+      + '<span style="font-size:18px">'+ico+'</span>'
+      + '<div style="flex:1"><b style="font-size:12.5px;font-weight:700;display:block">'+(a.outletName||a.name||'Activity')+(a.type==='interview'?' Interview':'')+'</b>'
+      + '<span style="font-size:11px;color:var(--mut)">'+(a.songName||'')+'</span></div>'
+      + '<div style="font-size:11.5px;font-weight:700;color:var(--acc);text-align:right">'+di.dayName+'<br><span style="font-size:10px;font-weight:500;opacity:.7">Wk '+di.week+'</span></div>'
+      + '</div>';
+  }).join('')
+  : '<div style="font-size:12px;color:var(--mut);padding:8px 0">Nothing else scheduled yet.</div>';
+
+  var html = '<div style="display:flex;flex-direction:column;height:100%;overflow:hidden">'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surf);border-bottom:1px solid var(--bord);flex:none">'
+    + '<button onclick="'+closeBtn+'" style="font-size:18px;color:var(--mut);background:none;border:none;cursor:pointer;padding:2px 6px">&#8592;</button>'
+    + '<div style="flex:1"><div style="font-size:15px;font-weight:800">&#128197; Calendar</div>'
+    + '<div style="font-size:11px;color:var(--mut)">Interview scheduled</div></div>'
+    + '</div>'
+
+    + '<div style="flex:1;overflow-y:auto;padding:10px 14px 16px">'
+
+    // Event card
+    + '<div style="background:linear-gradient(135deg,rgba(124,58,237,.09),rgba(37,99,235,.06));border:1.5px solid rgba(124,58,237,.25);border-radius:14px;padding:14px;margin-bottom:12px">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+    + '<span style="font-size:26px">'+oIco+'</span>'
+    + '<div><b style="font-size:14px;font-weight:800;display:block">'+oLabel+' Interview</b>'
+    + '<span style="font-size:11.5px;color:var(--mut)">Exclusive &bull; '+(song?song.name||song.title||'your song':'your song')+'</span></div>'
+    + '</div>'
+    + '<div style="font-size:12.5px;color:var(--mut);line-height:1.8">'
+    + '&#128197; <b style="color:var(--txt)">'+inf.dayName+' &bull; Week '+inf.week+'</b><br>'
+    + '&#11042; 8 questions &bull; approx. 5 min<br>'
+    + '&#128221; '+oLabel+' exclusive<br>'
+    + '&#127925; Discussing '+(song?song.name||song.title||'your song':'your song')
+    + '</div>'
+    + '<div style="margin-top:10px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.18);border-radius:8px;padding:8px 10px;font-size:11.5px;color:var(--txt);line-height:1.5">'
+    + '&#10024; Your answers shape the article tone and nudge your Commercial / Authentic axis.'
+    + '</div></div>'
+
+    // Upcoming
+    + '<div style="font-size:9.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--mut);margin-bottom:7px">Upcoming activities</div>'
+    + upcomingHTML
+
+    + '<div style="margin-top:10px;background:rgba(22,163,74,.06);border:1px solid rgba(22,163,74,.2);border-radius:9px;padding:9px 12px;font-size:12px;color:var(--txt);line-height:1.5">'
+    + '&#10003; Interview is booked. You can start it any time before the scheduled day passes.'
+    + '</div>'
+    + '</div>'
+
+    + '<div style="padding:12px 16px;border-top:1px solid var(--bord);background:var(--surf);flex:none;display:flex;gap:8px">'
+    + '<button onclick="'+closeBtn+'" style="flex:1;background:var(--card);color:var(--txt);border-radius:12px;font-size:13px;font-weight:700;padding:11px;border:1px solid var(--bord);cursor:pointer">Done</button>'
+    + '<button onclick="window._ivStartNow()" style="flex:2;background:var(--acc);color:#fff;border-radius:12px;font-size:13px;font-weight:800;padding:11px;border:none;cursor:pointer">&#9658; Start Now</button>'
+    + '</div>'
+    + '</div>';
+
+  window._ivStartNow = function() { _startInterviewQA(song, outlet, oLabel); };
+  _insertOverlay(html);
+}
+
+// ─── SCREEN 3: LIVE Q&A ──────────────────────────────────────────────────────
+
+async function _startInterviewQA(song, outlet, outletName) {
+  var oIco = outlet==='undertone'?'📰':outlet==='chartwell'?'🎤':'✨';
+  // Loading screen
+  var loadHtml = '<div style="display:flex;flex-direction:column;height:100%;align-items:center;justify-content:center;gap:12px;padding:24px">'
+    + '<div style="font-size:36px">'+oIco+'</div>'
+    + '<div style="font-size:14px;font-weight:800;color:var(--txt)">Preparing questions...</div>'
+    + '<div style="font-size:12px;color:var(--mut);text-align:center">'+outletName+' is ready for you</div>'
+    + '</div>';
+  _insertOverlay(loadHtml);
+
+  var ctx = {
+    artistName:    GAME.sn || GAME.artistName || 'you',
+    songName:      song ? (song.name||song.title||'your song') : 'your song',
+    genre:         GAME.genre || 'your genre',
+    fanCount:      _fmt(GAME.fans||0),
+    collabPartner: (GAME.collabHistory&&GAME.collabHistory.length) ? (GAME.collabHistory[GAME.collabHistory.length-1].partnerName||null) : null,
+    labelName:     GAME.signedLabel ? (GAME.signedLabel.name||'your label') : null,
+  };
+
+  var questions = _iqPick(outlet, ctx);
+
+  // Generate answers for each question (AI or fallback)
+  var qaPairs = [];
+  for (var i = 0; i < questions.length; i++) {
+    var answers = await _iqGenerateAnswers(questions[i], ctx, outlet);
+    qaPairs.push({ q: questions[i], answers: answers });
+  }
+
+  _renderInterviewQA(song, outlet, outletName, qaPairs, 0, []);
+}
+
+async function _iqGenerateAnswers(qObj, ctx, outlet) {
+  var EDGE = 'https://pvxrciebegirmrrrzkor.supabase.co/functions/v1/generate-interview-answers';
+  try {
+    var res = await Promise.race([
+      fetch(EDGE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+(typeof SUPABASE_ANON_KEY!=='undefined'?SUPABASE_ANON_KEY:'') },
+        body: JSON.stringify({ question: qObj.text, category: qObj.category, outlet: outlet, artistName: ctx.artistName, songName: ctx.songName, genre: ctx.genre, fanCount: ctx.fanCount }),
+      }),
+      new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, 7000); }),
+    ]);
+    if (!res.ok) throw new Error('http '+res.status);
+    var data = await res.json();
+    if (Array.isArray(data) && data.length >= 3) return data;
+  } catch(e) {
+    console.log('[Interview] AI answer gen unavailable, using fallback:', e.message);
+  }
+  return _iqFallbackSet();
+}
+
+function _renderInterviewQA(song, outlet, outletName, qaPairs, qIdx, chosen) {
+  var oIco  = outlet==='undertone'?'📰':outlet==='chartwell'?'🎤':'✨';
+  var total = qaPairs.length;
+  var pct   = Math.round((qIdx / total) * 100);
+  var pair  = qaPairs[qIdx];
+  var axis  = GAME.commercialAxis != null ? GAME.commercialAxis : 50;
+  var axisLbl = axis < 40 ? 'Leaning Authentic' : axis > 60 ? 'Leaning Commercial' : 'Balanced so far';
+
+  var answersHTML = pair.answers.map(function(ans, ai) {
+    var lean = ans.lean||'neutral';
+    var ico  = lean==='commercial'?'💰':lean==='authentic'?'🎸':'🤝';
+    var lbl  = lean==='commercial'?'Commercial lean':lean==='authentic'?'Authentic lean':'Neutral';
+    var tagStyle = lean==='commercial'
+      ? 'background:rgba(245,158,11,.12);color:#b45309'
+      : lean==='authentic'
+      ? 'background:rgba(124,58,237,.1);color:var(--acc)'
+      : 'background:rgba(22,163,74,.08);color:#15803d';
+    return '<div class="iv-ans" data-lean="'+lean+'" data-ai="'+ai+'" '
+      + 'onclick="window._ivPick('+ai+',\''+lean+'\')" '
+      + 'style="background:var(--surf);border:1.5px solid var(--bord);border-radius:12px;padding:11px 12px;cursor:pointer;display:flex;align-items:flex-start;gap:9px;margin-bottom:7px">'
+      + '<div style="width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.05);display:flex;align-items:center;justify-content:center;font-size:11px;flex:none;margin-top:1px">'+ico+'</div>'
+      + '<div style="flex:1">'
+      + '<div style="font-size:12.5px;color:var(--txt);line-height:1.5">'+ans.text+'</div>'
+      + '<span style="font-size:9px;font-weight:800;border-radius:4px;padding:1px 6px;margin-top:3px;display:inline-block;'+tagStyle+'">'+lbl+'</span>'
+      + '</div></div>';
+  }).join('');
+
+  var catLabel = (pair.q.category||'').replace(/_/g,' ').replace(/\b\w/g,function(c){ return c.toUpperCase(); });
+  var closeBtn = 'document.querySelector(\'[data-app-overlay]\').remove()';
+
+  var html = '<div style="display:flex;flex-direction:column;height:100%;overflow:hidden">'
+    // Sticky header
+    + '<div style="background:var(--surf);padding:10px 14px;border-bottom:1px solid var(--bord);flex:none">'
+    + '<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">'
+    + '<div style="width:30px;height:30px;border-radius:7px;background:rgba(22,163,74,.07);border:1px solid rgba(22,163,74,.18);display:flex;align-items:center;justify-content:center;font-size:15px">'+oIco+'</div>'
+    + '<div><b style="font-size:13px;font-weight:700;display:block">'+outletName+'</b>'
+    + '<span style="font-size:11px;color:var(--mut)">Live &bull; '+(song?song.name||song.title||'your song':'your song')+'</span></div>'
+    + '</div>'
+    + '<div style="display:flex;align-items:center;gap:8px">'
+    + '<div style="flex:1;height:6px;border-radius:3px;background:var(--bord);overflow:hidden">'
+    + '<div style="height:100%;width:'+pct+'%;border-radius:3px;background:linear-gradient(90deg,var(--acc),#a855f7);transition:width .3s"></div></div>'
+    + '<span style="font-size:11px;color:var(--mut);white-space:nowrap">'+qIdx+' / '+total+'</span>'
+    + '</div></div>'
+
+    // Scrollable body
+    + '<div style="flex:1;overflow-y:auto;padding:12px 14px 16px">'
+    + '<div style="font-size:11px;color:var(--acc);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">'+catLabel+'</div>'
+    + '<div style="font-size:14.5px;font-weight:700;color:var(--txt);line-height:1.55;margin-bottom:14px">&ldquo;'+pair.q.text+'&rdquo;</div>'
+    + answersHTML
+
+    // Axis meter
+    + '<div style="background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:10px 12px;margin-top:2px">'
+    + '<div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px">'
+    + '<span style="color:var(--acc)">&#127928; Authentic</span><span style="color:#b45309">Commercial &#128176;</span></div>'
+    + '<div style="height:10px;border-radius:5px;background:linear-gradient(90deg,var(--acc),rgba(200,190,220,.4),#b45309);position:relative">'
+    + '<div id="iv-axis-marker" style="position:absolute;top:-3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.22);border:2px solid var(--acc);left:calc('+axis+'% - 8px);transition:left .35s"></div>'
+    + '</div>'
+    + '<div style="text-align:center;font-size:11px;color:var(--mut);margin-top:4px">'+axisLbl+'</div>'
+    + '</div>'
+
+    + '<div style="margin-top:10px;font-size:11px;color:var(--mut);line-height:1.5">'
+    + 'The lean icons show how each answer will move your axis. '+(outletName)+' will reflect the overall tone in the article.'
+    + '</div>'
+    + '</div>'
+    + '</div>';
+
+  window._ivPick = function(ansIdx, lean) {
+    // Highlight chosen
+    document.querySelectorAll('.iv-ans').forEach(function(el) {
+      el.style.border     = '1.5px solid var(--bord)';
+      el.style.background = 'var(--surf)';
+    });
+    var chosen_el = document.querySelector('.iv-ans[data-ai="'+ansIdx+'"]');
+    if (chosen_el) { chosen_el.style.border='1.5px solid var(--acc)'; chosen_el.style.background='rgba(124,58,237,.05)'; }
+
+    if (lean==='authentic')  nudgeAxis('authentic',  2);
+    if (lean==='commercial') nudgeAxis('commercial', 2);
+
+    var newChosen = chosen.concat([{ q: pair.q.text, answerText: pair.answers[ansIdx].text, lean: lean }]);
+
+    setTimeout(function() {
+      if (qIdx + 1 < total) {
+        _renderInterviewQA(song, outlet, outletName, qaPairs, qIdx+1, newChosen);
+      } else {
+        _showInterviewResult(song, outlet, outletName, newChosen);
+      }
+    }, 370);
+  };
+
+  _insertOverlay(html);
+}
+
+// ─── SCREEN 4: RESULT ────────────────────────────────────────────────────────
+
+async function _showInterviewResult(song, outlet, outletName, chosen) {
+  var lc = { authentic:0, commercial:0, neutral:0 };
+  chosen.forEach(function(c){ lc[c.lean] = (lc[c.lean]||0)+1; });
+  var dominant = lc.authentic > lc.commercial ? 'authentic' : lc.commercial > lc.authentic ? 'commercial' : 'neutral';
+
+  var hypeGain = outlet==='undertone'    ? 35+Math.round(lc.authentic*3)
+               : outlet==='room_service' ? 40+Math.round(Math.random()*35)
+               : 25+Math.round(lc.neutral*4);
+  var fanGain  = outlet==='undertone'    ? Math.max(10,Math.round((GAME.fans||100)*0.014))
+               : outlet==='room_service' ? Math.max(5,Math.round((GAME.fans||100)*0.018))
+               : Math.max(5,Math.round((GAME.fans||100)*0.007));
+  var repGain  = outlet==='chartwell'   ? 0.2 : outlet==='undertone' ? 0.1 : 0.05;
+
+  GAME.hype = Math.min((GAME.hype||0)+hypeGain, 200);
+  GAME.fans = (GAME.fans||0)+fanGain;
+  if (GAME.rep != null) GAME.rep = Math.min(5, (GAME.rep||0)+repGain);
+  saveGame();
+
+  var axis     = GAME.commercialAxis != null ? GAME.commercialAxis : 50;
+  var axisNote = dominant==='authentic'
+    ? 'Your answers leaned <b style="color:var(--acc)">Authentic</b> ('+lc.authentic+' of '+chosen.length+'). '+(outlet==='undertone'?'Undertone noticed &mdash; keep it up and they\'ll keep covering you.':'')
+    : dominant==='commercial'
+    ? 'Your answers leaned <b style="color:#b45309">Commercial</b> ('+lc.commercial+' of '+chosen.length+').'+(outlet==='chartwell'?' Chartwell appreciated the business clarity.':'')
+    : 'You kept it balanced. Hard to predict how the coverage will spin it.';
+
+  var resultIco   = lc.authentic>=5?'⭐':lc.commercial>=5?'💰':'🎤';
+  var resultTitle = lc.authentic>=5?'Great interview':lc.commercial>=5?'Polished interview':'Solid interview';
+  var resultSub   = outlet==='undertone'?'Undertone is publishing the piece now.':outlet==='chartwell'?'Chartwell is running the story this week.':'Room Service has the scoop.';
+  var oIco        = outlet==='undertone'?'📰':outlet==='chartwell'?'🎤':'✨';
+  var closeBtn    = 'document.querySelector(\'[data-app-overlay]\').remove()';
+
+  var html = '<div style="display:flex;flex-direction:column;height:100%;overflow:hidden">'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surf);border-bottom:1px solid var(--bord);flex:none">'
+    + '<div style="flex:1"><div style="font-size:15px;font-weight:800">Interview Result</div>'
+    + '<div style="font-size:11px;color:var(--mut)">'+outletName+'</div></div>'
+    + '</div>'
+
+    + '<div style="flex:1;overflow-y:auto;padding:0 0 16px">'
+
+    // Hero
+    + '<div style="text-align:center;padding:20px 14px 14px;background:var(--surf);border-bottom:1px solid var(--bord)">'
+    + '<div style="font-size:46px;margin-bottom:6px">'+resultIco+'</div>'
+    + '<div style="font-size:18px;font-weight:800;color:var(--txt);margin-bottom:3px">'+resultTitle+'</div>'
+    + '<div style="font-size:12px;color:var(--mut);line-height:1.5">'+resultSub+'<br>Your <b>'+(dominant==='neutral'?'balanced':dominant)+'</b> lean came through.</div>'
+    + '</div>'
+
+    // Article card (filled asynchronously)
+    + '<div style="margin:10px 14px;background:var(--surf);border:1.5px solid var(--bord);border-radius:12px;overflow:hidden">'
+    + '<div style="padding:9px 12px;background:var(--card);border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:8px">'
+    + '<span style="font-size:14px">'+oIco+'</span>'
+    + '<span style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--mut)">'+outletName+' &bull; Published now</span>'
+    + '</div>'
+    + '<div id="iv-art-body" style="padding:11px 12px">'
+    + '<div style="font-size:12px;color:var(--mut);font-style:italic">Generating article...</div>'
+    + '</div></div>'
+
+    // Effects
+    + '<div style="margin:0 14px;display:flex;flex-direction:column;gap:5px">'
+    + '<div style="background:var(--surf);border:1px solid var(--bord);border-radius:9px;padding:9px 12px;display:flex;align-items:center;gap:9px;font-size:12.5px">'
+    + '<span style="font-size:16px">&#9889;</span><span style="flex:1;color:var(--txt)">Hype boost</span><span style="font-size:13px;font-weight:800;color:#16a34a">+'+hypeGain+'</span></div>'
+    + '<div style="background:var(--surf);border:1px solid var(--bord);border-radius:9px;padding:9px 12px;display:flex;align-items:center;gap:9px;font-size:12.5px">'
+    + '<span style="font-size:16px">&#128101;</span><span style="flex:1;color:var(--txt)">New fans from article readers</span><span style="font-size:13px;font-weight:800;color:#16a34a">+'+_fmt(fanGain)+'</span></div>'
+    + (repGain>0?'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:9px;padding:9px 12px;display:flex;align-items:center;gap:9px;font-size:12.5px">'
+    + '<span style="font-size:16px">&#11088;</span><span style="flex:1;color:var(--txt)">Rep boost ('+outletName+')</span><span style="font-size:13px;font-weight:800;color:#16a34a">+'+repGain.toFixed(1)+'</span></div>':'')
+    + '</div>'
+
+    // Axis result
+    + '<div style="margin:8px 14px 8px;background:var(--surf);border:1px solid var(--bord);border-radius:10px;padding:11px 12px">'
+    + '<div style="font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin-bottom:8px">Career direction &bull; this interview</div>'
+    + '<div style="height:10px;border-radius:5px;background:linear-gradient(90deg,var(--acc),rgba(200,190,220,.4),#b45309);position:relative;margin-bottom:4px">'
+    + '<div style="position:absolute;top:-3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.22);border:2px solid var(--acc);left:calc('+axis+'% - 8px)"></div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--mut);line-height:1.5;margin-top:7px">'+axisNote+'</div>'
+    + '</div>'
+    + '</div>'
+
+    + '<div style="padding:12px 16px;border-top:1px solid var(--bord);background:var(--surf);flex:none">'
+    + '<button onclick="'+closeBtn+'" style="width:100%;background:var(--acc);color:#fff;border-radius:12px;font-size:13.5px;font-weight:800;padding:12px;border:none;cursor:pointer">Done</button>'
+    + '</div>'
+    + '</div>';
+
+  _insertOverlay(html);
+
+  // Fire article generation async — fills the card when ready
+  var notableAnswers = chosen.filter(function(c){ return c.lean!=='neutral'; }).slice(0,3).map(function(c){ return c.answerText; });
+  _fireArticleTrigger({
+    triggerType: 'interview_'+outlet,
+    triggerKey:  'iv_'+outlet+'_'+(song?song.id||song.name:'x')+'_'+(GAME.week||1)+'_'+Date.now(),
+    outlet:      outlet==='undertone'?'Undertone':outlet==='chartwell'?'Chartwell':'Room Service',
+    facts: {
+      artistName:     GAME.sn||GAME.artistName||'the artist',
+      songName:       song?song.name||song.title||'their latest song':'their latest song',
+      overallLean:    dominant,
+      authCount:      lc.authentic,
+      commCount:      lc.commercial,
+      neutCount:      lc.neutral,
+      totalAnswers:   chosen.length,
+      notableAnswers: notableAnswers,
+    },
+    fallback: {
+      headline: outletName+': '+(GAME.sn||'The Artist')+' on '+(song?song.name||'the new song':'the new song'),
+      content: 'An exclusive interview where '+(dominant==='authentic'?'creative honesty took center stage':dominant==='commercial'?'strategic vision came through clearly':'every angle got covered')+'. Out now.',
+    },
+    onSuccess: function(art) {
+      var el = document.getElementById('iv-art-body');
+      if (el && art) {
+        el.innerHTML = '<div style="font-size:13.5px;font-weight:800;color:var(--txt);margin-bottom:6px;line-height:1.4">'+(art.headline||'')+'</div>'
+          + '<div style="font-size:12px;color:var(--mut);line-height:1.65;font-style:italic">'+(art.content||art.excerpt||'')+'</div>';
+      }
+    },
+  });
+}
+
+// ─── END INTERVIEW MINI-GAME ─────────────────────────────────────────────────
+
 function openPreReleaseHub(song) {
   if (!song) return;
 
@@ -9579,7 +10234,7 @@ function openPreReleaseHub(song) {
   var pts     = song.preRelease.hypePoints || 0;
   var mult    = song.preRelease.fanMomentum;
   var done    = song.preRelease.activitiesCompleted || [];
-  var relWeek = song.preRelease.releaseWeek;
+  var relWeek = song.preRelease.releaseWeek || (song.scheduledReleaseDay ? dayInfo(song.scheduledReleaseDay).week : null);
   var curWeek = GAME.week || 0;
   var weeksOut = relWeek ? Math.max(0, relWeek - curWeek) : 99;
 
@@ -9670,7 +10325,9 @@ function openPreReleaseHub(song) {
         var status = actStatus(id);
         var costStr = cost > 0 ? '$' + cost.toLocaleString() : energy > 0 ? '⚡' + energy + ' energy' : 'Free';
         var clickStr = status === 'available'
-          ? 'onclick="window._prcDoAct(\'' + id + '\',' + cost + ',' + energy + ',' + hpts + ',\'' + lbl.replace(/'/g,"\\'") + '\')"'
+          ? (id === 'exclusive_interview'
+              ? 'onclick="openInterviewScheduler(window._sdSong)"'
+              : 'onclick="window._prcDoAct(\'' + id + '\',' + cost + ',' + energy + ',' + hpts + ',\'' + lbl.replace(/'/g,"\\'") + '\')"')
           : '';
         html += '<div class="' + cardCls(id) + '" ' + clickStr + '>'
           + '<div class="prc-ico">' + ico + '</div>'
@@ -9684,7 +10341,7 @@ function openPreReleaseHub(song) {
   }
 
   var relWeekDisplay = relWeek
-    ? 'Week ' + relWeek + ' &bull; ' + weeksOut + ' week' + (weeksOut !== 1 ? 's' : '') + ' away'
+    ? (song.scheduledReleaseDate ? song.scheduledReleaseDate + ' &bull; ' : 'Week ' + relWeek + ' &bull; ') + weeksOut + ' week' + (weeksOut !== 1 ? 's' : '') + ' away'
     : 'No release date set';
 
   var closeBtn = 'document.querySelector(\'[data-app-overlay]\').remove()';
@@ -9711,7 +10368,7 @@ function openPreReleaseHub(song) {
     + '<div style="flex:1;overflow-y:auto;padding:10px 16px 20px">' + actCards() + '</div>'
     // Sticky footer
     + '<div style="padding:12px 16px;border-top:1px solid var(--bord);background:var(--surf);flex:none">'
-    + '<button onclick="' + closeBtn + '" '
+    + '<button onclick="document.querySelector(\'[data-app-overlay]\').remove();prepareRelease(\'' + song.id + '\')" '
     + 'style="width:100%;background:var(--acc);color:#fff;border-radius:12px;font-size:14px;font-weight:800;padding:12px;border:none;cursor:pointer">'
     + '🚀 Proceed to Release &bull; ' + mult + '× Fan Momentum</button></div>'
     + '</div>';
@@ -11512,7 +12169,9 @@ function goToSleepInternal(){
         const baseStreams=Math.floor((hypeMultiplier*qualityMultiplier*decayFactor*playlistBoost*followerBoost*labelBoost*Math.random()*8000)+1000);
         let viralMultiplier=1;
         if(Math.random()<0.02)viralMultiplier=Math.floor(Math.random()*90)+10;
-        const weeklyStreams=baseStreams*viralMultiplier;
+        // Axis-based velocity multiplier: authentic artists have more superfans → higher velocity per fan
+        const _vAxisMult=(GAME.commercialAxis!=null&&GAME.commercialAxis<=35)?1.15:(GAME.commercialAxis!=null&&GAME.commercialAxis>=65)?0.9:1.0;
+        const weeklyStreams=Math.floor(baseStreams*viralMultiplier*_vAxisMult);
         // Blended rate across all 5 platforms (~$0.004/stream weighted average)
         let weeklyRevenue=weeklyStreams*0.004;
         if(GAME.recordLabel){
@@ -20272,6 +20931,10 @@ function checkSongProgress(){
     var pct=Math.min(1,(now-song.progressStartTime)/song.progressDuration);
     if(pct>=1){
       if(song.inProgressType==='writing'){song.written=true;song.writtenWeek=GAME.week;song.writtenDay=((GAME.day-1)%7)+1||1;song.writtenYear=GAME.year||2025;song.inProgress=false;song.inProgressType=null;song.progressStartTime=null;song.progressDuration=null;changed=true;showToast('"'+song.title+'" is written!','green');
+        // Axis nudge: self-written song (no A&R/label source) = authentic push
+        if(song.source !== 'anr' && song.source !== 'label') nudgeAxis('authentic', 3);
+        // TODO: nudgeAxis('commercial', 5) when A&R song source is implemented (song.source === 'anr')
+        // TODO: nudgeAxis('authentic', 8) when passion project flag is implemented (song.passionProject === true)
         // Sync written state to collab partner
         if(GAME_MODE==='multi' && song.collab_request_id && !song.isCollabReceiver){
           supabase.from('collab_requests').update({ song_written_week: GAME.week, song_quality: song.quality||50, song_genre: song.genre||GAME.genre||'Pop' }).eq('id',song.collab_request_id).catch(()=>{});
@@ -21151,7 +21814,17 @@ async function respondCollab(requestId,action){
       var _relChange={great:15,lightning:15,surprise:10,good:5,disagreement:0,mediocre:-5,breakdown:-15,publicBreakdown:-25,cancelled:0,leak:15}[_sessionResult]||0;
       GAME.relationships[req.from_user_id]=(GAME.relationships[req.from_user_id]||0)+_relChange;
       var _wellChange={great:3,lightning:5,surprise:2,good:0,disagreement:0,mediocre:0,breakdown:-3,publicBreakdown:-5,leak:3}[_sessionResult]||0;
-      if(_wellChange!==0) GAME.wellbeing=Math.max(0,Math.min(100,(GAME.wellbeing||50)+_wellChange));
+      if(_wellChange!==0){
+        // Axis sensitivity multiplier: commercial artists feel setbacks harder; authentic artists feel them less.
+        // Positive outcomes: commercial gets a bigger boost from validation; authentic gets less (they care less about external wins).
+        var _wellAxis=GAME.commercialAxis!=null?GAME.commercialAxis:50;
+        var _wellMult=_wellAxis>=65?(_wellChange<0?1.6:1.4):_wellAxis<=35?(_wellChange<0?0.6:0.7):1.0;
+        var _adjWell=Math.round(_wellChange*_wellMult);
+        GAME.wellbeing=Math.max(0,Math.min(100,(GAME.wellbeing||50)+_adjWell));
+      }
+      // TODO: apply axis wellbeing multiplier to chart-drop wellbeing changes when that system is built.
+      // Commercial artists (axis >= 65): wellbeing * 1.6 on drops, * 1.4 on boosts.
+      // Authentic artists (axis <= 35): wellbeing * 0.6 on drops, * 0.7 on boosts.
       // Build dummy artist objects for calcCollabQuality
       var _meSkills={writing:GAME.skills&&GAME.skills.writing||0,singing:GAME.skills&&GAME.skills.singing||0,production:GAME.skills&&GAME.skills.production||0};
       var _themSkills={writing:30,singing:30,production:30}; // fallback avg for other player
@@ -38295,14 +38968,29 @@ async function _fireArticleTrigger(opts){
     }
   }
 
-  // UNDERTONE GATE — Undertone won't cover artists who are too commercial (axis > 65).
-  // They are an indie discovery outlet; a heavily commercial artist no longer fits their voice.
+  // UNDERTONE GATE — Undertone is an indie discovery outlet. Two independent gates:
+  // 1. Fan size: stops covering artists with 100K+ fans (they've outgrown underground).
+  // 2. Axis: stops covering artists who've drifted too commercial.
   if(opts.outlet && opts.outlet.toLowerCase() === 'undertone'){
-    var _axis = GAME && GAME.commercialAxis != null ? GAME.commercialAxis : 50;
-    if(_axis > 65){
-      console.warn('[Article] Undertone blocked — axis too commercial (' + _axis + ') for triggerKey: ' + opts.triggerKey);
+    var _utFans = GAME && GAME.fans != null ? GAME.fans : 0;
+    if(_utFans >= 100000){
+      console.warn('[Article] Undertone blocked — artist too large (' + _utFans + ' fans) for triggerKey: ' + opts.triggerKey);
       return;
     }
+    var _axis = GAME && GAME.commercialAxis != null ? GAME.commercialAxis : 50;
+    if(_axis > 80){
+      // Fully commercial — Undertone has stopped covering this artist entirely
+      console.warn('[Article] Undertone blocked — axis fully commercial (' + _axis + ') for triggerKey: ' + opts.triggerKey);
+      return;
+    }
+    if(_axis > 65){
+      // Becoming commercial — Undertone covers 40% of the time
+      if(Math.random() > 0.4){
+        console.warn('[Article] Undertone skipped (axis ' + _axis + ', random roll) for triggerKey: ' + opts.triggerKey);
+        return;
+      }
+    }
+    // Below 65: Undertone covers normally
   }
 
   var EDGE = 'https://pvxrciebegirmrrrzkor.supabase.co/functions/v1/generate-article';
