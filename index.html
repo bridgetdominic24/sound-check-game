@@ -10234,7 +10234,7 @@ function openPreReleaseHub(song) {
   var pts     = song.preRelease.hypePoints || 0;
   var mult    = song.preRelease.fanMomentum;
   var done    = song.preRelease.activitiesCompleted || [];
-  var relWeek = song.preRelease.releaseWeek;
+  var relWeek = song.preRelease.releaseWeek || (song.scheduledReleaseDay ? dayInfo(song.scheduledReleaseDay).week : null);
   var curWeek = GAME.week || 0;
   var weeksOut = relWeek ? Math.max(0, relWeek - curWeek) : 99;
 
@@ -10341,7 +10341,7 @@ function openPreReleaseHub(song) {
   }
 
   var relWeekDisplay = relWeek
-    ? 'Week ' + relWeek + ' &bull; ' + weeksOut + ' week' + (weeksOut !== 1 ? 's' : '') + ' away'
+    ? (song.scheduledReleaseDate ? song.scheduledReleaseDate + ' &bull; ' : 'Week ' + relWeek + ' &bull; ') + weeksOut + ' week' + (weeksOut !== 1 ? 's' : '') + ' away'
     : 'No release date set';
 
   var closeBtn = 'document.querySelector(\'[data-app-overlay]\').remove()';
@@ -10368,7 +10368,7 @@ function openPreReleaseHub(song) {
     + '<div style="flex:1;overflow-y:auto;padding:10px 16px 20px">' + actCards() + '</div>'
     // Sticky footer
     + '<div style="padding:12px 16px;border-top:1px solid var(--bord);background:var(--surf);flex:none">'
-    + '<button onclick="' + closeBtn + '" '
+    + '<button onclick="document.querySelector(\'[data-app-overlay]\').remove();prepareRelease(\'' + song.id + '\')" '
     + 'style="width:100%;background:var(--acc);color:#fff;border-radius:12px;font-size:14px;font-weight:800;padding:12px;border:none;cursor:pointer">'
     + '🚀 Proceed to Release &bull; ' + mult + '× Fan Momentum</button></div>'
     + '</div>';
