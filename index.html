@@ -4753,6 +4753,14 @@ function updateCareerDirectionBar() {
   lbl.textContent = getAxisLabel();
 }
 
+// Called from the interview mini-game for each answer the player picks.
+// lean: 'commercial' | 'authentic' | 'neutral'
+function applyInterviewAxisNudge(lean) {
+  if (lean === 'commercial') nudgeAxis('commercial', 2);
+  else if (lean === 'authentic') nudgeAxis('authentic', 2);
+  // neutral = no change
+}
+
 // Fandom composition ratio (used by fandoms system, Wave 3).
 // Returns superfan ratio: 0.15 (fully commercial) → 0.65 (fully authentic).
 function getSuperfanRatio() {
@@ -9321,9 +9329,12 @@ function launchPromoCampaign(songId){
     // Axis nudges based on promo type
     if (promoKey === 'grassroots') nudgeAxis('authentic', 3);
     else if (promoKey === 'teaser') nudgeAxis('authentic', 2);
+    else if (promoKey === 'street_mural' || promoKey === 'mural') nudgeAxis('authentic', 3);
+    else if (promoKey === 'podcast' || promoKey === 'podcast_circuit') nudgeAxis('authentic', 2);
     else if (promoKey.startsWith('billboard_')) nudgeAxis('commercial', 2);
     // Heavy Targeted Ads: any promo with budget >= $10K/wk
     else if (budget >= 10000 && (promoKey.includes('social') || promoKey.includes('ads') || promoKey.includes('targeted'))) nudgeAxis('commercial', 2);
+    // TODO: nudgeAxis('commercial', 4) when brand deal / endorsement acceptance is implemented
   });
 
   GAME._dirty = true;
@@ -12158,7 +12169,9 @@ function goToSleepInternal(){
         const baseStreams=Math.floor((hypeMultiplier*qualityMultiplier*decayFactor*playlistBoost*followerBoost*labelBoost*Math.random()*8000)+1000);
         let viralMultiplier=1;
         if(Math.random()<0.02)viralMultiplier=Math.floor(Math.random()*90)+10;
-        const weeklyStreams=baseStreams*viralMultiplier;
+        // Axis-based velocity multiplier: authentic artists have more superfans → higher velocity per fan
+        const _vAxisMult=(GAME.commercialAxis!=null&&GAME.commercialAxis<=35)?1.15:(GAME.commercialAxis!=null&&GAME.commercialAxis>=65)?0.9:1.0;
+        const weeklyStreams=Math.floor(baseStreams*viralMultiplier*_vAxisMult);
         // Blended rate across all 5 platforms (~$0.004/stream weighted average)
         let weeklyRevenue=weeklyStreams*0.004;
         if(GAME.recordLabel){
@@ -20918,6 +20931,10 @@ function checkSongProgress(){
     var pct=Math.min(1,(now-song.progressStartTime)/song.progressDuration);
     if(pct>=1){
       if(song.inProgressType==='writing'){song.written=true;song.writtenWeek=GAME.week;song.writtenDay=((GAME.day-1)%7)+1||1;song.writtenYear=GAME.year||2025;song.inProgress=false;song.inProgressType=null;song.progressStartTime=null;song.progressDuration=null;changed=true;showToast('"'+song.title+'" is written!','green');
+        // Axis nudge: self-written song (no A&R/label source) = authentic push
+        if(song.source !== 'anr' && song.source !== 'label') nudgeAxis('authentic', 3);
+        // TODO: nudgeAxis('commercial', 5) when A&R song source is implemented (song.source === 'anr')
+        // TODO: nudgeAxis('authentic', 8) when passion project flag is implemented (song.passionProject === true)
         // Sync written state to collab partner
         if(GAME_MODE==='multi' && song.collab_request_id && !song.isCollabReceiver){
           supabase.from('collab_requests').update({ song_written_week: GAME.week, song_quality: song.quality||50, song_genre: song.genre||GAME.genre||'Pop' }).eq('id',song.collab_request_id).catch(()=>{});
@@ -21797,7 +21814,17 @@ async function respondCollab(requestId,action){
       var _relChange={great:15,lightning:15,surprise:10,good:5,disagreement:0,mediocre:-5,breakdown:-15,publicBreakdown:-25,cancelled:0,leak:15}[_sessionResult]||0;
       GAME.relationships[req.from_user_id]=(GAME.relationships[req.from_user_id]||0)+_relChange;
       var _wellChange={great:3,lightning:5,surprise:2,good:0,disagreement:0,mediocre:0,breakdown:-3,publicBreakdown:-5,leak:3}[_sessionResult]||0;
-      if(_wellChange!==0) GAME.wellbeing=Math.max(0,Math.min(100,(GAME.wellbeing||50)+_wellChange));
+      if(_wellChange!==0){
+        // Axis sensitivity multiplier: commercial artists feel setbacks harder; authentic artists feel them less.
+        // Positive outcomes: commercial gets a bigger boost from validation; authentic gets less (they care less about external wins).
+        var _wellAxis=GAME.commercialAxis!=null?GAME.commercialAxis:50;
+        var _wellMult=_wellAxis>=65?(_wellChange<0?1.6:1.4):_wellAxis<=35?(_wellChange<0?0.6:0.7):1.0;
+        var _adjWell=Math.round(_wellChange*_wellMult);
+        GAME.wellbeing=Math.max(0,Math.min(100,(GAME.wellbeing||50)+_adjWell));
+      }
+      // TODO: apply axis wellbeing multiplier to chart-drop wellbeing changes when that system is built.
+      // Commercial artists (axis >= 65): wellbeing * 1.6 on drops, * 1.4 on boosts.
+      // Authentic artists (axis <= 35): wellbeing * 0.6 on drops, * 0.7 on boosts.
       // Build dummy artist objects for calcCollabQuality
       var _meSkills={writing:GAME.skills&&GAME.skills.writing||0,singing:GAME.skills&&GAME.skills.singing||0,production:GAME.skills&&GAME.skills.production||0};
       var _themSkills={writing:30,singing:30,production:30}; // fallback avg for other player
@@ -38941,14 +38968,29 @@ async function _fireArticleTrigger(opts){
     }
   }
 
-  // UNDERTONE GATE — Undertone won't cover artists who are too commercial (axis > 65).
-  // They are an indie discovery outlet; a heavily commercial artist no longer fits their voice.
+  // UNDERTONE GATE — Undertone is an indie discovery outlet. Two independent gates:
+  // 1. Fan size: stops covering artists with 100K+ fans (they've outgrown underground).
+  // 2. Axis: stops covering artists who've drifted too commercial.
   if(opts.outlet && opts.outlet.toLowerCase() === 'undertone'){
-    var _axis = GAME && GAME.commercialAxis != null ? GAME.commercialAxis : 50;
-    if(_axis > 65){
-      console.warn('[Article] Undertone blocked — axis too commercial (' + _axis + ') for triggerKey: ' + opts.triggerKey);
+    var _utFans = GAME && GAME.fans != null ? GAME.fans : 0;
+    if(_utFans >= 100000){
+      console.warn('[Article] Undertone blocked — artist too large (' + _utFans + ' fans) for triggerKey: ' + opts.triggerKey);
       return;
     }
+    var _axis = GAME && GAME.commercialAxis != null ? GAME.commercialAxis : 50;
+    if(_axis > 80){
+      // Fully commercial — Undertone has stopped covering this artist entirely
+      console.warn('[Article] Undertone blocked — axis fully commercial (' + _axis + ') for triggerKey: ' + opts.triggerKey);
+      return;
+    }
+    if(_axis > 65){
+      // Becoming commercial — Undertone covers 40% of the time
+      if(Math.random() > 0.4){
+        console.warn('[Article] Undertone skipped (axis ' + _axis + ', random roll) for triggerKey: ' + opts.triggerKey);
+        return;
+      }
+    }
+    // Below 65: Undertone covers normally
   }
 
   var EDGE = 'https://pvxrciebegirmrrrzkor.supabase.co/functions/v1/generate-article';
