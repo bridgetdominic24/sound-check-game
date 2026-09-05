@@ -40077,13 +40077,9 @@ async function initServerTime(){
 
       if(missedDays > 0){
         console.log('[Timer] Catching up', missedDays, 'missed days (day', lastProcessed, '→', serverDay, ')');
-        // Snapshot stats before catch-up so we can show a "while you were away" summary
-        const _preStreams = (GAME.songs||[]).reduce(function(s,sg){ return s+(sg.streams||0); }, 0);
-        const _preFans   = Object.values(GAME.fansByRegion||{}).reduce(function(s,v){ return s+v; }, 0);
-
         // Catch up silently — process economy/promo for each missed day
         // but don't spam notifications (suppress after day 1)
-        const MAX_CATCHUP = Math.min(missedDays, 90); // cap at 90 days (~3 months)
+        const MAX_CATCHUP = Math.min(missedDays, 30); // cap at 30 days
         for(let d = 1; d <= MAX_CATCHUP; d++){
           const catchDay = lastProcessed + d;
           if(catchDay === serverDay) break; // last day processed live below
@@ -40096,20 +40092,6 @@ async function initServerTime(){
         // Final day processed normally
         GAME.day = serverDay;
         GAME.week = Math.ceil(serverDay / 7);
-
-        // Show a "while you were away" summary notification
-        const _postStreams = (GAME.songs||[]).reduce(function(s,sg){ return s+(sg.streams||0); }, 0);
-        const _postFans   = Object.values(GAME.fansByRegion||{}).reduce(function(s,v){ return s+v; }, 0);
-        const _newStreams  = _postStreams - _preStreams;
-        const _newFans    = _postFans - _preFans;
-        const _daysAway   = Math.min(missedDays, MAX_CATCHUP);
-        var _awayParts = [];
-        if(_newStreams > 0) _awayParts.push('+'+_newStreams.toLocaleString()+' streams');
-        if(_newFans > 0)    _awayParts.push('+'+_newFans.toLocaleString()+' fans');
-        if(_awayParts.length > 0){
-          var _awayMsg = 'Away for '+_daysAway+' day'+((_daysAway!==1)?'s':'')+': '+_awayParts.join(', ')+'.';
-          setTimeout(function(){ addNotification('👋 Welcome back!', _awayMsg, 'info'); }, 1500);
-        }
       }
 
       window._lastEpochDay = Math.floor(Date.now() / DAY_MS);
@@ -40236,106 +40218,33 @@ function _silentDayCatchUp(day, showFirst){
   // Energy/creativity reset each day
   applyDailyRefresh();
 
-  // Weekly block — things that only happen once per game week
-  if(info.dow === 0){
-
-    // ── Hype/buzz decay (same formula as _onDayAdvanced) ──────────────
-    const recentActivity = (GAME._hypeActivityThisWeek || 0);
-    const decayAmount = Math.max(0, Math.floor(Math.random()*4)+3 - recentActivity);
-    GAME.buzz = Math.max(0, (GAME.buzz||0) - decayAmount);
-    GAME.hype = GAME.buzz;
-    GAME._hypeActivityThisWeek = 0;
-    if((GAME.buzz||0) > 1000){
-      const overflow = GAME.buzz - 1000;
-      GAME.buzz = 1000; GAME.hype = 1000;
-      GAME.money = (GAME.money||0) + overflow * 50;
-    }
-
-    // ── Organic social growth (same rates as checkDailyEconomy) ───────
-    if(GAME.social){
-      var igBase = GAME.social.instagram || 0;
-      var ttBase = GAME.social.tiktok    || 0;
-      var twBase = GAME.social.twitter   || 0;
-      if(igBase > 0) GAME.social.instagram += Math.floor(igBase * 0.02);
-      if(ttBase > 0) GAME.social.tiktok    += Math.floor(ttBase * 0.025);
-      if(twBase > 0) GAME.social.twitter   += Math.floor(twBase * 0.01);
-    }
-
-    // ── Rent ──────────────────────────────────────────────────────────
-    if(GAME.housing && GAME.housing.rent > 0){
-      GAME.money = Math.max(0, (GAME.money||0) - GAME.housing.rent);
-      if(!GAME.financeHistory) GAME.financeHistory = [];
-      var _rfh = GAME.financeHistory.find(h=>h.week===info.week);
-      if(!_rfh){ _rfh={week:info.week,streamingRevenue:0,jobPay:0,gigPay:0,tipsPay:0,minigamePay:0,rent:0,promo:0}; GAME.financeHistory.push(_rfh); }
-      _rfh.rent = (_rfh.rent||0) + GAME.housing.rent;
-    }
-
-    // ── Staff/manager fees ────────────────────────────────────────────
-    if(GAME.hiredManagers && GAME.hiredManagers.length > 0){
-      GAME.hiredManagers = GAME.hiredManagers.filter(function(m){
-        var fee = m.weeklyFee || 5000;
-        if((GAME.money||0) >= fee){ GAME.money -= fee; return true; }
-        return false; // can't afford → fires them silently during catch-up
-      });
-    }
-
-    // ── Penthouse rep bonus ───────────────────────────────────────────
-    if(GAME.housing && GAME.housing.repBonusPerWeek > 0){
-      if(typeof GAME.reputation === 'number')
-        GAME.reputation = Math.min(5, GAME.reputation + GAME.housing.repBonusPerWeek);
-    }
-
-    // ── Promo campaigns ───────────────────────────────────────────────
-    if(typeof processPromoCampaigns === 'function') processPromoCampaigns();
-
-    // ── Weekly stream history reset (MUST be before _processDailyStreams) ──
-    if(GAME.songs){
-      GAME.songs.forEach(function(song){
-        if(!song.released) return;
-        if(!Array.isArray(song.weeklyStreamsHistory)) song.weeklyStreamsHistory = [];
-        if(song.weeklyStreams > 0){
-          song.weeklyStreamsHistory.push({week: info.week - 1, streams: song.weeklyStreams});
-          if(song.weeklyStreamsHistory.length > 4) song.weeklyStreamsHistory.shift();
-        }
-        song.weeklyStreams = 0;
-      });
-    }
-
-    // ── Chart positions (rough offline estimate from stream totals) ───
-    if(GAME.songs){
-      var _sorted = GAME.songs.filter(function(s){ return s.released && (s.streams||0) >= 100000; });
-      _sorted.sort(function(a,b){ return (b.streams||0)-(a.streams||0); });
-      _sorted.forEach(function(s,idx){
-        s.lastChartPosition = s.chartPosition || null;
-        s.chartPosition = idx + 1;
-        if(!s.peakPosition || s.chartPosition < s.peakPosition) s.peakPosition = s.chartPosition;
-        s.weeksOnChart = (s.weeksOnChart||0) + 1;
-      });
-      GAME.songs.forEach(function(s){
-        if(s.released && s.chartPosition && (s.streams||0) < 100000){
-          s.lastChartPosition = s.chartPosition;
-          s.chartPosition = null;
-        }
-      });
-    }
-  }
-
-  // Economy: job pay (daily)
+  // Economy: job pay, promo campaigns
   if(GAME.job && GAME.jobPay){
-    var _jobHiredDay = GAME.jobHiredDay || 1;
-    var _daysSinceHired = day - _jobHiredDay;
-    var _isPayday = _daysSinceHired >= 0 && _daysSinceHired % 7 === 0;
-    if(_isPayday){
-      GAME.money = (GAME.money||0) + GAME.jobPay;
-      if(!GAME.financeHistory) GAME.financeHistory = [];
-      var fw = GAME.financeHistory.find(h=>h.week===info.week);
-      if(!fw){ fw={week:info.week,streamingRevenue:0,jobPay:0,gigPay:0,tipsPay:0,minigamePay:0,rent:0,promo:0}; GAME.financeHistory.push(fw); }
-      fw.jobPay = (fw.jobPay||0) + GAME.jobPay;
-    }
+    GAME.money = (GAME.money||0) + GAME.jobPay;
+    if(!GAME.financeHistory) GAME.financeHistory = [];
+    var fw = GAME.financeHistory.find(h=>h.week===info.week);
+    if(!fw){ fw={week:info.week,streamingRevenue:0,jobPay:0,gigPay:0,tipsPay:0,minigamePay:0,rent:0,promo:0}; GAME.financeHistory.push(fw); }
+    fw.jobPay = (fw.jobPay||0) + GAME.jobPay;
   }
 
-  // Skill decay (same function used in live play)
-  if(typeof processSkillDecay === 'function') processSkillDecay();
+  // Promo campaigns advance each week (dow===0)
+  if(info.dow === 0 && typeof processPromoCampaigns === 'function'){
+    processPromoCampaigns();
+  }
+
+  // Weekly reset: archive weeklyStreams to history, then zero it for the new week
+  // This MUST happen BEFORE _processDailyStreams() so the new week starts at 0
+  if(info.dow === 0 && GAME.songs){
+    GAME.songs.forEach(function(song){
+      if(!song.released) return;
+      if(!Array.isArray(song.weeklyStreamsHistory)) song.weeklyStreamsHistory = [];
+      if(song.weeklyStreams > 0){
+        song.weeklyStreamsHistory.push({week: info.week - 1, streams: song.weeklyStreams});
+        if(song.weeklyStreamsHistory.length > 4) song.weeklyStreamsHistory.shift();
+      }
+      song.weeklyStreams = 0;
+    });
+  }
 
   // Streaming revenue for released songs — use the same full algorithm
   // as the live path so catch-up and online play are identical.
