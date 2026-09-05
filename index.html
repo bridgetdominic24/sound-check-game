@@ -30354,7 +30354,7 @@ function finishPublishPost(platform, text, taggedSongId, vibe, location, uploade
             post_id: String(post.id),
             post_owner_id: currentUser.id,
             user_id: 'npc_' + Math.random().toString(36).substr(2, 9),
-            artist_name: c.author || 'Fan',
+            artist_name: c.author || c.user || generateUsername(),
             text: c.text || c,
             created_at: new Date().toISOString()
           };
@@ -30908,7 +30908,7 @@ function generateComments(postText,likes,taggedSongId){
   for(let i=0;i<numComments;i++){
     const type=Math.random();
     let text=type<0.94?responses[Math.floor(Math.random()*responses.length)]:negative[Math.floor(Math.random()*negative.length)];
-    comments.push({user:generateUsername(),text:text,isHate:type>0.94});
+    comments.push({author:generateUsername(),text:text,isHate:type>0.94});
   }
   // Prepend concept reactions if available (max 3, only for tagged release posts)
   const allComments = [...conceptSeeds, ...comments].slice(0, numComments);
