@@ -8810,79 +8810,79 @@ function getTotalFansDisplay(){
 const PROMO_TYPES = {
   // ── NORTH AMERICA ─────────────────────────────────────────────
   social: {
-    name: 'Social Media Push', icon: '📱', region: 'North America',
+    name: 'Social Media Push', icon: '📱', region: 'North America', category: 'digital',
     desc: 'Promote on Pentagram, Rookie, Y. Reach followers & trending audiences.',
     costPerListener: 0.15, minBudget: 500, maxBudget: 10000,
     fanRegion: 'North America', streamBoost: 1.2, hyp: 5
   },
   ads: {
-    name: 'Targeted Ads', icon: '🎯', region: 'North America',
+    name: 'Targeted Ads', icon: '🎯', region: 'North America', category: 'digital',
     desc: 'Paid digital ads targeting specific demographics. Higher cost, controlled reach.',
     costPerListener: 0.20, minBudget: 1000, maxBudget: 15000,
     fanRegion: 'North America', streamBoost: 1.3, hype: 3
   },
   teaser: {
-    name: 'Teaser Content', icon: '🎬', region: 'North America',
+    name: 'Teaser Content', icon: '🎬', region: 'North America', category: 'digital',
     desc: 'Behind-the-scenes clips, snippets, studio footage. Low cost, high viral potential.',
     costPerListener: 0.07, minBudget: 300, maxBudget: 3000,
     fanRegion: 'North America', streamBoost: 1.1, hype: 8, viralChance: 0.08
   },
   grassroots: {
-    name: 'Grassroots Campaign', icon: '👥', region: 'North America',
+    name: 'Grassroots Campaign', icon: '🌿', region: 'North America', category: 'digital',
     desc: 'Street teams, local events, flyering. Cheap but localized. High fan loyalty.',
     costPerListener: 0.08, minBudget: 500, maxBudget: 5000,
     fanRegion: 'North America', streamBoost: 1.0, hype: 4
   },
   email: {
-    name: 'Fan Email Campaign', icon: '💌', region: 'North America',
+    name: 'Fan Email Campaign', icon: '💌', region: 'North America', category: 'fans',
     desc: 'Direct email to existing fans. Very cheap, high conversion rate.',
     costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
     fanRegion: 'North America', streamBoost: 1.0, hype: 2
   },
   email_eu: {
-    name: 'Fan Email Campaign', icon: '💌', region: 'Europe',
+    name: 'Fan Email (Europe)', icon: '💌', region: 'Europe', category: 'fans',
     desc: 'Direct email to existing European fans. Very cheap, high conversion rate.',
     costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
     fanRegion: 'Europe', streamBoost: 1.0, hype: 2
   },
   email_af: {
-    name: 'Fan Email Campaign', icon: '💌', region: 'Africa',
+    name: 'Fan Email (Africa)', icon: '💌', region: 'Africa', category: 'fans',
     desc: 'Direct email to existing African fans. Very cheap, high conversion rate.',
     costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
     fanRegion: 'Africa', streamBoost: 1.0, hype: 2
   },
   email_as: {
-    name: 'Fan Email Campaign', icon: '💌', region: 'Asia',
+    name: 'Fan Email (Asia)', icon: '💌', region: 'Asia', category: 'fans',
     desc: 'Direct email to existing Asian fans. Very cheap, high conversion rate.',
     costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
     fanRegion: 'Asia', streamBoost: 1.0, hype: 2
   },
   email_sa: {
-    name: 'Fan Email Campaign', icon: '💌', region: 'South America',
+    name: 'Fan Email (South America)', icon: '💌', region: 'South America', category: 'fans',
     desc: 'Direct email to existing South American fans. Very cheap, high conversion rate.',
     costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
     fanRegion: 'South America', streamBoost: 1.0, hype: 2
   },
   email_oc: {
-    name: 'Fan Email Campaign', icon: '💌', region: 'Oceania',
+    name: 'Fan Email (Oceania)', icon: '💌', region: 'Oceania', category: 'fans',
     desc: 'Direct email to existing Oceanian fans. Very cheap, high conversion rate.',
     costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
     fanRegion: 'Oceania', streamBoost: 1.0, hype: 2
   },
   billboard_na: {
-    name: 'Billboard (North America)', icon: '🏙️', region: 'North America',
+    name: 'Billboard (North America)', icon: '🏙️', region: 'North America', category: 'ooh',
     desc: 'Static billboard in Times Square, Sunset Strip, or downtown Toronto. Brand recognition + hype spike.',
     costPerListener: 0.30, minBudget: 5000, maxBudget: 50000,
     fanRegion: 'North America', streamBoost: 1.4, hype: 20, ooh: true
   },
   transit_na: {
-    name: 'Transit Advertising (NA)', icon: '🚇', region: 'North America',
+    name: 'Transit Advertising (NA)', icon: '🚇', region: 'North America', category: 'ooh',
     desc: 'Ads on NYC Subway, Toronto TTC, LA Metro. Seen by millions daily. Steady fan growth.',
     costPerListener: 0.18, minBudget: 2000, maxBudget: 20000,
     fanRegion: 'North America', streamBoost: 1.2, hype: 10, ooh: true
   },
   led_truck_na: {
-    name: 'LED Truck Campaign (NA)', icon: '🚛', region: 'North America',
+    name: 'LED Truck Campaign (NA)', icon: '🚛', region: 'North America', category: 'ooh',
     desc: 'Mobile LED trucks playing your visuals through city streets. Targeted, memorable.',
     costPerListener: 0.22, minBudget: 1500, maxBudget: 12000,
     fanRegion: 'North America', streamBoost: 1.15, hype: 12, ooh: true, viralChance: 0.05
@@ -8890,25 +8890,25 @@ const PROMO_TYPES = {
 
   // ── EUROPE ────────────────────────────────────────────────────
   sync_eu: {
-    name: 'Sync Licensing Push (Europe)', icon: '🎬', region: 'Europe',
+    name: 'Sync Licensing Push (Europe)', icon: '📰', region: 'Europe', category: 'press',
     desc: 'Pitch to European TV, film, and ad agencies. Passive income + massive exposure.',
     costPerListener: 0.40, minBudget: 3000, maxBudget: 25000,
     fanRegion: 'Europe', streamBoost: 1.5, hype: 18, syncChance: 0.15
   },
   festival_eu: {
-    name: 'Festival Circuit (Europe)', icon: '🎪', region: 'Europe',
+    name: 'Festival Circuit (Europe)', icon: '🎪', region: 'Europe', category: 'fans',
     desc: 'Eurosonic, Great Escape, Primavera. Industry tastemakers discover breakthrough acts.',
     costPerListener: 0.50, minBudget: 5000, maxBudget: 40000,
     fanRegion: 'Europe', streamBoost: 1.6, hype: 25, viralChance: 0.10
   },
   billboard_eu: {
-    name: 'Billboard (Europe)', icon: '🏛️', region: 'Europe',
+    name: 'Billboard (Europe)', icon: '🏛️', region: 'Europe', category: 'ooh',
     desc: 'Static billboard in London, Paris, Berlin, Amsterdam. Cultural credibility.',
     costPerListener: 0.28, minBudget: 4000, maxBudget: 35000,
     fanRegion: 'Europe', streamBoost: 1.3, hype: 18, ooh: true
   },
   transit_eu: {
-    name: 'Transit Advertising (Europe)', icon: '🚉', region: 'Europe',
+    name: 'Transit Advertising (Europe)', icon: '🚉', region: 'Europe', category: 'ooh',
     desc: 'London Underground, Paris Métro, Berlin U-Bahn. High frequency, builds familiarity.',
     costPerListener: 0.20, minBudget: 2500, maxBudget: 22000,
     fanRegion: 'Europe', streamBoost: 1.2, hype: 12, ooh: true
@@ -8916,69 +8916,69 @@ const PROMO_TYPES = {
 
   // ── AFRICA ────────────────────────────────────────────────────
   street_af: {
-    name: 'Street Team (Africa)', icon: '🤝', region: 'Africa',
+    name: 'Street Team (Africa)', icon: '🤝', region: 'Africa', category: 'fans',
     desc: 'Physical presence in Lagos, Accra, Nairobi. QR codes, merchandise. Word-of-mouth king.',
     costPerListener: 0.05, minBudget: 200, maxBudget: 5000,
     fanRegion: 'Africa', streamBoost: 1.1, hype: 8, diasporaSpill: 0.15
   },
   shortform_af: {
-    name: 'Data-Light Content (Africa)', icon: '📲', region: 'Africa',
+    name: 'Data-Light Content (Africa)', icon: '📲', region: 'Africa', category: 'digital',
     desc: 'Short-form clips optimised for low data users. WhatsApp chain sharing mechanic.',
     costPerListener: 0.06, minBudget: 300, maxBudget: 4000,
     fanRegion: 'Africa', streamBoost: 1.3, hype: 10, viralChance: 0.12
   },
   diaspora_af: {
-    name: 'Diaspora Marketing', icon: '🌐', region: 'Africa',
+    name: 'Diaspora Marketing', icon: '🌐', region: 'Africa', category: 'digital',
     desc: 'Target African diaspora in UK, US, Canada. Music echoes back to the continent.',
     costPerListener: 0.18, minBudget: 1500, maxBudget: 15000,
     fanRegion: 'Africa', streamBoost: 1.4, hype: 12, crossRegion: 'North America', crossPct: 0.20
   },
   billboard_af: {
-    name: 'Billboard (Africa)', icon: '🌆', region: 'Africa',
+    name: 'Billboard (Africa)', icon: '🌆', region: 'Africa', category: 'ooh',
     desc: 'Billboards in Lagos, Accra, Johannesburg, Nairobi. Brand presence in major cities.',
     costPerListener: 0.10, minBudget: 800, maxBudget: 8000,
     fanRegion: 'Africa', streamBoost: 1.2, hype: 14, ooh: true
   },
   led_truck_af: {
-    name: 'LED Truck (Africa)', icon: '🚐', region: 'Africa',
+    name: 'LED Truck (Africa)', icon: '🚐', region: 'Africa', category: 'ooh',
     desc: 'Sound trucks and LED vehicles in Lekki, Victoria Island, Westlands. Pure spectacle.',
     costPerListener: 0.08, minBudget: 500, maxBudget: 6000,
     fanRegion: 'Africa', streamBoost: 1.15, hype: 16, ooh: true, viralChance: 0.08
   },
   // ── ASIA ──────────────────────────────────────────────────────
   social_as: {
-    name: 'Asian Social Campaign', icon: '📱', region: 'Asia',
+    name: 'Asian Social Campaign', icon: '📱', region: 'Asia', category: 'digital',
     desc: 'Platform-native content for Asian apps. High engagement, fast spread.',
     costPerListener: 0.15, minBudget: 1500, maxBudget: 12000,
     fanRegion: 'Asia', streamBoost: 1.2, hype: 10
   },
   billboard_as: {
-    name: 'Billboard (Asia)', icon: '🏯', region: 'Asia',
+    name: 'Billboard (Asia)', icon: '🏯', region: 'Asia', category: 'ooh',
     desc: 'Digital screens in Shibuya, Seoul, Mumbai, Shanghai. Iconic locations.',
     costPerListener: 0.35, minBudget: 6000, maxBudget: 50000,
     fanRegion: 'Asia', streamBoost: 1.4, hype: 22, ooh: true
   },
   // ── SOUTH AMERICA ─────────────────────────────────────────────
   remix_sa: {
-    name: 'Reggaeton/Funk Remix Campaign', icon: '🎶', region: 'South America',
+    name: 'Reggaeton/Funk Remix Campaign', icon: '🎶', region: 'South America', category: 'digital',
     desc: 'Collab remix with a local SA artist. Their fanbase becomes your fanbase.',
     costPerListener: 0.20, minBudget: 2000, maxBudget: 15000,
     fanRegion: 'South America', streamBoost: 1.5, hype: 18, crossRegion: 'Europe', crossPct: 0.10
   },
   carnival_sa: {
-    name: 'Carnival/Festival Timing (SA)', icon: '🎭', region: 'South America',
+    name: 'Carnival/Festival Timing (SA)', icon: '🎭', region: 'South America', category: 'fans',
     desc: 'Release during Brazilian Carnival or Colombian Feria. 2× cost, 5× exposure.',
     costPerListener: 0.40, minBudget: 3000, maxBudget: 25000,
     fanRegion: 'South America', streamBoost: 2.0, hype: 30, seasonal: true, viralChance: 0.15
   },
   billboard_sa: {
-    name: 'Billboard (South America)', icon: '🏙️', region: 'South America',
+    name: 'Billboard (South America)', icon: '🏙️', region: 'South America', category: 'ooh',
     desc: 'Billboards in São Paulo, Buenos Aires, Bogotá, Lima.',
     costPerListener: 0.15, minBudget: 1500, maxBudget: 12000,
     fanRegion: 'South America', streamBoost: 1.3, hype: 14, ooh: true
   },
   led_truck_sa: {
-    name: 'LED Trucks (South America)', icon: '🚛', region: 'South America',
+    name: 'LED Trucks (South America)', icon: '🚛', region: 'South America', category: 'ooh',
     desc: 'Sound vehicles through the streets of São Paulo and Buenos Aires.',
     costPerListener: 0.12, minBudget: 800, maxBudget: 8000,
     fanRegion: 'South America', streamBoost: 1.2, hype: 12, ooh: true
@@ -8986,26 +8986,156 @@ const PROMO_TYPES = {
 
   // ── OCEANIA ───────────────────────────────────────────────────
   festival_oc: {
-    name: 'Festival Circuit (Oceania)', icon: '🎪', region: 'Oceania',
+    name: 'Festival Circuit (Oceania)', icon: '🎪', region: 'Oceania', category: 'fans',
     desc: 'Splendour in the Grass, Laneway, Falls Festival. Loyal fanbase guaranteed.',
     costPerListener: 0.45, minBudget: 4000, maxBudget: 25000,
     fanRegion: 'Oceania', streamBoost: 1.5, hype: 22, viralChance: 0.08
   },
   billboard_oc: {
-    name: 'Billboard (Oceania)', icon: '🦘', region: 'Oceania',
+    name: 'Billboard (Oceania)', icon: '🦘', region: 'Oceania', category: 'ooh',
     desc: 'Billboards in Sydney, Melbourne, Auckland. Smaller market, high conversion.',
     costPerListener: 0.22, minBudget: 1500, maxBudget: 10000,
     fanRegion: 'Oceania', streamBoost: 1.2, hype: 12, ooh: true
   },
   commercial_oc: {
-    name: 'Commercial Radio (Oceania)', icon: '📡', region: 'Oceania',
+    name: 'Commercial Radio (Oceania)', icon: '📡', region: 'Oceania', category: 'press',
     desc: 'Australian commercial stations. Reaches mainstream audience fast.',
     costPerListener: 0.30, minBudget: 2000, maxBudget: 15000,
     fanRegion: 'Oceania', streamBoost: 1.4, hype: 16
   }
 };
 
+// ── PROMO SCREEN RENDER HELPERS ────────────────────────────────
+var PROMO_CATEGORIES_LIST = [
+  { key: 'ooh',     label: '🏙️ Out of Home',     color: '#7c3aed' },
+  { key: 'digital', label: '📱 Digital & Social', color: '#2563eb' },
+  { key: 'fans',    label: '🎧 Fan Direct',        color: '#d97706' },
+  { key: 'press',   label: '📰 Press & Media',     color: '#16a34a' },
+];
+var _HIDDEN_PROMO_KEYS = ['radio','airtime','radio_exclusive','am_radio','fm_radio'];
 
+function _isHiddenPromo(key) {
+  return _HIDDEN_PROMO_KEYS.some(function(h){ return key.toLowerCase().includes(h); });
+}
+
+function _getPromoSatBadge(song, key) {
+  if (!song || !song.promoHistory) return '<span style="font-size:10px;font-weight:800;background:rgba(22,163,74,.1);color:#16a34a;border-radius:5px;padding:2px 7px">Fresh</span>';
+  var runs = song.promoHistory.filter(function(h){ return h.key === key; }).length;
+  if (runs === 0) return '<span style="font-size:10px;font-weight:800;background:rgba(22,163,74,.1);color:#16a34a;border-radius:5px;padding:2px 7px">Fresh</span>';
+  if (runs === 1) return '<span style="font-size:10px;font-weight:800;background:rgba(245,158,11,.1);color:#d97706;border-radius:5px;padding:2px 7px">Used once · 80%</span>';
+  if (runs === 2) return '<span style="font-size:10px;font-weight:800;background:rgba(234,88,12,.09);color:#ea580c;border-radius:5px;padding:2px 7px">Used twice · 60%</span>';
+  return '<span style="font-size:10px;font-weight:800;background:rgba(220,38,38,.07);color:#dc2626;border-radius:5px;padding:2px 7px">Saturated · 50%</span>';
+}
+
+function _buildPromoListHTML(song) {
+  var html = '';
+  PROMO_CATEGORIES_LIST.forEach(function(cat) {
+    var catEntries = Object.entries(PROMO_TYPES).filter(function(pair) {
+      var key = pair[0]; var promo = pair[1];
+      if (_isHiddenPromo(key)) return false;
+      return (promo.category || '') === cat.key;
+    });
+    if (!catEntries.length) return;
+
+    html += '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:'+cat.color+';margin:12px 0 7px;display:flex;align-items:center;gap:7px">'
+      +'<div style="width:7px;height:7px;border-radius:50%;background:'+cat.color+';flex:none"></div>'+cat.label+'</div>';
+
+    catEntries.forEach(function(pair) {
+      var key = pair[0]; var promo = pair[1];
+      var satBadge = _getPromoSatBadge(song, key);
+      var costMin = promo.costMin || promo.minBudget || 0;
+      var costMax = promo.costMax || promo.maxBudget || costMin;
+      var canAfford = (GAME.money || 0) >= costMin || costMin === 0;
+      var costStr = costMin > 0
+        ? (costMin === costMax ? '$'+costMin.toLocaleString() : '$'+costMin.toLocaleString()+'–'+costMax.toLocaleString())
+        : 'Free';
+      if (costMin > 0) costStr += '/wk';
+
+      html += '<div style="background:var(--surf);border:1.5px solid var(--bord);border-radius:12px;margin-bottom:7px;overflow:hidden">'
+        +'<div style="padding:10px 12px;display:flex;align-items:flex-start;gap:9px;cursor:pointer" onclick="_togglePromoDetail(\''+key+'\')">'
+        +'<div style="font-size:20px;flex:none;width:28px;text-align:center">'+(promo.icon||'📣')+'</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+(promo.name||key)+' '+satBadge+'</div>'
+        +'<div style="font-size:11px;color:var(--mut);margin-bottom:5px">'+(promo.desc||promo.description||'')+'</div>'
+        +'</div>'
+        +'<div style="flex:none;text-align:right"><div style="font-size:12px;font-weight:800;color:var(--txt)">'+costStr+'</div>'
+        +(canAfford ? '' : '<div style="font-size:10px;color:#dc2626;margin-top:2px">Can\'t afford</div>')+'</div>'
+        +'</div>'
+        +'<div id="promo-detail-'+key+'" style="display:none;border-top:1px solid var(--bord);padding:10px 12px;background:var(--acc-bg,#f8f4ff)">'
+        +'<button onclick="_startPromo(\''+key+'\','+song.id+')" style="width:100%;background:'+(canAfford?'var(--acc)':'var(--mut)')+';color:#fff;border-radius:9px;font-size:13px;font-weight:800;padding:10px;border:none;cursor:pointer;font-family:var(--fb)">'
+        +(canAfford ? 'Start — '+costStr : 'Not enough money')+'</button>'
+        +'</div>'
+        +'</div>';
+    });
+  });
+
+  // Uncategorized fallback
+  var uncategorized = Object.entries(PROMO_TYPES).filter(function(pair) {
+    var key = pair[0]; var promo = pair[1];
+    if (_isHiddenPromo(key)) return false;
+    var cat = promo.category || '';
+    return !PROMO_CATEGORIES_LIST.some(function(c){ return c.key === cat; });
+  });
+  if (uncategorized.length) {
+    html += '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin:12px 0 7px">Other</div>';
+    uncategorized.forEach(function(pair) {
+      var key = pair[0]; var promo = pair[1];
+      var satBadge = _getPromoSatBadge(song, key);
+      var costMin = promo.costMin || promo.minBudget || 0;
+      var costStr = costMin > 0 ? '$'+costMin.toLocaleString()+'+/wk' : 'Free';
+      html += '<div style="background:var(--surf);border:1.5px solid var(--bord);border-radius:12px;margin-bottom:7px;padding:10px 12px;display:flex;align-items:center;gap:9px;cursor:pointer" onclick="_startPromo(\''+key+'\','+song.id+')">'
+        +'<div style="font-size:20px">'+(promo.icon||'📣')+'</div>'
+        +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--txt)">'+(promo.name||key)+' '+satBadge+'</div>'
+        +'<div style="font-size:11px;color:var(--mut)">'+(promo.desc||promo.description||'')+'</div></div>'
+        +'<div style="font-size:12px;font-weight:800;color:var(--txt)">'+costStr+'</div>'
+        +'</div>';
+    });
+  }
+
+  return html || '<div style="text-align:center;padding:20px;color:var(--mut);font-size:13px">No campaigns available.</div>';
+}
+
+window._togglePromoDetail = function(key) {
+  var el = document.getElementById('promo-detail-'+key);
+  if (!el) return;
+  var isOpen = el.style.display !== 'none';
+  document.querySelectorAll('[id^="promo-detail-"]').forEach(function(d){ d.style.display = 'none'; });
+  if (!isOpen) el.style.display = 'block';
+};
+
+window._startPromo = function(key, songId) {
+  var promo = PROMO_TYPES[key];
+  if (!promo) return;
+  var cost = promo.costMin || promo.minBudget || 0;
+  if (cost > 0 && (GAME.money || 0) < cost) {
+    if (typeof showToast === 'function') showToast('Not enough money');
+    else if (typeof _showToast === 'function') _showToast('Not enough money');
+    return;
+  }
+  if (cost > 0) GAME.money -= cost;
+
+  // Record for saturation tracking
+  var song = GAME.songs && GAME.songs.find(function(s){ return s.id === songId; });
+  if (song) {
+    if (!song.promoHistory) song.promoHistory = [];
+    song.promoHistory.push({ key: key, week: GAME.week || 0 });
+  }
+
+  // Axis nudges
+  if (typeof nudgeAxis === 'function') {
+    if (key === 'grassroots' || key === 'street_af') nudgeAxis('authentic', 3);
+    else if (key === 'teaser') nudgeAxis('authentic', 2);
+    else if (key && key.includes('billboard')) nudgeAxis('commercial', 2);
+  }
+
+  if (typeof saveGame === 'function') saveGame();
+  if (typeof showPromoManager === 'function') showPromoManager(songId);
+
+  var name = promo.name || key;
+  if (typeof showToast === 'function') showToast('✓ '+name+' started');
+  else if (typeof _showToast === 'function') _showToast('✓ '+name+' started');
+};
+// ── END PROMO RENDER HELPERS ───────────────────────────────────
 
 
 function _reRenderPromoOptions(songId){
@@ -9032,28 +9162,7 @@ function _reRenderPromoOptions(songId){
   // Re-render options
   const optsContainer = document.querySelector('.promo-options-list');
   if(!optsContainer) { showPromoManager(songId); return; }
-
-  let html = '';
-  Object.entries(PROMO_TYPES).forEach(([key, promo]) => {
-    if(selectedRegion !== 'All' && promo.region !== selectedRegion) return;
-    const alreadyActive = song.campaigns && song.campaigns.find(c => c.status === 'active' && c.type === key);
-    if(alreadyActive){
-      html += `<div onclick="editPromoCampaign(${songId},'${key}')" style="background:var(--acc-bg);border:1.5px solid var(--acc);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer">
-        <div style="font-weight:600;font-size:14px;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;color:var(--acc)">
-          <div><span style="font-size:18px;margin-right:6px">${promo.icon}</span>${promo.name}</div>
-          <span style="font-size:10px;background:var(--acc);color:white;padding:2px 8px;border-radius:10px">ACTIVE</span>
-        </div>
-        <div style="font-size:12px;color:var(--mut)">$${alreadyActive.budget.toLocaleString()}/week · ${alreadyActive.weeksRemaining} wks left · tap to edit</div>
-      </div>`;
-    } else {
-      html += `<div onclick="selectPromoOption(this,'${key}',${songId})" style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer" data-promo="${key}">
-        <div style="font-weight:600;font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:8px;color:var(--txt)"><span style="font-size:20px">${promo.icon}</span>${promo.name}</div>
-        <div style="font-size:12px;color:var(--mut);margin-bottom:8px">${promo.desc}</div>
-        <div style="font-size:12px;color:var(--acc);font-weight:600">Budget: $${promo.minBudget.toLocaleString()} – $${promo.maxBudget.toLocaleString()}/week</div>
-      </div>`;
-    }
-  });
-  optsContainer.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--mut);font-size:13px">No campaigns available for this region yet.</div>';
+  optsContainer.innerHTML = _buildPromoListHTML(song);
 }
 
 function showPromoManager(songId){
@@ -9078,27 +9187,7 @@ function showPromoManager(songId){
     totalListeners += campaign.listenersGained;
   });
   
-  let promoOptionsHTML = '';
-  // Region tabs
-  const regionTabs = ['All','North America','Europe','Africa','Asia','South America','Oceania'];
-  let tabHtml = '<div class="promo-region-tabs" style="display:flex;gap:6px;overflow-x:auto;padding:0 0 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch">';
-  regionTabs.forEach(r => {
-    const active = (window._promoRegion||'All') === r;
-    tabHtml += `<div onclick="window._promoRegion='${r}';_reRenderPromoOptions(${songId})" style="flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:${active?'var(--acc)':'var(--surf)'};color:${active?'white':'var(--mut)'};border:1.5px solid ${active?'var(--acc)':'var(--bord)'};touch-action:manipulation">${r}</div>`;
-  });
-  tabHtml += '</div>';
-  promoOptionsHTML = tabHtml;
-
-  const selectedRegion = window._promoRegion || 'All';
-  Object.entries(PROMO_TYPES).forEach(([key, promo]) => {
-    if(selectedRegion !== 'All' && promo.region !== selectedRegion) return;
-    const alreadyActive = song.campaigns && song.campaigns.find(c => c.status === 'active' && c.type === key);
-    if(alreadyActive){
-      promoOptionsHTML += `<div onclick="editPromoCampaign(${songId},'${key}')" style="background:var(--acc-bg);border:1.5px solid var(--acc);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all 0.2s" data-promo="${key}"><div style="font-weight:600;font-size:14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;color:var(--acc)"><div>${promo.name}</div><span style="font-size:11px;background:var(--acc);color:white;padding:2px 8px;border-radius:10px">ACTIVE — EDIT</span></div><div style="font-size:12px;color:var(--mut);margin-bottom:6px">${promo.desc}</div><div style="font-size:12px;color:var(--acc);font-weight:600">$${alreadyActive.budget.toLocaleString()}/week · ${alreadyActive.weeksRemaining} wks left · Tap to edit</div></div>`;
-    } else {
-      promoOptionsHTML += `<div onclick="selectPromoOption(this,'${key}',${songId})" style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;transition:all 0.2s" data-promo="${key}"><div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--txt)">${promo.name}</div><div style="font-size:12px;color:var(--mut);margin-bottom:10px">${promo.desc}</div><div style="font-size:12px;color:var(--acc);font-weight:600">Recommended Budget: $${promo.minBudget.toLocaleString()} - $${promo.maxBudget.toLocaleString()}/week</div></div>`;
-    }
-  });
+  let promoOptionsHTML = _buildPromoListHTML(song);
 
   const completedCampaigns = song.campaigns.filter(c => c.status === 'completed');
   let historyHTML = '';
