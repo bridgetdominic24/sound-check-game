@@ -37657,13 +37657,39 @@ function playViralMoment(){
 
 // 3. CROWDFUNDING - Enhanced with Real Campaigns!
 function playCrowdfunding(){
-  // Check if already has an active campaign
+  // Auto-complete any stale campaign that's past its deadline
+  if(GAME.activeCrowdfunding && GAME.week >= GAME.activeCrowdfunding.deadline){
+    const cf = GAME.activeCrowdfunding;
+    // Simulate all missed weeks of contributions
+    const missedWeeks = Math.max(1, GAME.week - cf.startWeek);
+    const totalFans = Object.values(GAME.fansByRegion || {}).reduce(function(s,v){return s+v;}, 0);
+    const baseContribution = Math.floor(totalFans * 0.05);
+    const amountPerFan = Math.random() * 8 + 2;
+    cf.raised = Math.min(cf.goal * 1.5, cf.raised + Math.floor(baseContribution * amountPerFan * missedWeeks * 0.4));
+    const success = cf.raised >= cf.goal;
+    if(success){
+      if(!GAME.pendingCrowdfundingBalance) GAME.pendingCrowdfundingBalance = 0;
+      GAME.pendingCrowdfundingBalance += cf.raised;
+      const fanBonus = Math.floor(cf.goal / 50);
+      const region = (typeof S !== 'undefined' && S.country) || 'North America';
+      if(!GAME.fansByRegion) GAME.fansByRegion = {};
+      GAME.fansByRegion[region] = (GAME.fansByRegion[region] || 0) + fanBonus;
+      showEvent('🎉','Campaign Complete!','Your '+cf.type+' crowdfunding campaign has ended!\n\n💰 $'+cf.raised.toLocaleString()+' raised\n👥 +'+fanBonus+' fans\n\n✅ Funds are pending — withdraw from GameHub → Crowdfunding!',['Nice!']);
+    } else {
+      showEvent('😢','Campaign Ended','Your '+cf.type+' campaign ran its course.\n\nGoal: $'+cf.goal.toLocaleString()+'\nRaised: $'+cf.raised.toLocaleString()+'\n\nYou can start a new one anytime!',['OK']);
+    }
+    delete GAME.activeCrowdfunding;
+    markDirty(); saveGame();
+    return;
+  }
+
+  // Check if already has an active campaign (not yet expired)
   if(GAME.activeCrowdfunding){
     const cf = GAME.activeCrowdfunding;
     const progress = (cf.raised / cf.goal) * 100;
-    const weeksLeft = Math.max(0, cf.deadline - GAME.week);
-    
-    showEvent('💰','Active Campaign',`You already have a ${cf.type} campaign running!\n\nGoal: $${cf.goal.toLocaleString()}\nRaised: $${cf.raised.toLocaleString()} (${Math.floor(progress)}%)\nDeadline: ${weeksLeft} weeks\n\nWait for it to complete or fail!`,['OK']);
+    const weeksLeft = Math.max(1, cf.deadline - GAME.week);
+
+    showEvent('💰','Active Campaign','You already have a '+cf.type+' campaign running!\n\nGoal: $'+cf.goal.toLocaleString()+'\nRaised: $'+cf.raised.toLocaleString()+' ('+Math.floor(progress)+'%)\nWeeks left: '+weeksLeft+'\n\nWait for it to complete!',['OK']);
     return;
   }
   
@@ -44890,11 +44916,12 @@ function buildCommentEl(comment, replies, bg, txt, bord){
   var timeAgo = getTimeAgo(comment.created_at);
   var isMe = currentUser && comment.user_id === currentUser.id;
   
+  var _cName = comment.artist_name || comment.author || comment.user || 'Fan';
   div.innerHTML = '<div style="display:flex;gap:10px;align-items:flex-start">'
-    +'<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0">'+((comment.artist_name||'?')[0].toUpperCase())+'</div>'
+    +'<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0">'+(_cName[0].toUpperCase())+'</div>'
     +'<div style="flex:1">'
     +'<div style="margin-bottom:2px">'
-    +'<span style="font-weight:700;font-size:14px;color:'+txt+'">'+escapeHtml(comment.artist_name||'Fan')+'</span>'
+    +'<span style="font-weight:700;font-size:14px;color:'+txt+'">'+escapeHtml(_cName)+'</span>'
     +(comment.user_id&&comment.user_id.startsWith('npc_')?'<span style="font-size:11px;color:'+(bg==='#000'?'#888':'#8e8e8e')+';margin-left:6px;opacity:0.8">(Bot)</span>':'')
     +'</div>'
     +'<span style="font-size:14px;color:'+txt+'">'+escapeHtml(comment.text||'')+'</span>'
