@@ -3670,6 +3670,11 @@ async function saveToCloud(force){
         cleanGAME.following = trimmedF;
       }
     }
+    // Stamp the save time so simulate-day knows this player was online recently
+    // and won't overwrite their session data with stale server-side state.
+    cleanGAME._lastOnlineSave = Date.now();
+    GAME._lastOnlineSave = cleanGAME._lastOnlineSave;
+
     // Strip verbose/debug fields
     delete cleanGAME._dirty;
     delete cleanGAME._weekPendingSync;
@@ -9002,6 +9007,112 @@ const PROMO_TYPES = {
     desc: 'Australian commercial stations. Reaches mainstream audience fast.',
     costPerListener: 0.30, minBudget: 2000, maxBudget: 15000,
     fanRegion: 'Oceania', streamBoost: 1.4, hype: 16
+  },
+
+  // ── NEW TYPES (all regions, categorized) ──────────────────────
+  digital_screens: {
+    name: 'Digital Screens', icon: '📺', category: 'ooh',
+    subtitle: 'Airports · malls · Piccadilly Circus · Times Square LED',
+    desc: 'High-brightness LED screens in premium foot-traffic locations. Moving visuals — more eye-catching than static. Airports reach traveling industry people specifically.',
+    tags: [{label:'Promo +0.07×',type:'p'},{label:'Hype +5',type:'h'},{label:'Industry eyes',type:'i'}],
+    costPerListener: 0.22, minBudget: 4000, maxBudget: 10000,
+    streamBoost: 1.3, hype: 5, ooh: true
+  },
+  street_mural: {
+    name: 'Street Mural', icon: '🎨', category: 'ooh',
+    subtitle: 'Commissioned art · neighbourhood locations',
+    desc: 'Large-scale artwork in a culturally relevant neighbourhood. Lower foot traffic than Times Square but higher credibility signal. Social media photo magnet. Undertone notices this.',
+    tags: [{label:'Hype +6',type:'h'},{label:'Authentic axis',type:'auth'},{label:'Superfan moments',type:'f'}],
+    costPerListener: 0.12, minBudget: 2000, maxBudget: 5000,
+    streamBoost: 1.1, hype: 6, ooh: true, viralChance: 0.04
+  },
+  influencer: {
+    name: 'Influencer Campaign', icon: '🌟', category: 'digital',
+    subtitle: 'Content creators · Rookie · Pentagram integrations',
+    desc: 'Pay content creators to organically feature your song in their content. Song gets tagged, reaches their audience. Micro vs macro tiers available. High viral ceiling.',
+    tags: [{label:'Hype +5',type:'h'},{label:'Casual discovery',type:'f'},{label:'Viral potential',type:'s'}],
+    costPerListener: 0.18, minBudget: 3000, maxBudget: 20000,
+    streamBoost: 1.35, hype: 5, viralChance: 0.10
+  },
+  playlist_pitch: {
+    name: 'Playlist Pitch', icon: '📜', category: 'digital',
+    subtitle: 'Loopify · Orange · Sahara editorial submission',
+    desc: 'Pay to submit your song for editorial playlist consideration. Placement not guaranteed — stronger song quality and genre fit increases acceptance. Long-tail streams if placed.',
+    tags: [{label:'Promo +0.08× if placed',type:'p'},{label:'Long-tail streams',type:'f'}],
+    costPerListener: 0.25, minBudget: 1000, maxBudget: 4000,
+    streamBoost: 1.45, hype: 4, oneTime: true
+  },
+  yourtube_premiere: {
+    name: 'Yourtube Premiere', icon: '▶️', category: 'digital',
+    subtitle: 'Scheduled live MV drop · fans watch together',
+    desc: 'Schedule a public Premiere for your MV. Fans gather in real time, watch-time spikes. One-time event per song.',
+    tags: [{label:'Hype +7',type:'h'},{label:'Superfan activation',type:'f'},{label:'Watch-time boost',type:'p'}],
+    costPerListener: 0.05, minBudget: 0, maxBudget: 500,
+    streamBoost: 1.2, hype: 7, oneTime: true, viralChance: 0.06
+  },
+  listening_party: {
+    name: 'Listening Party', icon: '👂', category: 'fans',
+    subtitle: 'Virtual or in-person · converts casuals to superfans',
+    desc: 'Invite fans to a listening event — virtual stream or a physical venue. Fans who attend upgrade loyalty tier. Highest casual→superfan conversion of any campaign type.',
+    tags: [{label:'Casual → Superfan',type:'f'},{label:'Hype +5',type:'h'},{label:'Deep loyalty',type:'f'}],
+    costPerListener: 0.08, minBudget: 0, maxBudget: 1500,
+    streamBoost: 1.05, hype: 5
+  },
+  stream_callout: {
+    name: 'Streaming Party Callout', icon: '📡', category: 'fans',
+    subtitle: 'Coordinate fans to stream together on a set day',
+    desc: 'Post a callout to your fanbase to stream the song on a specific day. High superfan ratio amplifies the effect. You provide the signal, they do the work.',
+    tags: [{label:'Chart decay reversal',type:'p'},{label:'Velocity spike',type:'f'}],
+    costPerListener: 0, minBudget: 0, maxBudget: 0,
+    streamBoost: 1.3, hype: 3
+  },
+  fan_contest: {
+    name: 'Fan Contest', icon: '🎯', category: 'fans',
+    subtitle: 'Remix · dance challenge · lyric video',
+    desc: 'Give fans a creative challenge. Winners get a shoutout or merch. Drives UGC on Rookie, organic tagging, and strong engagement from already-invested fans.',
+    tags: [{label:'Hype +4',type:'h'},{label:'UGC viral potential',type:'s'},{label:'Superfan boost',type:'f'}],
+    costPerListener: 0.10, minBudget: 500, maxBudget: 3000,
+    streamBoost: 1.2, hype: 4, viralChance: 0.08
+  },
+  merch_drop: {
+    name: 'Merch Drop', icon: '🛍️', category: 'fans',
+    subtitle: 'Limited edition · song-tied · pre-order',
+    desc: 'Release limited merch tied to this song — art print, shirt, collectible. Buyers are more likely to stream, share, and organize. Physical ownership creates stronger fan identity.',
+    tags: [{label:'Deep fan loyalty',type:'f'},{label:'Hype +3',type:'h'},{label:'Revenue',type:'s'}],
+    costPerListener: 0.15, minBudget: 1000, maxBudget: 8000,
+    streamBoost: 1.1, hype: 3
+  },
+  presave: {
+    name: 'Pre-Save Campaign', icon: '💾', category: 'fans',
+    subtitle: 'Drives day-1 streaming velocity · pre-release only',
+    desc: 'Fans pre-save before release and auto-stream on drop day. Single biggest day-1 velocity boost available. Locks in early chart position.',
+    tags: [{label:'Day-1 velocity +0.18×',type:'p'},{label:'Fan momentum',type:'h'}],
+    costPerListener: 0.10, minBudget: 800, maxBudget: 4000,
+    streamBoost: 1.18, hype: 3, preReleaseOnly: true
+  },
+  press_preview: {
+    name: 'Press Preview', icon: '📰', category: 'press',
+    subtitle: 'Exclusive pre-release listen for press',
+    desc: 'Invite select press outlets to hear the song before it drops. Increases the chance of coverage on release day. Better reviews come from journalists who had time with the song.',
+    tags: [{label:'Hype +4',type:'h'},{label:'Press momentum',type:'p'},{label:'Better reviews',type:'f'}],
+    costPerListener: 0.20, minBudget: 1000, maxBudget: 3000,
+    streamBoost: 1.15, hype: 4
+  },
+  exclusive_interview: {
+    name: 'Exclusive Interview', icon: '🎙️', category: 'press',
+    subtitle: 'Give one outlet the story first',
+    desc: 'Offer one outlet an exclusive — the story comes out first with them. Exclusivity makes for a stronger piece. Good for big moments like comebacks, first releases, or label signings.',
+    tags: [{label:'Hype +5',type:'h'},{label:'Guaranteed coverage',type:'p'}],
+    costPerListener: 0.15, minBudget: 500, maxBudget: 2000,
+    streamBoost: 1.12, hype: 5
+  },
+  podcast_circuit: {
+    name: 'Podcast Circuit', icon: '🎧', category: 'press',
+    subtitle: 'Music, culture & lifestyle podcasts · deep reach',
+    desc: 'Book appearances on music and culture podcasts. Long-form conversation = stronger fan connection than any ad. Audiences are engaged and convert to fans at high rates.',
+    tags: [{label:'Hype +4',type:'h'},{label:'High-loyalty discovery',type:'f'},{label:'Authentic axis',type:'auth'}],
+    costPerListener: 0.12, minBudget: 500, maxBudget: 2000,
+    streamBoost: 1.1, hype: 4
   }
 };
 
@@ -9022,6 +9133,24 @@ window._togglePromoDetail = function(key) {
   document.querySelectorAll('[id^="promo-detail-"]').forEach(function(d){ d.style.display = 'none'; });
   if (!isOpen) el.style.display = 'block';
 };
+
+// Save when app goes to background on mobile (prevents lost progress on logout / tab switch)
+(function() {
+  var _bgSaveTimer = null;
+  function _triggerBgSave() {
+    clearTimeout(_bgSaveTimer);
+    _bgSaveTimer = setTimeout(function() {
+      if (typeof saveGame === 'function' && typeof GAME !== 'undefined' && GAME && GAME.songs) {
+        console.log('📱 Background save triggered');
+        saveGame();
+      }
+    }, 300);
+  }
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'hidden') _triggerBgSave();
+  });
+  window.addEventListener('pagehide', _triggerBgSave);
+})();
 
 function showPromoManager(songId){
   const song = GAME.songs.find(s => s.id === songId);
@@ -9045,54 +9174,105 @@ function showPromoManager(songId){
     totalListeners += campaign.listenersGained;
   });
   
-  // Build categorized promo options HTML
+  // ── Build rich categorized promo browse HTML ──────────────────────────────
   var PROMO_CATS = [
-    { key: 'ooh',     label: '🏙️ Out of Home',     color: '#7c3aed' },
-    { key: 'digital', label: '📱 Digital & Social', color: '#2563eb' },
-    { key: 'fans',    label: '🎧 Fan Direct',        color: '#d97706' },
-    { key: 'press',   label: '📰 Press & Media',     color: '#16a34a' },
+    { key: 'ooh',     label: '🏙️ Out of Home',     color: '#7c3aed', bg: 'rgba(124,58,237,.1)'  },
+    { key: 'digital', label: '📱 Digital & Social', color: '#2563eb', bg: 'rgba(37,99,235,.09)'  },
+    { key: 'fans',    label: '🎧 Fan Direct',        color: '#d97706', bg: 'rgba(217,119,6,.09)'  },
+    { key: 'press',   label: '📰 Press & Media',     color: '#16a34a', bg: 'rgba(22,163,74,.09)'  },
   ];
-  function _getPromoBadge(s, k) {
+  var TAG_STYLES = {
+    p:    'background:rgba(124,58,237,.1);color:#7c3aed',
+    h:    'background:rgba(245,158,11,.1);color:#d97706',
+    f:    'background:rgba(22,163,74,.1);color:#16a34a',
+    i:    'background:rgba(37,99,235,.08);color:#2563eb',
+    s:    'background:rgba(234,88,12,.09);color:#ea580c',
+    auth: 'background:rgba(147,51,234,.09);color:#9333ea',
+  };
+  function _promoBadge(s, k) {
     var runs = (s && s.promoHistory) ? s.promoHistory.filter(function(h){return h.key===k;}).length : 0;
-    if (runs === 0) return '<span style="font-size:10px;font-weight:800;background:rgba(22,163,74,.1);color:#16a34a;border-radius:5px;padding:2px 7px">Fresh</span>';
-    if (runs === 1) return '<span style="font-size:10px;font-weight:800;background:rgba(245,158,11,.1);color:#d97706;border-radius:5px;padding:2px 7px">Used once · 80%</span>';
-    if (runs === 2) return '<span style="font-size:10px;font-weight:800;background:rgba(234,88,12,.09);color:#ea580c;border-radius:5px;padding:2px 7px">Used twice · 60%</span>';
-    return '<span style="font-size:10px;font-weight:800;background:rgba(220,38,38,.07);color:#dc2626;border-radius:5px;padding:2px 7px">Saturated · 50%</span>';
+    if (runs === 0) return '<span style="font-size:9.5px;font-weight:800;background:rgba(22,163,74,.1);color:#16a34a;border-radius:5px;padding:2px 6px">Fresh</span>';
+    if (runs === 1) return '<span style="font-size:9.5px;font-weight:800;background:rgba(245,158,11,.1);color:#d97706;border-radius:5px;padding:2px 6px">Used once — 80%</span>';
+    if (runs === 2) return '<span style="font-size:9.5px;font-weight:800;background:rgba(234,88,12,.09);color:#ea580c;border-radius:5px;padding:2px 6px">Used twice — 60%</span>';
+    return '<span style="font-size:9.5px;font-weight:800;background:rgba(220,38,38,.07);color:#dc2626;border-radius:5px;padding:2px 6px">Saturated — 50%</span>';
   }
+  function _promoCostStr(promo) {
+    if (!promo.minBudget && !promo.maxBudget) return 'Free';
+    if (!promo.minBudget) return 'From $' + promo.maxBudget.toLocaleString();
+    if (promo.minBudget === promo.maxBudget) return '$' + promo.minBudget.toLocaleString();
+    return '$' + (promo.minBudget === 0 ? 'Free' : promo.minBudget.toLocaleString()) + '–' + promo.maxBudget.toLocaleString();
+  }
+  function _buildPromoCard(key, promo, songObj, catBg) {
+    var alreadyActive = songObj.campaigns && songObj.campaigns.find(function(c){return c.status==='active' && c.type===key;});
+    if (alreadyActive) {
+      return '<div onclick="editPromoCampaign(' + songId + ',\'' + key + '\')" style="background:var(--acc-bg);border:1.5px solid var(--acc);border-radius:12px;margin-bottom:6px;padding:11px 12px;cursor:pointer">'
+        + '<div style="display:flex;align-items:center;gap:8px"><div style="font-size:17px">' + (promo.icon||'📣') + '</div>'
+        + '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--acc)">' + promo.name
+        + ' <span style="font-size:10px;background:var(--acc);color:#fff;border-radius:6px;padding:1px 7px;font-weight:800;vertical-align:middle">ACTIVE</span></div>'
+        + '<div style="font-size:11px;color:var(--mut);margin-top:2px">$' + (alreadyActive.budget||0).toLocaleString() + '/wk · ' + (alreadyActive.weeksRemaining||'?') + ' wks left · tap to edit</div></div>'
+        + '</div></div>';
+    }
+    var sat = _promoBadge(songObj, key);
+    var costStr = _promoCostStr(promo);
+    var costSuffix = (promo.minBudget > 0 || promo.maxBudget > 0) && !promo.oneTime ? '/wk' : (promo.oneTime ? '/event' : '');
+    var tagsHtml = '';
+    if (promo.tags) {
+      promo.tags.forEach(function(t){ tagsHtml += '<span style="font-size:10px;font-weight:700;border-radius:5px;padding:2px 7px;white-space:nowrap;' + (TAG_STYLES[t.type]||TAG_STYLES.p) + '">' + t.label + '</span>'; });
+    }
+    var satWarning = '';
+    var runs = (songObj.promoHistory||[]).filter(function(h){return h.key===key;}).length;
+    if (runs >= 3) satWarning = '<div style="padding:8px 10px;border-radius:8px;margin-bottom:8px;font-size:11.5px;line-height:1.5;display:flex;gap:7px;border:1px solid rgba(220,38,38,.2);background:rgba(220,38,38,.07);color:#7f1d1d"><span>⚠</span><span>Saturated. 50% effectiveness. A viral moment resets this.</span></div>';
+    else if (runs >= 2) satWarning = '<div style="padding:8px 10px;border-radius:8px;margin-bottom:8px;font-size:11.5px;line-height:1.5;display:flex;gap:7px;border:1px solid rgba(245,158,11,.25);background:rgba(245,158,11,.09);color:#78350f"><span>⚠</span><span>Used twice — 60% effective. Consider spacing out or waiting for a fresh moment.</span></div>';
+    return '<div style="background:var(--surf);border:1.5px solid rgba(108,59,191,.14);border-radius:12px;margin-bottom:6px;overflow:hidden">'
+      + '<div style="padding:10px 12px;display:flex;align-items:flex-start;gap:9px;cursor:pointer;touch-action:manipulation" onclick="_togglePromoDetail(\'' + key + '\')" data-promo="' + key + '">'
+      + '<div style="width:34px;height:34px;border-radius:8px;' + catBg + ';display:flex;align-items:center;justify-content:center;font-size:17px;flex:none">' + (promo.icon||'📣') + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:1px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">' + promo.name + ' ' + sat + '</div>'
+      + (promo.subtitle ? '<div style="font-size:11px;color:var(--mut);margin-bottom:3px">' + promo.subtitle + '</div>' : '')
+      + (promo.desc    ? '<div style="font-size:11.5px;color:var(--mut);line-height:1.4;margin-bottom:5px">' + promo.desc + '</div>' : '')
+      + (tagsHtml ? '<div style="display:flex;gap:4px;flex-wrap:wrap">' + tagsHtml + '</div>' : '')
+      + '</div>'
+      + '<div style="flex:none;text-align:right;min-width:52px;padding-left:5px">'
+      + '<div style="font-size:12px;font-weight:800;color:var(--txt)">' + costStr + '</div>'
+      + '<div style="font-size:9.5px;font-weight:400;color:var(--mut)">' + costSuffix + '</div>'
+      + '</div></div>'
+      + '<div id="promo-detail-' + key + '" style="display:none;border-top:1px solid var(--bord);padding:10px 12px;background:var(--acc-bg)">'
+      + satWarning
+      + '<button onclick="selectPromoOption(document.querySelector(\'[data-promo=\\\'' + key + '\\\']\'),\'' + key + '\',' + songId + ');_togglePromoDetail(\'' + key + '\')" style="width:100%;background:var(--acc);color:#fff;border-radius:9px;font-size:13px;font-weight:800;padding:10px;border:none;cursor:pointer;font-family:var(--fb);touch-action:manipulation">Set Budget &amp; Start →</button>'
+      + '</div></div>';
+  }
+
   var promoOptionsHTML = '';
+  // Region filter chips
+  var REGION_CHIPS = ['All','NA','Europe','Africa','Asia','S.Am','OC'];
+  var REGION_MAP   = {'NA':'North America','Europe':'Europe','Africa':'Africa','Asia':'Asia','S.Am':'South America','OC':'Oceania'};
+  var selRegion = window._promoRegion || 'All';
+  promoOptionsHTML += '<div style="display:flex;gap:5px;overflow-x:auto;padding:7px 0 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch">';
+  REGION_CHIPS.forEach(function(r) {
+    var on = selRegion === r;
+    promoOptionsHTML += '<div onclick="window._promoRegion=\'' + r + '\';_reRenderPromoOptions(' + songId + ')" style="flex-shrink:0;padding:5px 10px;border-radius:99px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;border:1.5px solid ' + (on?'rgba(124,58,237,.3)':'var(--bord)') + ';background:' + (on?'rgba(124,58,237,.1)':'var(--surf)') + ';color:' + (on?'var(--acc)':'var(--mut)') + ';touch-action:manipulation">' + r + '</div>';
+  });
+  promoOptionsHTML += '</div>';
+
+  // Category sections
   PROMO_CATS.forEach(function(cat) {
     var catEntries = Object.entries(PROMO_TYPES).filter(function(pair) {
-      return (pair[1].category || '') === cat.key;
+      var key = pair[0]; var promo = pair[1];
+      if ((promo.category || '') !== cat.key) return false;
+      if (selRegion !== 'All') {
+        var mapped = REGION_MAP[selRegion] || selRegion;
+        if (promo.region && promo.region !== mapped) return false;
+      }
+      return true;
     });
     if (!catEntries.length) return;
-    promoOptionsHTML += '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:' + cat.color + ';margin:12px 0 7px;display:flex;align-items:center;gap:7px"><div style="width:7px;height:7px;border-radius:50%;background:' + cat.color + ';flex:none"></div>' + cat.label + '</div>';
+    promoOptionsHTML += '<div style="padding:10px 0 0">'
+      + '<div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:' + cat.color + '">'
+      + '<div style="width:8px;height:8px;border-radius:50%;background:' + cat.color + ';flex:none"></div>' + cat.label + '</div>';
     catEntries.forEach(function(pair) {
-      var key = pair[0]; var promo = pair[1];
-      var alreadyActive = song.campaigns && song.campaigns.find(function(c){return c.status==='active' && c.type===key;});
-      if (alreadyActive) {
-        promoOptionsHTML += '<div onclick="editPromoCampaign(' + songId + ',\'' + key + '\')" style="background:var(--acc-bg);border:1.5px solid var(--acc);border-radius:12px;padding:13px 12px;margin-bottom:7px;cursor:pointer" data-promo="' + key + '">'
-          + '<div style="font-size:13px;font-weight:700;color:var(--acc);display:flex;align-items:center;gap:6px">' + (promo.icon||'📣') + ' ' + promo.name + ' <span style="font-size:10px;background:var(--acc);color:#fff;border-radius:6px;padding:1px 7px;margin-left:auto">ACTIVE</span></div>'
-          + '<div style="font-size:11px;color:var(--mut);margin-top:4px">$' + alreadyActive.budget.toLocaleString() + '/week · ' + alreadyActive.weeksRemaining + ' wks left · tap to edit</div>'
-          + '</div>';
-      } else {
-        var satBadge = _getPromoBadge(song, key);
-        var costStr = '$' + promo.minBudget.toLocaleString() + (promo.minBudget !== promo.maxBudget ? '–' + promo.maxBudget.toLocaleString() : '') + '/wk';
-        promoOptionsHTML += '<div style="background:var(--surf);border:1.5px solid var(--bord);border-radius:12px;margin-bottom:7px;overflow:hidden">'
-          + '<div style="padding:10px 12px;display:flex;align-items:flex-start;gap:9px;cursor:pointer" onclick="_togglePromoDetail(\'' + key + '\')">'
-          + '<div style="font-size:20px;flex:none;width:28px;text-align:center">' + (promo.icon||'📣') + '</div>'
-          + '<div style="flex:1;min-width:0">'
-          + '<div style="font-size:13px;font-weight:700;color:var(--txt);margin-bottom:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">' + promo.name + ' ' + satBadge + '</div>'
-          + '<div style="font-size:11px;color:var(--mut)">' + promo.desc + '</div>'
-          + '</div>'
-          + '<div style="flex:none;text-align:right;font-size:12px;font-weight:800;color:var(--txt)">' + costStr + '</div>'
-          + '</div>'
-          + '<div id="promo-detail-' + key + '" style="display:none;border-top:1px solid var(--bord);padding:10px 12px;background:var(--acc-bg)">'
-          + '<button onclick="selectPromoOption(document.querySelector(\'[data-promo=\\\'' + key + '\\\']\'),\'' + key + '\',' + songId + ');_togglePromoDetail(\'' + key + '\')" style="width:100%;background:var(--acc);color:#fff;border-radius:9px;font-size:13px;font-weight:800;padding:10px;border:none;cursor:pointer;font-family:var(--fb)">Set Budget & Start →</button>'
-          + '</div>'
-          + '</div>';
-        promoOptionsHTML += '<div data-promo="' + key + '" style="display:none"></div>';
-      }
+      promoOptionsHTML += _buildPromoCard(pair[0], pair[1], song, cat.bg);
     });
+    promoOptionsHTML += '</div>';
   });
   // Uncategorized fallback
   var uncatEntries = Object.entries(PROMO_TYPES).filter(function(pair) {
@@ -9100,23 +9280,11 @@ function showPromoManager(songId){
     return !PROMO_CATS.some(function(x){return x.key === c;});
   });
   if (uncatEntries.length) {
-    promoOptionsHTML += '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin:12px 0 7px">Other</div>';
+    promoOptionsHTML += '<div style="padding:10px 0 0"><div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:var(--mut);margin-bottom:8px">Other</div>';
     uncatEntries.forEach(function(pair) {
-      var key = pair[0]; var promo = pair[1];
-      var alreadyActive = song.campaigns && song.campaigns.find(function(c){return c.status==='active' && c.type===key;});
-      if (alreadyActive) {
-        promoOptionsHTML += '<div onclick="editPromoCampaign(' + songId + ',\'' + key + '\')" style="background:var(--acc-bg);border:1.5px solid var(--acc);border-radius:12px;padding:13px 12px;margin-bottom:7px;cursor:pointer" data-promo="' + key + '">'
-          + '<div style="font-size:13px;font-weight:700;color:var(--acc)">' + (promo.icon||'📣') + ' ' + promo.name + ' <span style="font-size:10px;background:var(--acc);color:#fff;border-radius:6px;padding:1px 7px">ACTIVE</span></div>'
-          + '</div>';
-      } else {
-        promoOptionsHTML += '<div onclick="selectPromoOption(this,\'' + key + '\',' + songId + ')" style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:13px 12px;margin-bottom:7px;cursor:pointer;display:flex;align-items:center;gap:9px" data-promo="' + key + '">'
-          + '<div style="font-size:20px">' + (promo.icon||'📣') + '</div>'
-          + '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--txt)">' + promo.name + '</div>'
-          + '<div style="font-size:11px;color:var(--mut)">' + promo.desc + '</div></div>'
-          + '<div style="font-size:12px;font-weight:800;color:var(--txt)">$' + promo.minBudget.toLocaleString() + '+/wk</div>'
-          + '</div>';
-      }
+      promoOptionsHTML += _buildPromoCard(pair[0], pair[1], song, 'rgba(108,59,191,.08)');
     });
+    promoOptionsHTML += '</div>';
   }
 
   const completedCampaigns = song.campaigns.filter(c => c.status === 'completed');

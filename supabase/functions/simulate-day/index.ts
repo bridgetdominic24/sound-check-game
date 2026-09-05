@@ -358,6 +358,16 @@ Deno.serve(async (_req: Request) => {
         const game = player.game_data;
         if (!game) { skipped++; continue; }
 
+        // Skip players who saved their game within the last 4 hours.
+        // Their client is (or was very recently) handling their own simulation via
+        // _onDayAdvanced, so running the server-side version would overwrite newer
+        // session data with the stale snapshot we loaded from the DB.
+        const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+        if (game._lastOnlineSave && (Date.now() - game._lastOnlineSave) < FOUR_HOURS_MS) {
+          skipped++;
+          continue;
+        }
+
         // Determine which days this player still needs simulated
         const lastSim = game._lastSimDay || (game._lastProcessedDay ? game._lastProcessedDay - 1 : (game.day || 1) - 1);
         const missedDays = Math.max(0, serverDay - lastSim);
