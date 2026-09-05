@@ -40256,6 +40256,9 @@ function _silentDayCatchUp(day, showFirst){
 function _onDayAdvanced(newDay){
   if(GAME._lastProcessedDay === newDay) return;
   GAME._lastProcessedDay = newDay;
+  // Tell the server-side simulate-day function this player is current —
+  // so it knows not to re-simulate days this client already processed live.
+  GAME._lastSimDay = newDay;
 
   const info = dayInfo(newDay);
   if(info.dow === 0){
