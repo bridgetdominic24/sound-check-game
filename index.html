@@ -19903,6 +19903,16 @@ function showFansDetail(){
     <div style="font-size:15px;font-weight:600;color:var(--txt);margin-bottom:4px">Regional Fan Analytics</div>
     <div style="font-size:13px;color:var(--mut);margin-bottom:16px">Understand your fanbase by region. Analytics take 2-3 weeks and boost discovery.</div>`;
   
+  // Auto-complete any analytics that finished while the player was offline
+  GAME.activeAnalytics = GAME.activeAnalytics.filter(a=>{
+    if(a.endWeek <= GAME.week){
+      GAME.fanAnalytics[a.region] = {completed:true, completedWeek:a.endWeek, completedDay:GAME.day||1};
+      markDirty();
+      return false; // remove from active
+    }
+    return true;
+  });
+
   uniqueRegions.forEach(region=>{
     const analyzed=GAME.fanAnalytics[region]?.completed || GAME.fanAnalytics[region]===true;
     const isRunning=GAME.activeAnalytics.some(a=>a.region===region);
@@ -19930,7 +19940,7 @@ function showFansDetail(){
       </div>`;
     }else if(isRunning){
       const analytics=GAME.activeAnalytics.find(a=>a.region===region);
-      const weeksLeft=analytics.endWeek-GAME.week;
+      const weeksLeft=Math.max(0, analytics.endWeek-GAME.week);
       html+=`<div style="background:var(--surf);padding:12px;border-radius:10px;margin-bottom:8px;border-left:3px solid #FFA726">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div style="font-weight:600;color:var(--txt)">${region}</div>
