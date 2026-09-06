@@ -21550,7 +21550,7 @@ function openCollabProposeScreen(artist){
     +'<div style="font-size:12px;color:var(--mut);margin-bottom:6px">Their royalty share (your streams)</div>'
     +'<div style="display:flex;align-items:center;gap:10px">'
     +'<div id="cp-sv-fa" style="font-size:14px;font-weight:800;color:var(--acc);min-width:36px">65%</div>'
-    +'<input type="range" id="cp-royalty-slider" min="20" max="80" value="35" oninput="cpUpdateSplit(this.value)" style="flex:1">'
+    +'<input type="range" id="cp-royalty-slider" min="5" max="80" value="35" oninput="cpUpdateSplit(this.value)" style="flex:1">'
     +'<div id="cp-sv-fb" style="font-size:14px;font-weight:800;color:var(--mut);min-width:36px;text-align:right">35%</div>'
     +'</div>'
     +'<div id="cp-sv-h" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center">You: 65% · Them: 35%</div>'
@@ -21561,7 +21561,7 @@ function openCollabProposeScreen(artist){
     +'<div style="font-size:12px;color:var(--mut);margin-bottom:6px">Their royalty share (your streams)</div>'
     +'<div style="display:flex;align-items:center;gap:10px">'
     +'<div id="cp-sv-fa2" style="font-size:14px;font-weight:800;color:var(--acc);min-width:36px">65%</div>'
-    +'<input type="range" id="cp-royalty-slider2" min="20" max="80" value="35" oninput="cpUpdateSplit2(this.value)" style="flex:1">'
+    +'<input type="range" id="cp-royalty-slider2" min="5" max="80" value="35" oninput="cpUpdateSplit2(this.value)" style="flex:1">'
     +'<div id="cp-sv-fb2" style="font-size:14px;font-weight:800;color:var(--mut);min-width:36px;text-align:right">35%</div>'
     +'</div>'
     +'<div id="cp-sv-h2" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center">You: 65% · Them: 35%</div>'
@@ -21687,16 +21687,10 @@ async function cpSendProposal(artistId,artistName){
       offered_fee:flatAmt,
       royalty_pct:royaltyPct,
       fee_type:payType,
-      payment_type:payType,
-      flat_amount:flatAmt,
       message:note,
-      note:note,
       list_credits:true,
       status:'pending',
       round:1,
-      max_rounds:2,
-      vibe_label:cp.vibeLabel||'',
-      payment_summary:paymentSummary,
       created_at:new Date().toISOString()
     };
     var {error:insertErr}=await supabase.from('collab_requests').insert(request);
@@ -21704,7 +21698,11 @@ async function cpSendProposal(artistId,artistName){
     GAME.messages.push({type:'collab_sent',from:fromArtistName,to:artistName,message:'Sent '+collabType+' proposal to '+artistName+' — '+paymentSummary,time:new Date(),subType:'collab'});
     closeMenu();
     showToast('Proposal sent to '+artistName+'! 📤','success');
-  }catch(e){showToast('Error sending proposal: '+(e.message||e),'error');}
+  }catch(e){
+    var msg=e&&(e.message||e.details||e.hint||JSON.stringify(e))||'Unknown error';
+    console.error('cpSendProposal error:',e);
+    showToast('Error sending proposal: '+msg,'error');
+  }
 }
 
 // Collab Duration Constants (REAL MINUTES - single player is HALF of multiplayer)
@@ -34533,9 +34531,9 @@ function openCollabCounterSheet(req){
     // Flat panel
     +'<div id="cs-pay-flat" style="margin-bottom:10px"><input type="number" id="cs-flat-amt" value="'+(req.offered_fee||5000)+'" min="0" step="500" placeholder="$ amount" style="width:100%;padding:12px;background:var(--surf);border:2px solid var(--bord);border-radius:8px;font-size:15px;font-weight:700;color:var(--txt);font-family:var(--fb);box-sizing:border-box"></div>'
     // Royalty panel
-    +'<div id="cs-pay-royalty" style="display:none;margin-bottom:10px"><div style="font-size:12px;color:var(--mut);margin-bottom:6px">Their royalty share</div><div style="display:flex;align-items:center;gap:10px"><div id="cs-sv-fa" style="font-size:14px;font-weight:800;color:var(--acc);min-width:36px">65%</div><input type="range" id="cs-royalty-slider" min="20" max="80" value="'+(req.royalty_pct||35)+'" oninput="csUpdateSplit(this.value)" style="flex:1"><div id="cs-sv-fb" style="font-size:14px;font-weight:800;color:var(--mut);min-width:36px;text-align:right">'+(req.royalty_pct||35)+'%</div></div><div id="cs-sv-h" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center">You: '+(100-(req.royalty_pct||35))+'% · Them: '+(req.royalty_pct||35)+'%</div></div>'
+    +'<div id="cs-pay-royalty" style="display:none;margin-bottom:10px"><div style="font-size:12px;color:var(--mut);margin-bottom:6px">Their royalty share</div><div style="display:flex;align-items:center;gap:10px"><div id="cs-sv-fa" style="font-size:14px;font-weight:800;color:var(--acc);min-width:36px">65%</div><input type="range" id="cs-royalty-slider" min="5" max="80" value="'+(req.royalty_pct||35)+'" oninput="csUpdateSplit(this.value)" style="flex:1"><div id="cs-sv-fb" style="font-size:14px;font-weight:800;color:var(--mut);min-width:36px;text-align:right">'+(req.royalty_pct||35)+'%</div></div><div id="cs-sv-h" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center">You: '+(100-(req.royalty_pct||35))+'% · Them: '+(req.royalty_pct||35)+'%</div></div>'
     // Mix panel
-    +'<div id="cs-pay-mix" style="display:none;margin-bottom:10px"><input type="number" id="cs-mix-amt" value="'+(Math.round((req.offered_fee||2000)/2))+'" min="0" step="250" placeholder="$ flat portion" style="width:100%;padding:10px;background:var(--surf);border:2px solid var(--bord);border-radius:8px;font-size:14px;font-weight:700;color:var(--txt);font-family:var(--fb);box-sizing:border-box;margin-bottom:8px"><div style="font-size:12px;color:var(--mut);margin-bottom:6px">Their royalty share</div><div style="display:flex;align-items:center;gap:10px"><div id="cs-sv-fa2" style="font-size:14px;font-weight:800;color:var(--acc);min-width:36px">65%</div><input type="range" id="cs-royalty-slider2" min="20" max="80" value="35" oninput="csUpdateSplit2(this.value)" style="flex:1"><div id="cs-sv-fb2" style="font-size:14px;font-weight:800;color:var(--mut);min-width:36px;text-align:right">35%</div></div><div id="cs-sv-h2" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center">You: 65% · Them: 35%</div></div>'
+    +'<div id="cs-pay-mix" style="display:none;margin-bottom:10px"><input type="number" id="cs-mix-amt" value="'+(Math.round((req.offered_fee||2000)/2))+'" min="0" step="250" placeholder="$ flat portion" style="width:100%;padding:10px;background:var(--surf);border:2px solid var(--bord);border-radius:8px;font-size:14px;font-weight:700;color:var(--txt);font-family:var(--fb);box-sizing:border-box;margin-bottom:8px"><div style="font-size:12px;color:var(--mut);margin-bottom:6px">Their royalty share</div><div style="display:flex;align-items:center;gap:10px"><div id="cs-sv-fa2" style="font-size:14px;font-weight:800;color:var(--acc);min-width:36px">65%</div><input type="range" id="cs-royalty-slider2" min="5" max="80" value="35" oninput="csUpdateSplit2(this.value)" style="flex:1"><div id="cs-sv-fb2" style="font-size:14px;font-weight:800;color:var(--mut);min-width:36px;text-align:right">35%</div></div><div id="cs-sv-h2" style="font-size:11px;color:var(--mut);margin-top:4px;text-align:center">You: 65% · Them: 35%</div></div>'
     // Buttons
     +'<button onclick="csSubmitCounter(\''+req.id+'\')" style="width:100%;padding:14px;background:#ffa502;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--fb);margin-bottom:10px">Send Counter →</button>'
     +'<button onclick="document.getElementById(\'collabCounterSheet\').remove()" style="width:100%;padding:12px;background:none;color:var(--mut);border:1.5px solid var(--bord);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--fb)">Cancel</button>'
