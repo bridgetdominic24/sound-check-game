@@ -31998,75 +31998,127 @@ function _rfRenderScreen2(){
   if(!song) return;
 
   var images = song.conceptImages || (song.conceptImage ? [song.conceptImage] : []);
+  var hasImages = images.length > 0;
+  var analyzing = !!song.conceptAnalyzing;
+  var hasAnalysis = !!song.conceptAnalysis;
+
+  // Photo slots row
   var slots = [0,1,2].map(function(i){
     var img = images[i];
     var filled = !!img;
-    return '<div onclick="window._rfConceptSlot('+i+')" style="flex:1;aspect-ratio:1;border-radius:12px;background:var(--surf);border:1.5px dashed '+(filled?'rgba(76,201,138,.4)':'rgba(255,255,255,.12)')+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;overflow:hidden;position:relative">'
-      +(filled?'<img src="'+img+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"><div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:9px;font-weight:800;color:rgba(255,255,255,.8);background:rgba(0,0,0,.4);padding:2px">✓ Added</div>':'<span style="font-size:22px">📸</span><span style="font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--mut);text-transform:uppercase">Photo '+(i+1)+'</span>')
+    return '<div onclick="document.getElementById(\'rfConceptInput\').click()" style="flex:1;aspect-ratio:1;border-radius:12px;background:var(--surf);border:1.5px dashed '+(filled?'var(--green,#4cc98a)':'var(--bord)')+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;overflow:hidden;position:relative">'
+      +(filled?'<img src="'+img+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"><div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:9px;font-weight:800;color:rgba(255,255,255,.85);background:rgba(0,0,0,.45);padding:2px">✓ Added</div>':'<span style="font-size:22px">📸</span><span style="font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--mut);text-transform:uppercase">Photo '+(i+1)+'</span>')
       +'</div>';
   }).join('');
+
+  // Analysis / fan reactions section
+  var analysisHtml = '';
+  if(analyzing){
+    var pct = window._conceptAnalysisStart ? Math.min(92, Math.floor((Date.now()-window._conceptAnalysisStart)/280)) : 5;
+    analysisHtml = '<div style="background:var(--acc-bg);border:1px solid var(--acc);border-radius:12px;padding:14px">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+      +'<div style="font-size:18px">🎨</div>'
+      +'<div><div style="font-size:13px;font-weight:700;color:var(--acc)">Reading the vibe...</div>'
+      +'<div style="font-size:11px;color:var(--mut);margin-top:1px">Analyzing concept · Writing fan reactions</div></div></div>'
+      +'<div style="height:6px;background:rgba(0,0,0,.08);border-radius:3px;overflow:hidden">'
+      +'<div id="rfProgressBar" style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--acc),#a855f7);border-radius:3px;transition:width .5s ease"></div></div>'
+      +'<div id="rfProgressPct" style="font-size:10px;color:var(--mut);margin-top:4px;text-align:right">'+pct+'%</div>'
+      +'</div>';
+  } else if(hasAnalysis){
+    var mood = song.conceptMood ? '<span style="background:var(--acc-bg);color:var(--acc);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;margin-right:6px">'+song.conceptMood+'</span>' : '';
+    var palette = song.conceptPalette ? '<div style="font-size:11px;color:var(--mut);margin-top:6px">🎨 '+song.conceptPalette+'</div>' : '';
+    var reactions = (song.conceptFanReactions && song.conceptFanReactions.length > 0)
+      ? '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bord)">'
+        +'<div style="font-size:10px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🎨 Fan Reactions · preview</div>'
+        +song.conceptFanReactions.slice(0,3).map(function(r){
+          return '<div style="font-size:12px;color:var(--txt);margin-bottom:5px;padding:8px 10px;background:var(--bg);border-radius:8px;line-height:1.5">"'+r+'"</div>';
+        }).join('')+'</div>' : '';
+    analysisHtml = '<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:14px">'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">'
+      +'<span style="font-size:10px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:1px">Vibe Analysis</span>'
+      +'<span style="font-size:10px;color:var(--green,#4cc98a);font-weight:700">✓ Complete</span></div>'
+      +(mood?'<div style="margin-bottom:8px">'+mood+'</div>':'')
+      +(song.conceptAesthetic?'<div style="font-size:12px;color:var(--mut);margin-bottom:6px;font-style:italic">"'+song.conceptAesthetic+'"</div>':'')
+      +'<div style="font-size:13px;color:var(--txt);line-height:1.5;margin-bottom:6px">'+song.conceptAnalysis+'</div>'
+      +palette+reactions+'</div>';
+  } else if(hasImages){
+    analysisHtml = '<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:12px 14px;font-size:12px;color:var(--mut)">'
+      +'💡 Photos saved. Vibe analysis didn\'t complete — your fans will still see the concept art.'
+      +'</div>';
+  } else {
+    // No images yet — show placeholder preview
+    analysisHtml = '<div>'
+      +'<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:10px">🎨 Fan reactions · preview (after upload)</div>'
+      +'<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;overflow:hidden;opacity:.6">'
+      +'<div style="padding:10px 14px;border-bottom:1px solid var(--bord);font-size:12px;color:var(--txt);display:flex;gap:10px;align-items:flex-start;line-height:1.5"><div style="font-size:16px;flex:none">🌙</div><div>"the whole aesthetic is giving midnight city this era is it"</div></div>'
+      +'<div style="padding:10px 14px;border-bottom:1px solid var(--bord);font-size:12px;color:var(--txt);display:flex;gap:10px;align-items:flex-start;line-height:1.5"><div style="font-size:16px;flex:none">✨</div><div>"okay the visuals alone... I need this song NOW"</div></div>'
+      +'<div style="padding:10px 14px;font-size:12px;color:var(--txt);display:flex;gap:10px;align-items:flex-start;line-height:1.5"><div style="font-size:16px;flex:none">🔥</div><div>"STREAM MISSION activated the second it drops"</div></div>'
+      +'</div>'
+      +'<div style="font-size:10.5px;color:var(--mut);text-align:center;margin-top:6px">Upload photos above to get reactions tailored to your vibe</div>'
+      +'</div>';
+  }
 
   var html = '<div id="releaseFlowOverlay" style="display:flex;flex-direction:column;min-height:100%;overflow:hidden">'
     + _rfSteps(2)
     + _rfTopbar('Release Concept','_rfRenderScreen1(GAME.songs.find(function(s){return s.id===_RF.songId}))','window._rfGoS3()','Skip →')
     + '<div style="flex:1;overflow-y:auto;padding:0 16px 20px;display:flex;flex-direction:column;gap:14px">'
-    // Hero card
-    + '<div style="background:linear-gradient(135deg,var(--acc-bg),var(--card));border:1px solid rgba(169,125,232,.25);border-radius:16px;padding:16px;display:flex;gap:14px;align-items:flex-start">'
-    + '<div style="font-size:28px;flex:none">🎨</div>'
-    + '<div><div style="font-size:14px;font-weight:800;color:var(--acc);margin-bottom:4px">Fan Reactions · preview</div>'
-    + '<div style="font-size:11.5px;color:var(--mut);line-height:1.55">Upload up to 3 photos of your aesthetic, vibe, or shoot. We read the vibe and seed your fandom with reactions when the music drops.</div></div>'
+    // Explainer
+    + '<div style="background:linear-gradient(135deg,var(--acc-bg),var(--card));border:1px solid rgba(169,125,232,.2);border-radius:14px;padding:14px;display:flex;gap:12px;align-items:flex-start">'
+    + '<div style="font-size:26px;flex:none">🎨</div>'
+    + '<div><div style="font-size:13.5px;font-weight:800;color:var(--acc);margin-bottom:3px">Fan Reactions · preview</div>'
+    + '<div style="font-size:11.5px;color:var(--mut);line-height:1.5">Upload up to 3 photos of your aesthetic, vibe, or shoot. We read the vibe and write fan reactions tailored to your concept.</div></div>'
     + '</div>'
     // Photo slots
     + '<div>'
     + '<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:10px">Upload concept photos (up to 3)</div>'
     + '<div style="display:flex;gap:8px">'+slots+'</div>'
     + '<input type="file" id="rfConceptInput" accept="image/*" multiple style="display:none" onchange="window._rfHandleConceptUpload(event)">'
+    + (hasImages && !analyzing ? '<button onclick="document.getElementById(\'rfConceptInput\').click()" style="margin-top:8px;width:100%;padding:8px;background:var(--surf);border:1px solid var(--bord);color:var(--mut);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔄 Replace photos</button>' : '')
     + '</div>'
-    // Static fan reactions preview
-    + '<div>'
-    + '<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:10px">What fans will post when it drops</div>'
-    + '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;overflow:hidden">'
-    + '<div style="padding:10px 14px;background:var(--surf);border-bottom:1px solid var(--bord);font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;display:flex;align-items:center;gap:6px">✦ Fan reactions · preview</div>'
-    + '<div style="padding:10px 14px;border-bottom:1px solid var(--bord);font-size:12px;color:var(--txt);display:flex;gap:10px;align-items:flex-start;line-height:1.5"><div style="font-size:16px;flex:none;margin-top:1px">🌙</div><div>"the whole aesthetic is giving midnight city 🌆 this era is it"</div></div>'
-    + '<div style="padding:10px 14px;border-bottom:1px solid var(--bord);font-size:12px;color:var(--txt);display:flex;gap:10px;align-items:flex-start;line-height:1.5"><div style="font-size:16px;flex:none;margin-top:1px">✨</div><div>"okay the visuals alone... I need this song NOW 👀"</div></div>'
-    + '<div style="padding:10px 14px;font-size:12px;color:var(--txt);display:flex;gap:10px;align-items:flex-start;line-height:1.5"><div style="font-size:16px;flex:none;margin-top:1px">🔥</div><div>"STREAM MISSION activated the second it drops"</div></div>'
-    + '</div></div>'
+    // Analysis / reactions
+    + '<div>'+analysisHtml+'</div>'
     + '</div>'
     // Footer
     + '<div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;flex:none;background:var(--bg);border-top:1px solid var(--bord)">'
-    + '<button onclick="window._rfGoS3()" style="width:100%;background:var(--acc);color:var(--acc-txt,#0d0f14);border:none;border-radius:14px;font-size:15px;font-weight:800;padding:15px;cursor:pointer">Continue → Review</button>'
+    + '<button onclick="window._rfGoS3()" style="width:100%;background:var(--acc);color:var(--acc-txt,#0d0f14);border:none;border-radius:14px;font-size:15px;font-weight:800;padding:15px;cursor:pointer">'
+    + (analyzing ? '⏳ Analyzing... tap to continue anyway' : 'Continue → Review') + '</button>'
     + '<button onclick="window._rfGoS3()" style="background:none;border:none;color:var(--mut);font-size:13px;font-weight:700;padding:10px;width:100%;text-align:center;cursor:pointer">Skip — release without concept</button>'
     + '</div>'
     + '</div>';
 
   _insertOverlay(html);
+
+  // Start progress bar ticker if analyzing
+  if(analyzing){
+    clearInterval(window._rfBarTicker);
+    window._rfBarTicker = setInterval(function(){
+      var bar = document.getElementById('rfProgressBar');
+      var pctEl = document.getElementById('rfProgressPct');
+      if(!bar){ clearInterval(window._rfBarTicker); return; }
+      var pct = window._conceptAnalysisStart ? Math.min(92, Math.floor((Date.now()-window._conceptAnalysisStart)/280)) : 5;
+      bar.style.width = pct+'%';
+      if(pctEl) pctEl.textContent = pct+'%';
+    }, 500);
+  }
 }
+
+// Route showConceptUpload back to release flow screen 2 when in release flow
+var _origShowConceptUpload = null;
+window._rfInFlow = false;
 
 window._rfConceptSlot = function(idx){
   document.getElementById('rfConceptInput').click();
-  window._rfConceptSlotIdx = idx;
 };
 
 window._rfHandleConceptUpload = function(e){
-  var files = Array.from(e.target.files).slice(0,3);
-  if(!files.length) return;
   var song = GAME.songs.find(function(s){return s.id===_RF.songId;});
   if(!song) return;
-  if(!song.conceptImages) song.conceptImages=[];
-  var pending = files.length;
-  files.forEach(function(file,fi){
-    var reader = new FileReader();
-    reader.onload = function(ev){
-      var slot = (window._rfConceptSlotIdx||0) + fi;
-      if(slot>2) slot=2;
-      song.conceptImages[slot] = ev.target.result;
-      pending--;
-      if(pending===0){
-        if(files.length>3) showToast('Only the first 3 photos were used.','amber');
-        _rfRenderScreen2();
-      }
-    };
-    reader.readAsDataURL(file);
+  if(e.target.files && e.target.files.length>3) showToast('Only the first 3 photos were used.','amber');
+  // Patch showConceptUpload to redirect to release flow screen 2 during analysis
+  var _origSCU = window.showConceptUpload;
+  window.showConceptUpload = function(){ _rfRenderScreen2(); };
+  handleConceptUpload(e, _RF.songId).finally(function(){
+    window.showConceptUpload = _origSCU;
   });
 };
 
