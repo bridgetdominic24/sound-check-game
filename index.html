@@ -3955,6 +3955,56 @@ async function loadCloudSave(){
       GAME.commercialAxis = GAME.commercialAxis ?? 50;
       GAME.axisHistory = saved.axisHistory || [];
 
+      // ── MIGRATION: rescue EPs/albums scheduled before the pending-release fix ──
+      // Old bug: doScheduleRelease stamped scheduledReleaseDay on already-released songs
+      // without creating a GAME.releases entry. Detect those and create pending entries.
+      (function _migrateOldScheduledReleases(){
+        if(!GAME.songs || !GAME.releases) return;
+        // Find any already-released songs that still have scheduledReleaseDay set
+        var orphaned = GAME.songs.filter(function(s){ return s.released && s.scheduledReleaseDay; });
+        if(!orphaned.length) return;
+        // Group by scheduledReleaseDay (each unique day = one pending release group)
+        var byDay = {};
+        orphaned.forEach(function(s){
+          var d = s.scheduledReleaseDay;
+          if(!byDay[d]) byDay[d] = [];
+          byDay[d].push(s);
+          // Clear the bad stamp
+          delete s.scheduledReleaseDay;
+          delete s.scheduledReleaseDate;
+        });
+        Object.keys(byDay).forEach(function(day){
+          var songs = byDay[day];
+          var firstSong = songs[0];
+          // Skip if a GAME.releases entry already covers these songs
+          var alreadyCovered = GAME.releases.some(function(r){
+            return r.songs && r.songs.some(function(rs){ return rs && rs.id === firstSong.id; });
+          });
+          if(alreadyCovered) return;
+          var targetDay = parseInt(day);
+          var origin = new Date(2017,0,1).getTime();
+          var realDate = new Date(origin + (targetDay-1)*86400000);
+          var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+          var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+          var dateLabel = dayNames[realDate.getDay()] + ', ' + months[realDate.getMonth()] + ' ' + realDate.getDate() + ', ' + realDate.getFullYear();
+          var type = songs.length > 1 ? 'ep' : 'single';
+          GAME.releases.push({
+            id: Date.now() + Math.random(),
+            title: firstSong.title + (songs.length > 1 ? ' EP' : ''),
+            type: type,
+            songs: songs.map(function(s){ return {id:s.id, title:s.title}; }),
+            scheduledReleaseDay: targetDay,
+            scheduledReleaseDate: dateLabel,
+            pending: true,
+            coverImage: firstSong.coverImage || null,
+            cover: firstSong.cover || '🎶',
+          });
+          console.log('[Migration] Created pending release entry for', songs.length, 'orphaned song(s) scheduled for', dateLabel);
+        });
+        markDirty();
+      })();
+      // ── end migration ──
+
       // Clean up completed/corrupted tours
       cleanupTours();
 
