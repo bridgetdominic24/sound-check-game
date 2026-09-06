@@ -112,6 +112,43 @@ input[type=range].age-range{-webkit-appearance:none;width:100%;height:4px;backgr
 .cd-bar{height:10px;border-radius:5px;background:linear-gradient(90deg,#7c3aed,#e0daea,#f59e0b);position:relative;margin-bottom:4px}
 .cd-marker{position:absolute;top:-3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);border:2px solid #7c3aed;transition:left 0.3s ease}
 .cd-label{font-size:12px;color:var(--mut);text-align:center}
+/* Sound Identity — Music Overview */
+.si-section{background:var(--surf);border-top:1px solid var(--bord);padding:12px 16px}
+.si-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.si-head-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--mut)}
+.si-head-link{font-size:11.5px;font-weight:700;color:var(--acc);cursor:pointer;touch-action:manipulation}
+.si-bar-labels{display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;color:var(--mut);font-weight:700}
+.si-bar-wrap{height:6px;border-radius:3px;background:linear-gradient(90deg,#7c3aed,#e0daea,#f59e0b);position:relative;margin-bottom:5px}
+.si-bar-dot{position:absolute;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:50%;background:var(--surf);border:2px solid var(--acc);box-shadow:0 1px 4px rgba(0,0,0,.15);transition:left .4s ease}
+.si-bar-val{text-align:center;font-size:11.5px;font-weight:700;color:var(--acc);margin-bottom:9px}
+.si-nudges{display:flex;flex-direction:column;gap:4px}
+.si-nudge{display:flex;align-items:center;gap:8px;font-size:11.5px}
+.si-nudge-ico{font-size:13px;flex:none}
+.si-nudge-txt{flex:1;color:var(--txt)}
+.si-nudge-comm{font-size:11px;font-weight:700;color:var(--spark)}
+.si-nudge-auth{font-size:11px;font-weight:700;color:var(--green,#4cc98a)}
+/* Sound Identity detail overlay */
+.si-overlay{position:fixed;inset:0;z-index:200000;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+.si-ov-head{background:var(--surf);padding:12px 16px;border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:10px;flex:none}
+.si-ov-back{font-size:12px;font-weight:800;color:var(--acc);background:var(--acc-bg,rgba(232,180,76,.1));border:1.5px solid var(--acc);border-radius:20px;padding:5px 12px;cursor:pointer;touch-action:manipulation}
+.si-ov-title{font-size:15px;font-weight:800;color:var(--txt)}
+.si-ov-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.si-ov-card{background:var(--surf);border:1.5px solid var(--bord);border-radius:14px;padding:14px}
+.si-ov-card-title{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin-bottom:10px}
+.si-ov-bar-wrap{height:10px;border-radius:5px;background:linear-gradient(90deg,#7c3aed,#e0daea,#f59e0b);position:relative;margin-bottom:6px}
+.si-ov-bar-dot{position:absolute;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:var(--surf);border:2.5px solid var(--acc);box-shadow:0 2px 6px rgba(0,0,0,.2);transition:left .4s ease}
+.si-ov-bar-val{text-align:center;font-size:15px;font-weight:800;color:var(--acc);margin-bottom:6px}
+.si-ov-bar-desc{font-size:11.5px;color:var(--mut);text-align:center;line-height:1.5}
+.si-ov-effect{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bord);font-size:12.5px}
+.si-ov-effect:last-child{border:none;padding-bottom:0}
+.si-ov-eff-ico{font-size:16px;flex:none}
+.si-ov-eff-txt{flex:1;color:var(--txt)}
+.si-ov-eff-val{font-size:11.5px;font-weight:700;flex:none}
+.si-ov-move{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bord);font-size:12px}
+.si-ov-move:last-child{border:none}
+.si-ov-move-ico{font-size:14px;flex:none}
+.si-ov-move-txt{flex:1;color:var(--txt)}
+.si-ov-move-val{font-size:11px;font-weight:800;flex:none}
 .stat-box{background:var(--surf);border:1.5px solid var(--bord);padding:14px;border-radius:12px;backdrop-filter:blur(10px);box-shadow:0 2px 12px rgba(0,0,0,0.05);transition:transform 0.2s ease,box-shadow 0.2s ease}
 .stat-box:active{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.08)}
 .stat-icon{font-size:24px;margin-bottom:4px}
@@ -943,18 +980,7 @@ function emergencySkip() {
     </div>
   </div>
   
-  <!-- CAREER DIRECTION — Commercial/Authentic Axis -->
-  <div class="career-direction-section">
-    <div style="font-size:13px;font-weight:700;color:var(--mut);letter-spacing:0.5px;margin-bottom:10px;text-transform:uppercase;padding-top:12px;border-top:1px solid var(--bord)">Career Direction</div>
-    <div class="cd-labels">
-      <span>Authentic</span>
-      <span>Commercial</span>
-    </div>
-    <div class="cd-bar">
-      <div class="cd-marker" id="cdMarker" style="left:calc(50% - 8px)"></div>
-    </div>
-    <div class="cd-label" id="cdLabel">Balanced</div>
-  </div>
+  <!-- Career Direction bar moved to Music Overview tab (Sound Identity section) -->
 
   <!-- MULTIPLAYER: Week Countdown Timer -->
   <!-- Notifications Section -->
@@ -1013,6 +1039,14 @@ function emergencySkip() {
         <div class="ms-stat-card"><div class="ms-stat-icon">▶️</div><div class="ms-stat-value" id="statStreams">0</div><div class="ms-stat-label">Streams</div></div>
         <div class="ms-stat-card" onclick="showFansDetail()" style="cursor:pointer;transition:all 0.2s" title="Click to view fan analytics" onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 4px 12px rgba(102,126,234,0.4)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow=''"><div class="ms-stat-icon">👥</div><div class="ms-stat-value" id="statFans">0</div><div class="ms-stat-label">Fans</div></div>
         <div class="ms-stat-card" style="grid-column:span 2"><div class="ms-stat-icon">⚡</div><div class="ms-stat-value" id="statHype">0</div><div class="ms-stat-label">Hype</div></div>
+      </div>
+      <div class="si-section" id="si-overview-section">
+        <!-- populated by updateSoundIdentitySection() -->
+        <div class="si-head"><span class="si-head-label">Sound Identity</span><span class="si-head-link" onclick="showSoundIdentityDetail()">Full breakdown ›</span></div>
+        <div class="si-bar-labels"><span>Authentic</span><span>Commercial</span></div>
+        <div class="si-bar-wrap"><div class="si-bar-dot" style="left:calc(50% - 7px)"></div></div>
+        <div class="si-bar-val">Balanced</div>
+        <div class="si-nudges"><div style="font-size:11.5px;color:var(--mut)">No moves recorded yet.</div></div>
       </div>
     </div>
     <div class="ms-tab-content" id="ms-songs">
@@ -3919,6 +3953,7 @@ async function loadCloudSave(){
       
       // Initialize commercial/authentic axis for old saves
       GAME.commercialAxis = GAME.commercialAxis ?? 50;
+      GAME.axisHistory = saved.axisHistory || [];
 
       // Clean up completed/corrupted tours
       cleanupTours();
@@ -4721,7 +4756,7 @@ function createFreshGame(){
 // Hidden 0–100 number on GAME.commercialAxis (0=fully authentic, 100=fully commercial).
 // Players never see the raw number — only getAxisLabel() text and the spectrum bar.
 
-function nudgeAxis(direction, amount) {
+function nudgeAxis(direction, amount, source, label) {
   // direction: 'commercial' or 'authentic'  |  amount: 1–10
   if (GAME.commercialAxis == null) GAME.commercialAxis = 50;
   if (direction === 'commercial') {
@@ -4729,8 +4764,21 @@ function nudgeAxis(direction, amount) {
   } else {
     GAME.commercialAxis = Math.max(0, GAME.commercialAxis - amount);
   }
+  // Log this nudge for the Sound Identity recent moves list
+  if (!GAME.axisHistory) GAME.axisHistory = [];
+  GAME.axisHistory.unshift({
+    direction: direction,
+    amount: amount,
+    source: source || 'unknown',
+    label: label || (direction === 'commercial' ? 'Commercial move' : 'Authentic move'),
+    week: GAME.week || 0,
+  });
+  // Keep only last 10 moves
+  if (GAME.axisHistory.length > 10) GAME.axisHistory.length = 10;
   // Update the bar on the homepage if it's visible
   updateCareerDirectionBar();
+  // Update the Sound Identity section if visible
+  if (typeof updateSoundIdentitySection === 'function') updateSoundIdentitySection();
 }
 
 function getAxisLabel() {
@@ -4745,12 +4793,94 @@ function getAxisLabel() {
 }
 
 function updateCareerDirectionBar() {
-  var bar = document.getElementById('cdMarker');
-  var lbl = document.getElementById('cdLabel');
-  if (!bar || !lbl || !GAME) return;
+  // Home screen bar removed — Career Direction now lives in Music Overview (Sound Identity section)
+  if (typeof updateSoundIdentitySection === 'function') updateSoundIdentitySection();
+}
+
+function updateSoundIdentitySection() {
+  var el = document.getElementById('si-overview-section');
+  if (!el) return;
   var axis = GAME.commercialAxis != null ? GAME.commercialAxis : 50;
-  bar.style.left = 'calc(' + axis + '% - 8px)';
-  lbl.textContent = getAxisLabel();
+  var pct = axis;
+  var label = typeof getAxisLabel === 'function' ? getAxisLabel() : 'Balanced';
+  var nudgeIcons = {
+    billboard:'🏙️', targeted_ads:'📢', quick_release:'⚡',
+    anr_song:'🎧', brand_deal:'💼', influencer_macro:'🌟',
+    grassroots:'🌿', teaser:'📱', street_mural:'🎨',
+    self_written:'🎵', podcast:'🎙️', passion_project:'✨',
+  };
+  var history = (GAME.axisHistory || []).slice(0, 3);
+  var nudgesHTML = history.length > 0
+    ? history.map(function(h) {
+        var ico = nudgeIcons[h.source] || (h.direction === 'commercial' ? '📈' : '🌿');
+        var lbl2 = h.label || (h.direction === 'commercial' ? 'Commercial move' : 'Authentic move');
+        var valCls = h.direction === 'commercial' ? 'si-nudge-comm' : 'si-nudge-auth';
+        var valTxt = (h.direction === 'commercial' ? '→ Commercial' : '→ Authentic') + ' +' + h.amount;
+        return '<div class="si-nudge"><span class="si-nudge-ico">' + ico + '</span><span class="si-nudge-txt">' + lbl2 + '</span><span class="' + valCls + '">' + valTxt + '</span></div>';
+      }).join('')
+    : '<div style="font-size:11.5px;color:var(--mut)">No moves recorded yet — make music, release, promote.</div>';
+  el.innerHTML =
+    '<div class="si-head"><span class="si-head-label">Sound Identity</span><span class="si-head-link" onclick="showSoundIdentityDetail()">Full breakdown ›</span></div>'
+    + '<div class="si-bar-labels"><span>Authentic</span><span>Commercial</span></div>'
+    + '<div class="si-bar-wrap"><div class="si-bar-dot" style="left:calc(' + pct + '% - 7px)"></div></div>'
+    + '<div class="si-bar-val">' + label + '</div>'
+    + '<div class="si-nudges">' + nudgesHTML + '</div>';
+}
+
+function showSoundIdentityDetail() {
+  var axis = GAME.commercialAxis != null ? GAME.commercialAxis : 50;
+  var label = typeof getAxisLabel === 'function' ? getAxisLabel() : 'Balanced';
+  var pct = axis;
+  var descriptions = {
+    'Deeply Authentic':    'Your music is built entirely from personal truth. Undertone loves you. Superfans are fiercely loyal.',
+    'Authentic Leaning':   'Strong creative identity. Undertone actively covers you. Superfan ratio is high.',
+    'Slightly Authentic':  'Mostly genuine. A healthy balance with a creative lean.',
+    'Balanced':            'Sitting in the middle. Creative and commercially aware. Watch which way you drift.',
+    'Slightly Commercial': 'Your music leans toward the market. Still creative — just commercially aware.',
+    'Commercial Leaning':  'Undertone is pulling back. Fandom is shifting toward casuals. Chart drops hit harder.',
+    'Very Commercial':     'Undertone has stopped covering you. Fanbase is mostly casuals. High chart sensitivity.',
+  };
+  var desc = descriptions[label] || 'Your artistic direction is forming.';
+  var undertoneStatus = axis > 80 ? 'Stopped covering you' : axis > 65 ? 'Pulling back — covering less often' : 'Active — covering you';
+  var undertoneColor = axis > 65 ? 'var(--spark,#f59e0b)' : '#4cc98a';
+  var fanMix = axis >= 65 ? 'Mostly casuals' : axis <= 35 ? 'Mostly superfans' : 'Mixed';
+  var fanColor = axis >= 65 ? 'var(--spark,#f59e0b)' : '#4cc98a';
+  var chartSens = axis >= 65 ? 'Higher — drops hit harder' : axis <= 35 ? 'Lower — more resilient' : 'Normal';
+  var warningText = axis >= 65 ? 'Undertone fully stops at: Very Commercial' : 'Undertone pulls back at: Commercial Leaning';
+  var nudgeIcons = {
+    billboard:'🏙️', targeted_ads:'📢', quick_release:'⚡',
+    anr_song:'🎧', brand_deal:'💼', influencer_macro:'🌟',
+    grassroots:'🌿', teaser:'📱', street_mural:'🎨',
+    self_written:'🎵', podcast:'🎙️', passion_project:'✨',
+  };
+  var history = (GAME.axisHistory || []).slice(0, 8);
+  var movesHTML = history.length > 0
+    ? history.map(function(h) {
+        var ico = nudgeIcons[h.source] || (h.direction === 'commercial' ? '📈' : '🌿');
+        var lbl = h.label || (h.direction === 'commercial' ? 'Commercial move' : 'Authentic move');
+        var val = (h.direction === 'commercial' ? '+' + h.amount + ' commercial' : '+' + h.amount + ' authentic');
+        var col = h.direction === 'commercial' ? 'var(--spark,#f59e0b)' : '#4cc98a';
+        return '<div class="si-ov-move"><span class="si-ov-move-ico">' + ico + '</span><span class="si-ov-move-txt">' + lbl + '</span><span class="si-ov-move-val" style="color:' + col + '">' + val + '</span></div>';
+      }).join('')
+    : '<div style="font-size:12px;color:var(--mut);padding:8px 0">No moves recorded yet.</div>';
+  var existing = document.getElementById('siDetailOverlay');
+  if (existing) existing.remove();
+  var html = '<div class="si-overlay" id="siDetailOverlay">'
+    + '<div class="si-ov-head"><button class="si-ov-back" onclick="document.getElementById(\'siDetailOverlay\').remove()">← Back</button><span class="si-ov-title">Sound Identity</span></div>'
+    + '<div class="si-ov-body">'
+    + '<div class="si-ov-card"><div class="si-ov-card-title">Your direction</div>'
+    + '<div class="si-bar-labels"><span>Authentic</span><span>Commercial</span></div>'
+    + '<div class="si-ov-bar-wrap"><div class="si-ov-bar-dot" style="left:calc(' + pct + '% - 9px)"></div></div>'
+    + '<div class="si-ov-bar-val">' + label + '</div><div class="si-ov-bar-desc">' + desc + '</div></div>'
+    + '<div class="si-ov-card"><div class="si-ov-card-title">What this means right now</div>'
+    + '<div class="si-ov-effect"><span class="si-ov-eff-ico">📰</span><span class="si-ov-eff-txt">Undertone coverage</span><span class="si-ov-eff-val" style="color:' + undertoneColor + '">' + undertoneStatus + '</span></div>'
+    + '<div class="si-ov-effect"><span class="si-ov-eff-ico">👥</span><span class="si-ov-eff-txt">Fan mix</span><span class="si-ov-eff-val" style="color:' + fanColor + '">' + fanMix + '</span></div>'
+    + '<div class="si-ov-effect"><span class="si-ov-eff-ico">📉</span><span class="si-ov-eff-txt">Chart drop sensitivity</span><span class="si-ov-eff-val" style="color:var(--mut)">' + chartSens + '</span></div>'
+    + '<div class="si-ov-effect"><span class="si-ov-eff-ico">⚠️</span><span class="si-ov-eff-txt">' + warningText + '</span><span class="si-ov-eff-val" style="color:var(--mut)"></span></div>'
+    + '</div>'
+    + '<div class="si-ov-card"><div class="si-ov-card-title">Recent moves</div>' + movesHTML + '</div>'
+    + '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
 }
 
 // Called from the interview mini-game for each answer the player picks.
@@ -6317,6 +6447,8 @@ function updateMusicStats(){
   }
   // Check achievements on every stats update (throttled)
   if(typeof _throttledAchCheck === 'function') _throttledAchCheck();
+  // Refresh Sound Identity section if visible
+  if(typeof updateSoundIdentitySection === 'function') updateSoundIdentitySection();
   
   // Update Songs tab stats
   if(document.getElementById('statTotalSongs')){
@@ -9123,9 +9255,9 @@ window._startPromo = function(key, songId) {
 
   // Axis nudges
   if (typeof nudgeAxis === 'function') {
-    if (key === 'grassroots' || key === 'street_af') nudgeAxis('authentic', 3);
-    else if (key === 'teaser') nudgeAxis('authentic', 2);
-    else if (key && key.includes('billboard')) nudgeAxis('commercial', 2);
+    if (key === 'grassroots' || key === 'street_af') nudgeAxis('authentic', 3, 'grassroots', 'Grassroots campaign');
+    else if (key === 'teaser') nudgeAxis('authentic', 2, 'teaser', 'Teaser content');
+    else if (key && key.includes('billboard')) nudgeAxis('commercial', 2, 'billboard', 'Billboard campaign');
   }
 
   if (typeof saveGame === 'function') saveGame();
@@ -9425,13 +9557,13 @@ function launchPromoCampaign(songId){
     launchedPromos.push(promo.name);
 
     // Axis nudges based on promo type
-    if (promoKey === 'grassroots') nudgeAxis('authentic', 3);
-    else if (promoKey === 'teaser') nudgeAxis('authentic', 2);
-    else if (promoKey === 'street_mural' || promoKey === 'mural') nudgeAxis('authentic', 3);
-    else if (promoKey === 'podcast' || promoKey === 'podcast_circuit') nudgeAxis('authentic', 2);
-    else if (promoKey.startsWith('billboard_')) nudgeAxis('commercial', 2);
+    if (promoKey === 'grassroots') nudgeAxis('authentic', 3, 'grassroots', 'Grassroots campaign');
+    else if (promoKey === 'teaser') nudgeAxis('authentic', 2, 'teaser', 'Teaser content');
+    else if (promoKey === 'street_mural' || promoKey === 'mural') nudgeAxis('authentic', 3, 'street_mural', 'Street mural');
+    else if (promoKey === 'podcast' || promoKey === 'podcast_circuit') nudgeAxis('authentic', 2, 'podcast', 'Podcast appearance');
+    else if (promoKey.startsWith('billboard_')) nudgeAxis('commercial', 2, 'billboard', 'Billboard campaign');
     // Heavy Targeted Ads: any promo with budget >= $10K/wk
-    else if (budget >= 10000 && (promoKey.includes('social') || promoKey.includes('ads') || promoKey.includes('targeted'))) nudgeAxis('commercial', 2);
+    else if (budget >= 10000 && (promoKey.includes('social') || promoKey.includes('ads') || promoKey.includes('targeted'))) nudgeAxis('commercial', 2, 'targeted_ads', 'Targeted ads');
     // TODO: nudgeAxis('commercial', 4) when brand deal / endorsement acceptance is implemented
   });
 
@@ -15288,7 +15420,7 @@ function switchMusicTab(tab){
   // Refresh songs list when opening Songs tab
   if(tab === 'songs') renderSongs();
   // Update stats when opening Overview tab
-  if(tab === 'overview') updateMusicStats();
+  if(tab === 'overview'){ updateMusicStats(); updateSoundIdentitySection(); }
   
   // Refresh lists when opening Live tab
   if(tab === 'live'){
@@ -20480,7 +20612,7 @@ function finishSong(topic, subgenre, title, minutes, seconds){
   GAME.songs.push(song);
 
   // Axis: writing your own song = authentic nudge (A&R sourcing would add commercial nudge when built)
-  nudgeAxis('authentic', 3);
+  nudgeAxis('authentic', 3, 'self_written', 'Self-written song');
 
   closeMenu();
   updateStats();
@@ -21044,7 +21176,7 @@ function checkSongProgress(){
     if(pct>=1){
       if(song.inProgressType==='writing'){song.written=true;song.writtenWeek=GAME.week;song.writtenDay=((GAME.day-1)%7)+1||1;song.writtenYear=GAME.year||2025;song.inProgress=false;song.inProgressType=null;song.progressStartTime=null;song.progressDuration=null;changed=true;showToast('"'+song.title+'" is written!','green');
         // Axis nudge: self-written song (no A&R/label source) = authentic push
-        if(song.source !== 'anr' && song.source !== 'label') nudgeAxis('authentic', 3);
+        if(song.source !== 'anr' && song.source !== 'label') nudgeAxis('authentic', 3, 'self_written', 'Self-written song');
         // TODO: nudgeAxis('commercial', 5) when A&R song source is implemented (song.source === 'anr')
         // TODO: nudgeAxis('authentic', 8) when passion project flag is implemented (song.passionProject === true)
         // Sync written state to collab partner
@@ -32653,7 +32785,7 @@ function updatePromo(region,budgetIndex){
 function skipPromos(songId){
   GAME.pendingPromos={};
   // Quick release (no promo) = commercial nudge
-  nudgeAxis('commercial', 2);
+  nudgeAxis('commercial', 2, 'quick_release', 'Quick release');
   closeMenu();
   releaseSingle(songId);
 }
