@@ -128,7 +128,7 @@ input[type=range].age-range{-webkit-appearance:none;width:100%;height:4px;backgr
 .si-nudge-comm{font-size:11px;font-weight:700;color:var(--spark)}
 .si-nudge-auth{font-size:11px;font-weight:700;color:var(--green,#4cc98a)}
 /* Sound Identity detail overlay */
-.si-overlay{position:fixed;inset:0;z-index:200000;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+.si-overlay{position:fixed;inset:0;z-index:200000;background:var(--bg,#fff);display:flex;flex-direction:column;overflow:hidden;opacity:1}
 .si-ov-head{background:var(--surf);padding:12px 16px;border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:10px;flex:none}
 .si-ov-back{font-size:12px;font-weight:800;color:var(--acc);background:var(--acc-bg,rgba(232,180,76,.1));border:1.5px solid var(--acc);border-radius:20px;padding:5px 12px;cursor:pointer;touch-action:manipulation}
 .si-ov-title{font-size:15px;font-weight:800;color:var(--txt)}
@@ -1033,20 +1033,20 @@ function emergencySkip() {
   </div>
   <div class="ms-content">
     <div class="ms-tab-content active" id="ms-overview">
-      <div class="ms-stats-grid">
-        <div class="ms-stat-card"><div class="ms-stat-icon">🎵</div><div class="ms-stat-value" id="statSongs">0</div><div class="ms-stat-label">Songs</div></div>
-        <div class="ms-stat-card"><div class="ms-stat-icon">💿</div><div class="ms-stat-value" id="statReleases">0</div><div class="ms-stat-label">Releases</div></div>
-        <div class="ms-stat-card"><div class="ms-stat-icon">▶️</div><div class="ms-stat-value" id="statStreams">0</div><div class="ms-stat-label">Streams</div></div>
-        <div class="ms-stat-card" onclick="showFansDetail()" style="cursor:pointer;transition:all 0.2s" title="Click to view fan analytics" onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 4px 12px rgba(102,126,234,0.4)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow=''"><div class="ms-stat-icon">👥</div><div class="ms-stat-value" id="statFans">0</div><div class="ms-stat-label">Fans</div></div>
-        <div class="ms-stat-card" style="grid-column:span 2"><div class="ms-stat-icon">⚡</div><div class="ms-stat-value" id="statHype">0</div><div class="ms-stat-label">Hype</div></div>
-      </div>
-      <div class="si-section" id="si-overview-section">
+      <div class="si-section" id="si-overview-section" style="border-top:none;border-bottom:1px solid var(--bord);margin-bottom:0">
         <!-- populated by updateSoundIdentitySection() -->
         <div class="si-head"><span class="si-head-label">Sound Identity</span><span class="si-head-link" onclick="showSoundIdentityDetail()">Full breakdown ›</span></div>
         <div class="si-bar-labels"><span>Authentic</span><span>Commercial</span></div>
         <div class="si-bar-wrap"><div class="si-bar-dot" style="left:calc(50% - 7px)"></div></div>
         <div class="si-bar-val">Balanced</div>
         <div class="si-nudges"><div style="font-size:11.5px;color:var(--mut)">No moves recorded yet.</div></div>
+      </div>
+      <div class="ms-stats-grid">
+        <div class="ms-stat-card"><div class="ms-stat-icon">🎵</div><div class="ms-stat-value" id="statSongs">0</div><div class="ms-stat-label">Songs</div></div>
+        <div class="ms-stat-card"><div class="ms-stat-icon">💿</div><div class="ms-stat-value" id="statReleases">0</div><div class="ms-stat-label">Releases</div></div>
+        <div class="ms-stat-card"><div class="ms-stat-icon">▶️</div><div class="ms-stat-value" id="statStreams">0</div><div class="ms-stat-label">Streams</div></div>
+        <div class="ms-stat-card" onclick="showFansDetail()" style="cursor:pointer;transition:all 0.2s" title="Click to view fan analytics" onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 4px 12px rgba(102,126,234,0.4)'" onmouseout="this.style.transform='scale(1)';this.style.boxShadow=''"><div class="ms-stat-icon">👥</div><div class="ms-stat-value" id="statFans">0</div><div class="ms-stat-label">Fans</div></div>
+        <div class="ms-stat-card" style="grid-column:span 2"><div class="ms-stat-icon">⚡</div><div class="ms-stat-value" id="statHype">0</div><div class="ms-stat-label">Hype</div></div>
       </div>
     </div>
     <div class="ms-tab-content" id="ms-songs">
@@ -4865,7 +4865,8 @@ function showSoundIdentityDetail() {
     : '<div style="font-size:12px;color:var(--mut);padding:8px 0">No moves recorded yet.</div>';
   var existing = document.getElementById('siDetailOverlay');
   if (existing) existing.remove();
-  var html = '<div class="si-overlay" id="siDetailOverlay">'
+  var _bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#fff';
+  var html = '<div class="si-overlay" id="siDetailOverlay" style="background:'+_bg+'">'
     + '<div class="si-ov-head"><button class="si-ov-back" onclick="document.getElementById(\'siDetailOverlay\').remove()">← Back</button><span class="si-ov-title">Sound Identity</span></div>'
     + '<div class="si-ov-body">'
     + '<div class="si-ov-card"><div class="si-ov-card-title">Your direction</div>'
