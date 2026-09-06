@@ -31871,6 +31871,8 @@ function setReleaseType(songId,type){
 var _RF = {}; // release-flow state (temp, not saved)
 
 function _rfClose(){
+  // Remove via _insertOverlay's data-app-overlay wrapper
+  document.querySelectorAll('body > div[data-app-overlay]').forEach(function(el){ el.remove(); });
   var el=document.getElementById('releaseFlowOverlay');
   if(el) el.remove();
 }
@@ -31942,7 +31944,7 @@ function _rfRenderScreen1(song){
     return '<button onclick="window._rfPickGrad('+i+')" style="font-size:11px;font-weight:700;border-radius:99px;padding:5px 13px;border:1px solid '+(sel?'var(--acc)':'var(--bord)')+';background:'+(sel?'var(--acc-bg)':'var(--card)')+';color:'+(sel?'var(--acc)':'var(--mut)')+';cursor:pointer">'+g.label+'</button>';
   }).join('');
 
-  var html = '<div id="releaseFlowOverlay" style="position:fixed;inset:0;z-index:200000;background:var(--bg,#0d0f14);display:flex;flex-direction:column;overflow:hidden">'
+  var html = '<div id="releaseFlowOverlay" style="display:flex;flex-direction:column;min-height:100%;overflow:hidden">'
     + _rfSteps(1)
     + _rfTopbar('Cover Art','_rfClose()','window._rfGoS2()','Skip →')
     + '<div style="flex:1;overflow-y:auto;padding:0 24px 20px;display:flex;flex-direction:column;align-items:center">'
@@ -31968,9 +31970,7 @@ function _rfRenderScreen1(song){
     + '</div>'
     + '</div>';
 
-  var existing = document.getElementById('releaseFlowOverlay');
-  if(existing) existing.remove();
-  document.body.insertAdjacentHTML('beforeend', html);
+  _insertOverlay(html);
 }
 
 window._rfPickGrad = function(idx){
@@ -32006,7 +32006,7 @@ function _rfRenderScreen2(){
       +'</div>';
   }).join('');
 
-  var html = '<div id="releaseFlowOverlay" style="position:fixed;inset:0;z-index:200000;background:var(--bg,#0d0f14);display:flex;flex-direction:column;overflow:hidden">'
+  var html = '<div id="releaseFlowOverlay" style="display:flex;flex-direction:column;min-height:100%;overflow:hidden">'
     + _rfSteps(2)
     + _rfTopbar('Release Concept','_rfRenderScreen1(GAME.songs.find(function(s){return s.id===_RF.songId}))','window._rfGoS3()','Skip →')
     + '<div style="flex:1;overflow-y:auto;padding:0 16px 20px;display:flex;flex-direction:column;gap:14px">'
@@ -32039,9 +32039,7 @@ function _rfRenderScreen2(){
     + '</div>'
     + '</div>';
 
-  var existing = document.getElementById('releaseFlowOverlay');
-  if(existing) existing.remove();
-  document.body.insertAdjacentHTML('beforeend', html);
+  _insertOverlay(html);
 }
 
 window._rfConceptSlot = function(idx){
@@ -32112,13 +32110,8 @@ function _rfRenderScreen3(){
     return '<div onclick="window._rfSelDay(\''+d+'\')" style="font-size:12px;font-weight:700;border-radius:8px;padding:8px 12px;background:'+(sel?'var(--acc-bg)':'var(--surf)')+';border:1px solid '+(sel?'var(--acc)':'var(--bord)')+';color:'+(sel?'var(--acc)':'var(--mut)')+';cursor:pointer">'+d+'</div>';
   }).join('');
 
-  var html = '<div id="releaseFlowOverlay" style="position:fixed;inset:0;z-index:200000;background:var(--bg,#0d0f14);display:flex;flex-direction:column;overflow:hidden">'
-    + '<div style="flex:none"><div style="display:flex;align-items:center;padding:14px 20px 10px;gap:0;flex:none">'+_rfSteps(3).replace('<div id="releaseFlowOverlay"','<x')+'</div></div>'
-    // Rebuild steps inline for screen 3
-    +'<div style="position:fixed;inset:0;z-index:200000;background:var(--bg,#0d0f14);display:flex;flex-direction:column;overflow:hidden" id="releaseFlowOverlay">';
-
-  // Rebuild cleanly — drop the partial attempt above
-  html = '<div id="releaseFlowOverlay" style="position:fixed;inset:0;z-index:200000;background:var(--bg,#0d0f14);display:flex;flex-direction:column;overflow:hidden">'
+  // Rebuild cleanly
+  var html = '<div id="releaseFlowOverlay" style="display:flex;flex-direction:column;min-height:100%;overflow:hidden">'
     + _rfSteps(3)
     // Hero
     + '<div style="flex:none;height:260px;position:relative;overflow:hidden">'
@@ -32164,9 +32157,7 @@ function _rfRenderScreen3(){
     + '</div>'
     + '</div>';
 
-  var existing = document.getElementById('releaseFlowOverlay');
-  if(existing) existing.remove();
-  document.body.insertAdjacentHTML('beforeend', html);
+  _insertOverlay(html);
 }
 
 window._rfToggleSched = function(){
