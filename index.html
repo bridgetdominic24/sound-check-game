@@ -31865,86 +31865,367 @@ function setReleaseType(songId,type){
   showCoverSelection(songId);
 }
 
-function showCoverSelection(songId){
-  GAME.pendingReleaseSong=songId;
-  const song=GAME.songs.find(s=>s.id===songId);
-  const type=GAME.pendingReleaseType||song.releaseType||'single';
-  const songCount=GAME.pendingReleaseSongs?GAME.pendingReleaseSongs.length:1;
-  
-  const covers=['💿','🎵','🎤','🎧','🎸','🎹','🥁','🎺','🎻','🌟','💎','🔥','💙','💜','🖤','🤍','❤️','🌈','🌙','⭐','✨','🎬','📀','🎼'];
-  
-  const typeLabel={single:'Single',album:'Album',ep:'EP',deluxe:'Deluxe'}[type]||'Single';
-  
-  let html=`
-    <div style="text-align:center;margin-bottom:24px">
-      <div style="font-size:20px;font-weight:800;font-family:var(--fb);margin-bottom:8px">${GAME.pendingAlbumName||song.title}</div>
-      <div style="font-size:13px;color:var(--mut)">${typeLabel} · ${songCount} Song${songCount>1?'s':''}</div>
-    </div>
-    
-    ${song.coverImage?`
-    <div style="text-align:center;margin-bottom:24px">
-      <img src="${song.coverImage}" style="width:150px;height:150px;object-fit:cover;border-radius:12px;border:2px solid var(--acc)">
-    </div>
-    `:''}
-    
-    <div style="font-size:14px;font-weight:700;margin-bottom:12px;font-family:var(--fb)">Album Cover</div>
-    
-    <button class="ms-btn" onclick="uploadCustomCover()" style="margin-bottom:16px">📷 Upload from Gallery</button>
-    
-    <div style="font-size:13px;color:var(--mut);margin-bottom:12px;text-align:center">or choose emoji:</div>
-    
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px">`;
-  
-  covers.forEach(cover=>{
-    html+=`<div onclick="selectCover('${cover}')" style="aspect-ratio:1;background:var(--surf);border:2px solid ${!song.coverImage && song.cover===cover?'var(--acc)':'var(--bord)'};border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer">${cover}</div>`;
-  });
-  
-  html+=`</div>
-    <button class="ms-btn" onclick="confirmRelease()">Continue to Promotions →</button>
-    <div style="text-align:center;margin-top:12px">
-      <button onclick="closeMenu()" style="background:none;border:none;color:var(--mut);font-family:var(--fb);font-size:13px;padding:12px;cursor:pointer">Cancel</button>
-    </div>
-  `;
-  
-  openMenu('',html);
+// ═══════════════════════════════════════════════════════════════
+// NEW 3-SCREEN RELEASE FLOW  (Cover Art → Concept → Review)
+// Blueprint: docs/release_flow.html
+// ═══════════════════════════════════════════════════════════════
+
+var _RF = {}; // release-flow state (temp, not saved)
+
+function _rfClose(){
+  var el=document.getElementById('releaseFlowOverlay');
+  if(el) el.remove();
 }
 
+function _rfStepDot(n, active, done){
+  var bg = done ? 'var(--green)' : active ? 'var(--acc)' : 'var(--surf)';
+  var col = done ? '#071a0e' : active ? 'var(--acc-txt,#0d0f14)' : 'var(--mut)';
+  var border = (!done && !active) ? ';border:1px solid var(--bord)' : '';
+  var shadow = active ? ';box-shadow:0 0 12px rgba(232,180,76,.4)' : '';
+  var txt = done ? '✓' : n;
+  return '<div style="width:28px;height:28px;border-radius:50%;background:'+bg+';color:'+col+border+shadow+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:none">'+txt+'</div>';
+}
+
+function _rfSteps(active){
+  var labels=['Cover','Concept','Review'];
+  var dots='';
+  labels.forEach(function(lbl,i){
+    var n=i+1;
+    var isDone = n < active;
+    var isActive = n === active;
+    dots += '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">'
+      + _rfStepDot(n, isActive, isDone)
+      + '<div style="font-size:8.5px;font-weight:800;letter-spacing:.5px;color:var(--mut);text-transform:uppercase">'+lbl+'</div>'
+      + '</div>';
+    if(i<2) dots += '<div style="flex:1;height:2px;background:'+(isDone?'var(--green)':'var(--bord)')+';margin:0 4px;border-radius:1px;margin-bottom:14px"></div>';
+  });
+  return '<div style="display:flex;align-items:center;padding:16px 20px;flex:none">'+dots+'</div>';
+}
+
+function _rfTopbar(title, onBack, onSkip, skipLabel){
+  return '<div style="display:flex;align-items:center;padding:0 16px 14px;gap:12px;flex:none">'
+    +'<button onclick="'+onBack+'" style="width:34px;height:34px;border-radius:50%;background:var(--surf);border:1px solid var(--bord);color:var(--txt);font-size:16px;display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer">‹</button>'
+    +'<div style="font-size:16px;font-weight:800;flex:1;color:var(--txt)">'+title+'</div>'
+    +(onSkip?'<button onclick="'+onSkip+'" style="font-size:12px;font-weight:700;color:var(--mut);background:none;border:none;padding:6px 0;cursor:pointer">'+(skipLabel||'Skip →')+'</button>':'')
+    +'</div>';
+}
+
+function showCoverSelection(songId){
+  GAME.pendingReleaseSong = songId;
+  _RF.songId = songId;
+  var song = GAME.songs.find(function(s){return s.id===songId;});
+  if(!song) return;
+  _rfRenderScreen1(song);
+}
+
+function _rfRenderScreen1(song){
+  var themeGrads = [
+    {label:'Night Blue',  c1:'#1e2a3e', c2:'#0a1628'},
+    {label:'Deep Purple', c1:'#1e1530', c2:'#2a1e4a'},
+    {label:'Forest',      c1:'#1a3a2e', c2:'#0e2a1a'},
+    {label:'Amber',       c1:'#3a1e0e', c2:'#2a1208'},
+    {label:'Crimson',     c1:'#2a0e10', c2:'#1a0608'},
+  ];
+  if(!_RF.gradIdx && _RF.gradIdx!==0) _RF.gradIdx = 1; // default Deep Purple
+
+  var selGrad = themeGrads[_RF.gradIdx];
+  var hasCoverImg = !!(song.coverImage);
+
+  var coverInner = hasCoverImg
+    ? '<img src="'+song.coverImage+'" style="width:100%;height:100%;object-fit:cover">'
+    : '<div style="width:100%;height:100%;background:linear-gradient(145deg,'+selGrad.c1+','+selGrad.c2+',#0a0a10);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;position:relative">'
+      +'<div style="width:110px;height:110px;border-radius:50%;background:radial-gradient(circle at 50% 50%,#d4d4d4 0%,#c0c0c0 18%,transparent 18%),conic-gradient(rgba(169,125,232,.5) 0deg,rgba(90,157,243,.4) 60deg,rgba(76,201,138,.3) 120deg,rgba(232,180,76,.5) 180deg,rgba(232,138,173,.4) 240deg,rgba(169,125,232,.5) 300deg);border:1px solid rgba(255,255,255,.1);position:relative;flex:none">'
+      +'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;background:#1e1530;border:2px solid rgba(255,255,255,.2)"></div></div>'
+      +'<div style="position:absolute;bottom:14px;left:0;right:0;text-align:center;font-family:Georgia,serif;font-size:13px;color:rgba(255,255,255,.7);padding:0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+song.title+'</div>'
+      +'</div>';
+
+  var chipBtns = themeGrads.map(function(g,i){
+    var sel = i===_RF.gradIdx && !hasCoverImg;
+    return '<button onclick="window._rfPickGrad('+i+')" style="font-size:11px;font-weight:700;border-radius:99px;padding:5px 13px;border:1px solid '+(sel?'var(--acc)':'var(--bord)')+';background:'+(sel?'var(--acc-bg)':'var(--card)')+';color:'+(sel?'var(--acc)':'var(--mut)')+';cursor:pointer">'+g.label+'</button>';
+  }).join('');
+
+  var html = '<div id="releaseFlowOverlay" style="position:fixed;inset:0;z-index:200000;background:var(--bg,#0d0f14);display:flex;flex-direction:column;overflow:hidden">'
+    + _rfSteps(1)
+    + _rfTopbar('Cover Art','_rfClose()','window._rfGoS2()','Skip →')
+    + '<div style="flex:1;overflow-y:auto;padding:0 24px 20px;display:flex;flex-direction:column;align-items:center">'
+    // Cover square
+    + '<div style="width:220px;height:220px;border-radius:20px;overflow:hidden;flex:none;margin:8px auto 20px;box-shadow:0 8px 40px rgba(0,0,0,.5)">'+coverInner+'</div>'
+    // Replace button when image uploaded
+    + (hasCoverImg?'<button onclick="document.getElementById(\'rfCoverInput\').click()" style="background:var(--surf);border:1px solid var(--bord);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;color:var(--txt);cursor:pointer;margin-bottom:16px">🖼 Replace</button>':'')
+    // Upload zone (hidden when image present)
+    + (!hasCoverImg?'<div onclick="document.getElementById(\'rfCoverInput\').click()" style="width:100%;background:var(--surf);border:1.5px dashed rgba(169,125,232,.4);border-radius:14px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;margin-bottom:16px">'
+      +'<div style="font-size:32px">📷</div><div style="font-size:14px;font-weight:700;color:var(--txt)">Upload Cover Art</div><div style="font-size:11.5px;color:var(--mut)">JPG or PNG</div></div>':'')
+    + '<input type="file" id="rfCoverInput" accept="image/*" style="display:none" onchange="window._rfHandleCoverUpload(event)">'
+    // Gradient chips
+    + '<div style="width:100%;margin-top:4px">'
+    + '<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:8px;text-align:center">Or apply a default colour theme</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:6px">'+chipBtns+'</div>'
+    + '<div style="font-size:10.5px;color:var(--mut);text-align:center">Default shows when no image is uploaded</div>'
+    + '</div>'
+    + '</div>'
+    // Footer
+    + '<div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;flex:none;background:var(--bg);border-top:1px solid var(--bord)">'
+    + '<button onclick="window._rfGoS2()" style="width:100%;background:var(--acc);color:var(--acc-txt,#0d0f14);border:none;border-radius:14px;font-size:15px;font-weight:800;padding:15px;cursor:pointer">Continue → Concept</button>'
+    + '<button onclick="window._rfGoS3()" style="background:none;border:none;color:var(--mut);font-size:13px;font-weight:700;padding:10px;width:100%;text-align:center;cursor:pointer">Skip concept, go to review</button>'
+    + '</div>'
+    + '</div>';
+
+  var existing = document.getElementById('releaseFlowOverlay');
+  if(existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+window._rfPickGrad = function(idx){
+  _RF.gradIdx = idx;
+  var song = GAME.songs.find(function(s){return s.id===_RF.songId;});
+  if(song){ song.coverImage=null; _rfRenderScreen1(song); }
+};
+
+window._rfHandleCoverUpload = function(e){
+  var file = e.target.files[0]; if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    var song = GAME.songs.find(function(s){return s.id===_RF.songId;});
+    if(song){ song.coverImage = ev.target.result; song.cover='💿'; }
+    _rfRenderScreen1(song);
+  };
+  reader.readAsDataURL(file);
+};
+
+window._rfGoS2 = function(){ _rfRenderScreen2(); };
+window._rfGoS3 = function(){ _rfRenderScreen3(); };
+
+function _rfRenderScreen2(){
+  var song = GAME.songs.find(function(s){return s.id===_RF.songId;});
+  if(!song) return;
+
+  var images = song.conceptImages || (song.conceptImage ? [song.conceptImage] : []);
+  var slots = [0,1,2].map(function(i){
+    var img = images[i];
+    var filled = !!img;
+    return '<div onclick="window._rfConceptSlot('+i+')" style="flex:1;aspect-ratio:1;border-radius:12px;background:var(--surf);border:1.5px dashed '+(filled?'rgba(76,201,138,.4)':'rgba(255,255,255,.12)')+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;overflow:hidden;position:relative">'
+      +(filled?'<img src="'+img+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"><div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:9px;font-weight:800;color:rgba(255,255,255,.8);background:rgba(0,0,0,.4);padding:2px">✓ Added</div>':'<span style="font-size:22px">📸</span><span style="font-size:9px;font-weight:800;letter-spacing:.5px;color:var(--mut);text-transform:uppercase">Photo '+(i+1)+'</span>')
+      +'</div>';
+  }).join('');
+
+  var html = '<div id="releaseFlowOverlay" style="position:fixed;inset:0;z-index:200000;background:var(--bg,#0d0f14);display:flex;flex-direction:column;overflow:hidden">'
+    + _rfSteps(2)
+    + _rfTopbar('Release Concept','_rfRenderScreen1(GAME.songs.find(function(s){return s.id===_RF.songId}))','window._rfGoS3()','Skip →')
+    + '<div style="flex:1;overflow-y:auto;padding:0 16px 20px;display:flex;flex-direction:column;gap:14px">'
+    // Hero card
+    + '<div style="background:linear-gradient(135deg,var(--acc-bg),var(--card));border:1px solid rgba(169,125,232,.25);border-radius:16px;padding:16px;display:flex;gap:14px;align-items:flex-start">'
+    + '<div style="font-size:28px;flex:none">🎨</div>'
+    + '<div><div style="font-size:14px;font-weight:800;color:var(--acc);margin-bottom:4px">Fan Reactions · preview</div>'
+    + '<div style="font-size:11.5px;color:var(--mut);line-height:1.55">Upload up to 3 photos of your aesthetic, vibe, or shoot. We read the vibe and seed your fandom with reactions when the music drops.</div></div>'
+    + '</div>'
+    // Photo slots
+    + '<div>'
+    + '<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:10px">Upload concept photos (up to 3)</div>'
+    + '<div style="display:flex;gap:8px">'+slots+'</div>'
+    + '<input type="file" id="rfConceptInput" accept="image/*" multiple style="display:none" onchange="window._rfHandleConceptUpload(event)">'
+    + '</div>'
+    // Static fan reactions preview
+    + '<div>'
+    + '<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:10px">What fans will post when it drops</div>'
+    + '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;overflow:hidden">'
+    + '<div style="padding:10px 14px;background:var(--surf);border-bottom:1px solid var(--bord);font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;display:flex;align-items:center;gap:6px">✦ Fan reactions · preview</div>'
+    + '<div style="padding:10px 14px;border-bottom:1px solid var(--bord);font-size:12px;color:var(--txt);display:flex;gap:10px;align-items:flex-start;line-height:1.5"><div style="font-size:16px;flex:none;margin-top:1px">🌙</div><div>"the whole aesthetic is giving midnight city 🌆 this era is it"</div></div>'
+    + '<div style="padding:10px 14px;border-bottom:1px solid var(--bord);font-size:12px;color:var(--txt);display:flex;gap:10px;align-items:flex-start;line-height:1.5"><div style="font-size:16px;flex:none;margin-top:1px">✨</div><div>"okay the visuals alone... I need this song NOW 👀"</div></div>'
+    + '<div style="padding:10px 14px;font-size:12px;color:var(--txt);display:flex;gap:10px;align-items:flex-start;line-height:1.5"><div style="font-size:16px;flex:none;margin-top:1px">🔥</div><div>"STREAM MISSION activated the second it drops"</div></div>'
+    + '</div></div>'
+    + '</div>'
+    // Footer
+    + '<div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;flex:none;background:var(--bg);border-top:1px solid var(--bord)">'
+    + '<button onclick="window._rfGoS3()" style="width:100%;background:var(--acc);color:var(--acc-txt,#0d0f14);border:none;border-radius:14px;font-size:15px;font-weight:800;padding:15px;cursor:pointer">Continue → Review</button>'
+    + '<button onclick="window._rfGoS3()" style="background:none;border:none;color:var(--mut);font-size:13px;font-weight:700;padding:10px;width:100%;text-align:center;cursor:pointer">Skip — release without concept</button>'
+    + '</div>'
+    + '</div>';
+
+  var existing = document.getElementById('releaseFlowOverlay');
+  if(existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+window._rfConceptSlot = function(idx){
+  document.getElementById('rfConceptInput').click();
+  window._rfConceptSlotIdx = idx;
+};
+
+window._rfHandleConceptUpload = function(e){
+  var files = Array.from(e.target.files).slice(0,3);
+  if(!files.length) return;
+  var song = GAME.songs.find(function(s){return s.id===_RF.songId;});
+  if(!song) return;
+  if(!song.conceptImages) song.conceptImages=[];
+  var pending = files.length;
+  files.forEach(function(file,fi){
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var slot = (window._rfConceptSlotIdx||0) + fi;
+      if(slot>2) slot=2;
+      song.conceptImages[slot] = ev.target.result;
+      pending--;
+      if(pending===0){
+        if(files.length>3) showToast('Only the first 3 photos were used.','amber');
+        _rfRenderScreen2();
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+function _rfRenderScreen3(){
+  var song = GAME.songs.find(function(s){return s.id===_RF.songId;});
+  if(!song) return;
+  var songIds = (GAME.pendingReleaseSongs && GAME.pendingReleaseSongs.length>0) ? GAME.pendingReleaseSongs : [_RF.songId];
+  var type = GAME.pendingReleaseType||'single';
+  var typeLabel = {single:'SINGLE',ep:'EP',album:'ALBUM',deluxe:'DELUXE'}[type]||'SINGLE';
+  var albumName = GAME.pendingAlbumName||song.title;
+  var hasConcept = !!(song.conceptImages && song.conceptImages.length>0) || !!song.conceptImage;
+
+  // Hero background
+  var heroBg = song.coverImage
+    ? 'url('+song.coverImage+') center/cover no-repeat'
+    : 'linear-gradient(145deg,var(--acc-bg),#2a1e4a,var(--bg))';
+
+  // Cover in hero
+  var heroInner = song.coverImage
+    ? '<img src="'+song.coverImage+'" style="width:100%;height:100%;object-fit:cover">'
+    : '<div style="width:100%;height:100%;background:linear-gradient(145deg,var(--acc-bg),var(--bg));display:flex;align-items:center;justify-content:center"><div style="width:80px;height:80px;border-radius:50%;background:conic-gradient(rgba(169,125,232,.5) 0deg,rgba(90,157,243,.4) 60deg,rgba(76,201,138,.3) 120deg,rgba(232,180,76,.5) 180deg,rgba(169,125,232,.5) 360deg);position:relative"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:15px;height:15px;border-radius:50%;background:var(--bg)"></div></div></div>';
+
+  // Track list
+  var trackList = songIds.map(function(id,i){
+    var s = GAME.songs.find(function(x){return x.id===id;}) || song;
+    var q = s.quality||0;
+    var qCol = q>=80?'var(--green)':q>=60?'var(--acc)':'var(--mut)';
+    return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:'+(i<songIds.length-1?'1px solid var(--bord)':'none')+'">'
+      +'<div style="font-size:12px;color:var(--mut);width:18px;text-align:right;flex:none">'+(i+1)+'</div>'
+      +'<div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--txt)">'+s.title+'</div>'
+      +'<div style="font-size:11px;color:var(--mut);margin-top:2px">'+(s.topic||s.genre||'')+'</div></div>'
+      +'<div style="font-size:11px;font-weight:800;color:'+qCol+';flex:none">'+q+' quality</div>'
+      +'</div>';
+  }).join('');
+
+  // Schedule picker state
+  if(!_RF.schedDay) _RF.schedDay = null;
+  var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var dayChips = days.map(function(d){
+    var sel = _RF.schedDay===d;
+    return '<div onclick="window._rfSelDay(\''+d+'\')" style="font-size:12px;font-weight:700;border-radius:8px;padding:8px 12px;background:'+(sel?'var(--acc-bg)':'var(--surf)')+';border:1px solid '+(sel?'var(--acc)':'var(--bord)')+';color:'+(sel?'var(--acc)':'var(--mut)')+';cursor:pointer">'+d+'</div>';
+  }).join('');
+
+  var html = '<div id="releaseFlowOverlay" style="position:fixed;inset:0;z-index:200000;background:var(--bg,#0d0f14);display:flex;flex-direction:column;overflow:hidden">'
+    + '<div style="flex:none"><div style="display:flex;align-items:center;padding:14px 20px 10px;gap:0;flex:none">'+_rfSteps(3).replace('<div id="releaseFlowOverlay"','<x')+'</div></div>'
+    // Rebuild steps inline for screen 3
+    +'<div style="position:fixed;inset:0;z-index:200000;background:var(--bg,#0d0f14);display:flex;flex-direction:column;overflow:hidden" id="releaseFlowOverlay">';
+
+  // Rebuild cleanly — drop the partial attempt above
+  html = '<div id="releaseFlowOverlay" style="position:fixed;inset:0;z-index:200000;background:var(--bg,#0d0f14);display:flex;flex-direction:column;overflow:hidden">'
+    + _rfSteps(3)
+    // Hero
+    + '<div style="flex:none;height:260px;position:relative;overflow:hidden">'
+    + '<div style="position:absolute;inset:-20px;background:'+heroBg+';filter:blur(20px);transform:scale(1.1)"></div>'
+    + '<div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 80%,rgba(232,180,76,.15),transparent 70%)"></div>'
+    + '<div style="position:relative;z-index:2;width:150px;height:150px;border-radius:18px;overflow:hidden;margin:20px auto 0;box-shadow:0 16px 60px rgba(0,0,0,.6)">'+heroInner+'</div>'
+    + '<div style="position:absolute;bottom:0;left:0;right:0;height:100px;background:linear-gradient(transparent,var(--bg))"></div>'
+    + '</div>'
+    // Body
+    + '<div style="flex:1;overflow-y:auto;padding:0 20px 20px">'
+    + '<div style="font-family:Georgia,serif;font-size:26px;text-align:center;margin:0 0 4px;color:var(--txt)">'+albumName+'</div>'
+    + '<div style="font-size:12px;color:var(--mut);text-align:center;margin-bottom:20px;font-weight:600;letter-spacing:.5px">'+typeLabel+' · '+songIds.length+' TRACK'+(songIds.length>1?'S':'')+'</div>'
+    // Concept banner
+    + '<div onclick="window._rfGoS2()" style="background:'+(hasConcept?'rgba(76,201,138,.08)':'var(--acc-bg)')+';border:1px solid '+(hasConcept?'rgba(76,201,138,.3)':'rgba(169,125,232,.3)')+';border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;margin-bottom:14px;cursor:pointer">'
+    + '<div style="font-size:22px;flex:none">🎨</div>'
+    + '<div style="flex:1"><div style="font-size:13px;font-weight:700;display:block;color:'+(hasConcept?'var(--green)':'var(--acc)')+'">'+(hasConcept?'Concept photos added':'Add a release concept')+'</div>'
+    + '<div style="font-size:11px;color:var(--mut)">'+(hasConcept?'Fan reactions will seed when you release':'Get personalized fan reactions — tap to add')+'</div></div>'
+    + '<div style="font-size:18px;color:var(--mut)">'+(hasConcept?'✓':'›')+'</div>'
+    + '</div>'
+    // Tracklist
+    + '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;overflow:hidden;margin-bottom:14px">'
+    + '<div style="padding:10px 14px;background:var(--surf);border-bottom:1px solid var(--bord);font-size:9.5px;font-weight:800;letter-spacing:1.2px;color:var(--mut);text-transform:uppercase">Tracklist</div>'
+    + trackList
+    + '</div>'
+    // Release timing
+    + '<div onclick="window._rfToggleSched()" id="rfTimingCard" style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;margin-bottom:14px;cursor:pointer">'
+    + '<div style="font-size:22px;flex:none" id="rfTimingIcon">🚀</div>'
+    + '<div style="flex:1"><div style="font-size:13px;font-weight:700;display:block;color:var(--txt)" id="rfTimingTitle">'+(hasConcept?'Release immediately':'Release immediately')+'</div>'
+    + '<div style="font-size:11px;color:var(--mut);margin-top:2px;display:block" id="rfTimingDesc">Fans on all platforms get notified now</div></div>'
+    + '<div style="font-size:13px;color:var(--mut)">›</div>'
+    + '</div>'
+    // Schedule picker (hidden initially)
+    + '<div id="rfSchedPicker" style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:14px;margin-bottom:14px;display:none">'
+    + '<div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:10px">Schedule for a future day</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap" id="rfDayChips">'+dayChips+'</div>'
+    + '<div style="font-size:11px;color:var(--mut)">Scheduled drops process at the start of that game day</div>'
+    + '</div>'
+    + '</div>'
+    // Footer
+    + '<div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;flex:none;background:var(--bg);border-top:1px solid var(--bord)">'
+    + '<button onclick="window._rfReleaseNow()" style="width:100%;background:var(--acc);color:var(--acc-txt,#0d0f14);border:none;border-radius:14px;font-size:15px;font-weight:800;padding:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">🚀 Release Now</button>'
+    + '<button onclick="window._rfSchedule()" style="width:100%;background:var(--surf);border:1px solid var(--bord);color:var(--txt);border-radius:14px;font-size:14px;font-weight:700;padding:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">📅 Schedule Release</button>'
+    + '</div>'
+    + '</div>';
+
+  var existing = document.getElementById('releaseFlowOverlay');
+  if(existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+window._rfToggleSched = function(){
+  var p = document.getElementById('rfSchedPicker');
+  if(!p) return;
+  var show = p.style.display==='none';
+  p.style.display = show ? 'block' : 'none';
+  var t = document.getElementById('rfTimingTitle');
+  if(t) t.textContent = show ? 'Scheduled release' : 'Release immediately';
+};
+
+window._rfSelDay = function(day){
+  _RF.schedDay = day;
+  var chips = document.getElementById('rfDayChips');
+  if(!chips) return;
+  var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  chips.innerHTML = days.map(function(d){
+    var sel = d===day;
+    return '<div onclick="window._rfSelDay(\''+d+'\')" style="font-size:12px;font-weight:700;border-radius:8px;padding:8px 12px;background:'+(sel?'var(--acc-bg)':'var(--surf)')+';border:1px solid '+(sel?'var(--acc)':'var(--bord)')+';color:'+(sel?'var(--acc)':'var(--mut)')+';cursor:pointer">'+d+'</div>';
+  }).join('');
+  var t = document.getElementById('rfTimingTitle');
+  if(t) t.textContent = 'Releasing '+day;
+  var d2 = document.getElementById('rfTimingDesc');
+  if(d2) d2.textContent = 'Drops at the start of '+day+' this week';
+};
+
+window._rfReleaseNow = function(){
+  var songId = _RF.songId;
+  var song = GAME.songs.find(function(s){return s.id===songId;});
+  if(!song){ return; }
+  if(!song.cover && !song.coverImage){ song.cover='💿'; }
+  _rfClose();
+  GAME._releaseNow = true;
+  showDistributionStep(songId);
+};
+
+window._rfSchedule = function(){
+  var songId = _RF.songId;
+  var song = GAME.songs.find(function(s){return s.id===songId;});
+  if(!song){ return; }
+  if(!song.cover && !song.coverImage){ song.cover='💿'; }
+  _rfClose();
+  GAME._releaseNow = false;
+  showScheduleReleasePicker();
+};
+
 function selectCover(cover){
-  const songId=GAME.pendingReleaseSong || (GAME.pendingReleaseSongs && GAME.pendingReleaseSongs[0]);
-  const song=GAME.songs.find(s=>s.id===songId);
-  if(song){
-    song.cover=cover;
-    song.coverImage=null; // Clear custom image
-    showCoverSelection(songId);
-  }
+  // Legacy: keep working for any existing call sites
+  var songId = GAME.pendingReleaseSong || (GAME.pendingReleaseSongs && GAME.pendingReleaseSongs[0]);
+  var song = GAME.songs.find(function(s){return s.id===songId;});
+  if(song){ song.cover=cover; song.coverImage=null; }
+  _rfRenderScreen1(song);
 }
 
 function confirmRelease(){
-  console.log('confirmRelease called');
-  console.log('pendingReleaseSong:', GAME.pendingReleaseSong);
-  console.log('pendingReleaseSongs:', GAME.pendingReleaseSongs);
-  
-  // Get song from either single or multi-song release
-  const songId=GAME.pendingReleaseSong || (GAME.pendingReleaseSongs && GAME.pendingReleaseSongs[0]);
-  console.log('songId:', songId);
-  
-  const song=GAME.songs.find(s=>s.id===songId);
-  console.log('song found:', song);
-  
-  if(!song){
-    alert('Error: No song found - songId: '+songId);
-    return;
-  }
-  
-  // Make sure a cover is selected (either emoji or custom image)
-  if(!song.cover && !song.coverImage){
-    alert('Please select a cover first!');
-    return;
-  }
-  
-  console.log('Calling showReleaseReview');
-  // Show review screen before promotions
-  showReleaseReview();
+  // Legacy entry → just go to review
+  _rfGoS3();
 }
 
 // ══════════════════════════════════════════════════════
@@ -32388,20 +32669,18 @@ function showDistributionStep(songId){
 }
 
 function showReleaseReview(){
-  // Fix: Check if array is empty OR doesn't exist
-  const songIds=(GAME.pendingReleaseSongs && GAME.pendingReleaseSongs.length>0) ? GAME.pendingReleaseSongs : [GAME.pendingReleaseSong];
-  
-  console.log('showReleaseReview - songIds:', songIds);
-  
+  // Redirect to new 3-screen release flow — Screen 3
+  var songIds=(GAME.pendingReleaseSongs && GAME.pendingReleaseSongs.length>0) ? GAME.pendingReleaseSongs : [GAME.pendingReleaseSong];
+  var mainSong=GAME.songs.find(function(s){return s.id===songIds[0];});
+  if(!mainSong){ alert('Error in showReleaseReview - no song found'); return; }
+  _RF.songId = songIds[0];
+  closeMenu();
+  _rfRenderScreen3();
+  return;
+
+  // ─── LEGACY CODE (kept for reference, unreachable) ───
   const type=GAME.pendingReleaseType||'single';
   const typeLabel={single:'Single',ep:'EP',album:'Album',deluxe:'Deluxe'}[type];
-  const mainSong=GAME.songs.find(s=>s.id===songIds[0]);
-  
-  if(!mainSong){
-    alert('Error in showReleaseReview - no song found with ID: '+songIds[0]);
-    return;
-  }
-  
   const albumName=GAME.pendingAlbumName||mainSong.title;
   
   let html=`<div style="padding:16px">
