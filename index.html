@@ -6614,7 +6614,9 @@ function renderSongs(){
           const actual = GAME.songs && GAME.songs.find(function(gs){ return gs.id === s.id; });
           return actual && actual.released;
         });
-        if(hasReleasedSong) visibleReleases.push(release);
+        // Also show pending (scheduled) releases that haven't dropped yet
+        const isPendingScheduled = release.pending && release.scheduledReleaseDay;
+        if(hasReleasedSong || isPendingScheduled) visibleReleases.push(release);
       }else if(filter==='collabs'){
         const hasReleasedCollab = release.songs && release.songs.some(function(s){
           if(!s) return false;
@@ -6655,19 +6657,25 @@ function renderSongs(){
       const songCount=release.songs.length;
       const totalStreams=release.songs.reduce((sum,s)=>sum+(s&&s.streams||0),0);
       
-      // Get cover image from first song, or use emoji
+      // Get cover image from release itself, first song, or use emoji
       let coverContent=releaseIcon;
-      if(release.songs&&release.songs[0]&&release.songs[0].coverImage){
-        coverContent=`<img src="${release.songs[0].coverImage}" style="width:100%;height:100%;object-fit:cover;border-radius:4px">`;
-      }else if(release.songs&&release.songs[0]&&release.songs[0].cover){
-        coverContent=release.songs[0].cover;
+      const _firstSongFull = release.songs&&release.songs[0] && GAME.songs&&GAME.songs.find(gs=>gs.id===(release.songs[0].id||release.songs[0]));
+      const _coverImg = release.coverImage || (_firstSongFull&&_firstSongFull.coverImage) || (release.songs&&release.songs[0]&&release.songs[0].coverImage);
+      const _coverEmoji = (_firstSongFull&&_firstSongFull.cover) || (release.songs&&release.songs[0]&&release.songs[0].cover) || release.cover;
+      if(_coverImg){
+        coverContent=`<img src="${_coverImg}" style="width:100%;height:100%;object-fit:cover;border-radius:4px">`;
+      }else if(_coverEmoji){
+        coverContent=_coverEmoji;
       }
       
-      cardHtml+=`<div style="background:var(--surf);border:0.5px solid var(--bord);border-radius:var(--border-radius-lg);padding:12px;cursor:pointer;text-align:center;transition:all 0.2s" onclick="showReleaseOptions(${release.id})">
+      const isPending = release.pending && release.scheduledReleaseDay;
+      const schedBadge = isPending ? `<div style="font-size:9px;font-weight:800;color:var(--acc);background:var(--acc-bg);border-radius:4px;padding:2px 5px;margin-bottom:4px;display:inline-block">📅 ${release.scheduledReleaseDate||'Scheduled'}</div>` : '';
+      const bottomLine = isPending ? schedBadge : `<div style="font-size:10px;color:var(--mut)">${totalStreams.toLocaleString()} streams</div>`;
+      cardHtml+=`<div style="background:var(--surf);border:${isPending?'1.5px solid var(--acc)':'0.5px solid var(--bord)'};border-radius:var(--border-radius-lg);padding:12px;cursor:pointer;text-align:center;transition:all 0.2s" onclick="showReleaseOptions(${release.id})">
         <div style="background:var(--bg);border-radius:6px;height:70px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden">${coverContent}</div>
         <div style="font-size:12px;font-weight:600;color:var(--txt);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${release.title}</div>
-        <div style="font-size:10px;color:var(--mut);margin-bottom:6px">${releaseType} · ${songCount} ${songCount===1?'song':'songs'}</div>
-        <div style="font-size:10px;color:var(--mut)">${totalStreams.toLocaleString()} streams</div>
+        <div style="font-size:10px;color:var(--mut);margin-bottom:4px">${releaseType} · ${songCount} ${songCount===1?'song':'songs'}</div>
+        ${bottomLine}
       </div>`;
     });
     cardGrid.innerHTML=cardHtml;
@@ -6689,10 +6697,12 @@ function renderSongs(){
     
     // Only show album header for multi-song releases (albums/EPs)
     if(!isSingle){
+      const _isPending = release.pending && release.scheduledReleaseDay;
+      const _statusLabel = _isPending ? `<span style="font-size:11px;background:var(--acc-bg);padding:3px 8px;border-radius:var(--border-radius-md);color:var(--acc)">📅 ${release.scheduledReleaseDate||'Scheduled'}</span>` : `<span style="font-size:11px;background:var(--surf);padding:3px 8px;border-radius:var(--border-radius-md);color:var(--mut)">Released</span>`;
       html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-weight:600;color:var(--txt)">
         <span style="font-size:13px;text-transform:uppercase;letter-spacing:0.5px;color:var(--mut)">${releaseIcon} ${releaseType}</span>
         <span style="font-size:14px">${release.title}</span>
-        <span style="font-size:11px;background:var(--surf);padding:3px 8px;border-radius:var(--border-radius-md);color:var(--mut)">Released</span>
+        ${_statusLabel}
       </div>`;
       html+=`<div style="border-left:2px solid var(--bord);padding-left:12px">`;
     }
@@ -31997,10 +32007,14 @@ function _rfRenderScreen2(){
   var song = GAME.songs.find(function(s){return s.id===_RF.songId;});
   if(!song) return;
 
-  var images = song.conceptImages || (song.conceptImage ? [song.conceptImage] : []);
+  // Use proxy concept data if title track is already released
+  var _conceptSrc = (song.released && _RF.conceptData) ? _RF.conceptData
+    : (song.released && _RF.conceptProxy) ? _RF.conceptProxy
+    : song;
+  var images = _conceptSrc.conceptImages || (_conceptSrc.conceptImage ? [_conceptSrc.conceptImage] : []);
   var hasImages = images.length > 0;
-  var analyzing = !!song.conceptAnalyzing;
-  var hasAnalysis = !!song.conceptAnalysis;
+  var analyzing = !!_conceptSrc.conceptAnalyzing || (song.released && !!(_RF.conceptProxy && _RF.conceptProxy.conceptAnalyzing));
+  var hasAnalysis = !!_conceptSrc.conceptAnalysis;
 
   // Photo slots row
   var slots = [0,1,2].map(function(i){
@@ -32025,12 +32039,12 @@ function _rfRenderScreen2(){
       +'<div id="rfProgressPct" style="font-size:10px;color:var(--mut);margin-top:4px;text-align:right">'+pct+'%</div>'
       +'</div>';
   } else if(hasAnalysis){
-    var mood = song.conceptMood ? '<span style="background:var(--acc-bg);color:var(--acc);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;margin-right:6px">'+song.conceptMood+'</span>' : '';
-    var palette = song.conceptPalette ? '<div style="font-size:11px;color:var(--mut);margin-top:6px">🎨 '+song.conceptPalette+'</div>' : '';
-    var reactions = (song.conceptFanReactions && song.conceptFanReactions.length > 0)
+    var mood = _conceptSrc.conceptMood ? '<span style="background:var(--acc-bg);color:var(--acc);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;margin-right:6px">'+_conceptSrc.conceptMood+'</span>' : '';
+    var palette = _conceptSrc.conceptPalette ? '<div style="font-size:11px;color:var(--mut);margin-top:6px">🎨 '+_conceptSrc.conceptPalette+'</div>' : '';
+    var reactions = (_conceptSrc.conceptFanReactions && _conceptSrc.conceptFanReactions.length > 0)
       ? '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bord)">'
         +'<div style="font-size:10px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🎨 Fan Reactions · preview</div>'
-        +song.conceptFanReactions.slice(0,3).map(function(r){
+        +_conceptSrc.conceptFanReactions.slice(0,3).map(function(r){
           return '<div style="font-size:12px;color:var(--txt);margin-bottom:5px;padding:8px 10px;background:var(--bg);border-radius:8px;line-height:1.5">"'+r+'"</div>';
         }).join('')+'</div>' : '';
     analysisHtml = '<div style="background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:14px">'
@@ -32038,8 +32052,8 @@ function _rfRenderScreen2(){
       +'<span style="font-size:10px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:1px">Vibe Analysis</span>'
       +'<span style="font-size:10px;color:var(--green,#4cc98a);font-weight:700">✓ Complete</span></div>'
       +(mood?'<div style="margin-bottom:8px">'+mood+'</div>':'')
-      +(song.conceptAesthetic?'<div style="font-size:12px;color:var(--mut);margin-bottom:6px;font-style:italic">"'+song.conceptAesthetic+'"</div>':'')
-      +'<div style="font-size:13px;color:var(--txt);line-height:1.5;margin-bottom:6px">'+song.conceptAnalysis+'</div>'
+      +(_conceptSrc.conceptAesthetic?'<div style="font-size:12px;color:var(--mut);margin-bottom:6px;font-style:italic">"'+_conceptSrc.conceptAesthetic+'"</div>':'')
+      +'<div style="font-size:13px;color:var(--txt);line-height:1.5;margin-bottom:6px">'+_conceptSrc.conceptAnalysis+'</div>'
       +palette+reactions+'</div>';
   } else if(hasImages){
     analysisHtml = '<div style="background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:12px 14px;font-size:12px;color:var(--mut)">'
@@ -32114,11 +32128,45 @@ window._rfHandleConceptUpload = function(e){
   var song = GAME.songs.find(function(s){return s.id===_RF.songId;});
   if(!song) return;
   if(e.target.files && e.target.files.length>3) showToast('Only the first 3 photos were used.','amber');
+
+  // If the title track is already released, use a scratch proxy so we don't
+  // overwrite its existing concept data. The proxy gets stored on _RF and
+  // written to the release object when the EP/album is confirmed.
+  var targetId = _RF.songId;
+  if(song.released){
+    // Create a proxy song object so handleConceptUpload has somewhere to write
+    if(!_RF.conceptProxy){
+      _RF.conceptProxy = {id: '__rfProxy__', title: song.title};
+      GAME.songs.push(_RF.conceptProxy);
+    }
+    targetId = '__rfProxy__';
+  }
+
   // Patch showConceptUpload to redirect to release flow screen 2 during analysis
   var _origSCU = window.showConceptUpload;
   window.showConceptUpload = function(){ _rfRenderScreen2(); };
-  handleConceptUpload(e, _RF.songId).finally(function(){
+  handleConceptUpload(e, targetId).finally(function(){
     window.showConceptUpload = _origSCU;
+    // Remove proxy from GAME.songs — it should never appear in the songs tab
+    if(targetId === '__rfProxy__'){
+      GAME.songs = GAME.songs.filter(function(s){ return s.id !== '__rfProxy__'; });
+      // Copy proxy result back onto _RF so screen 2 can display it
+      var proxy = _RF.conceptProxy;
+      if(proxy){
+        _RF.conceptData = {
+          conceptImages: proxy.conceptImages,
+          conceptImage: proxy.conceptImage,
+          conceptAnalysis: proxy.conceptAnalysis,
+          conceptMood: proxy.conceptMood,
+          conceptPalette: proxy.conceptPalette,
+          conceptAesthetic: proxy.conceptAesthetic,
+          conceptFanReactions: proxy.conceptFanReactions,
+          conceptAnalyzing: false
+        };
+        _RF.conceptProxy = null;
+        _rfRenderScreen2();
+      }
+    }
   });
 };
 
@@ -32875,25 +32923,72 @@ function doScheduleRelease(targetDay){
   const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const dateLabel = dayNames[realDate.getDay()] + ', ' + months[realDate.getMonth()] + ' ' + realDate.getDate() + ', ' + realDate.getFullYear();
 
-  songIds.forEach(function(id){
-    var song = GAME.songs.find(function(s){ return s.id===id; });
-    if(song){
-      song.scheduledReleaseDay = targetDay;
-      song.scheduledReleaseDate = dateLabel;
-    }
+  const releaseType = GAME.pendingReleaseType || 'single';
+  const titleSong = GAME.songs.find(s=>s.id===songIds[0]);
+  const titleName = GAME.pendingAlbumName || (titleSong && titleSong.title) || 'New Release';
+
+  // Check if any songs are already released — if so this is an EP/album with existing tracks
+  const anyAlreadyReleased = songIds.some(function(id){
+    var s = GAME.songs.find(function(gs){ return gs.id===id; });
+    return s && s.released;
   });
 
-  // Also store on release object if it exists
-  if(GAME.pendingReleaseObj){
-    GAME.pendingReleaseObj.scheduledReleaseDay = targetDay;
+  if(anyAlreadyReleased || releaseType === 'ep' || releaseType === 'album'){
+    // Create a pending release entry in GAME.releases rather than stamping scheduledReleaseDay
+    // on already-released songs (which would try to release them again)
+    var pendingRelease = {
+      id: Date.now(),
+      title: titleName,
+      type: releaseType,
+      songs: songIds.map(function(id){
+        var s = GAME.songs.find(function(gs){ return gs.id===id; });
+        return s ? {id:s.id, title:s.title} : null;
+      }).filter(Boolean),
+      scheduledReleaseDay: targetDay,
+      scheduledReleaseDate: dateLabel,
+      pending: true, // marks this as not yet live
+      coverImage: titleSong && titleSong.coverImage || null,
+      cover: titleSong && titleSong.cover || '🎶',
+      // Attach concept data from release flow proxy if available
+      conceptAnalysis: (_RF.conceptData && _RF.conceptData.conceptAnalysis) || null,
+      conceptMood: (_RF.conceptData && _RF.conceptData.conceptMood) || null,
+      conceptImages: (_RF.conceptData && _RF.conceptData.conceptImages) || null,
+      conceptFanReactions: (_RF.conceptData && _RF.conceptData.conceptFanReactions) || null,
+    };
+    if(!GAME.releases) GAME.releases = [];
+    GAME.releases.push(pendingRelease);
+    // Only stamp scheduledReleaseDay on unreleased songs in the EP/album
+    songIds.forEach(function(id){
+      var song = GAME.songs.find(function(s){ return s.id===id; });
+      if(song && !song.released){
+        song.scheduledReleaseDay = targetDay;
+        song.scheduledReleaseDate = dateLabel;
+      }
+    });
+  } else {
+    // Single: stamp directly on the song
+    songIds.forEach(function(id){
+      var song = GAME.songs.find(function(s){ return s.id===id; });
+      if(song){
+        song.scheduledReleaseDay = targetDay;
+        song.scheduledReleaseDate = dateLabel;
+      }
+    });
+    if(GAME.pendingReleaseObj){
+      GAME.pendingReleaseObj.scheduledReleaseDay = targetDay;
+    }
   }
+
+  // Clear release flow concept proxy
+  _RF.conceptData = null;
+  _RF.conceptProxy = null;
 
   markDirty();
   saveToCloud();
   closeMenu();
 
   showToast('📅 Dropping '+dateLabel+'!', 'green');
-  addNotification('📅 Release scheduled', '"'+(GAME.songs.find(s=>s.id===songIds[0])||{}).title+'" drops '+dateLabel, 'release');
+  addNotification('📅 Release scheduled', '"'+titleName+'" drops '+dateLabel, 'release');
 
   delete GAME.pendingReleaseSong;
   delete GAME.pendingReleaseSongs;
