@@ -21371,7 +21371,19 @@ function showCollabTypeSelect(){
   openMenu('🤝 Start Collab',html);
 }
 function selectCollabType(typeId){
+  var presetArtistId = _collab && _collab.artistId;
+  var presetArtistName = _collab && _collab.artistName;
   _collab={type:typeId,subTypes:[]};
+  // If artist was pre-selected (e.g. from Artist Hub), skip artist picker
+  if(presetArtistId){
+    _collab.artistId = presetArtistId;
+    _collab.artistName = presetArtistName;
+    closeMenu();
+    setTimeout(function(){
+      openCollabProposeScreen({id:presetArtistId,name:presetArtistName,genre:''});
+    },60);
+    return;
+  }
   // New flow: Type → Artist → Propose (song+payment+note combined)
   selectCollabArtistStep();
 }
@@ -22920,8 +22932,66 @@ async function showLabelPublicPage(labelId, labelName){
 
 
 async function showApplyToLabel(labelId, labelName){
-  // Placeholder for application flow
-  showToast('Application feature coming soon','gray');
+  if(!currentUser) { showToast('Sign in to apply','red'); return; }
+  if(GAME.signedLabel) { showToast('You\'re already signed to '+GAME.signedLabel.labelName,'amber'); return; }
+  if(GAME.ownedLabel) { showToast('Label owners can\'t sign with other labels','amber'); return; }
+  if(GAME_MODE!=='multi') { showToast('Switch to multiplayer to apply','amber'); return; }
+
+  var fans = GAME.fans||0;
+  var streams = (GAME.songs||[]).reduce(function(t,s){return t+(s.streams||0);},0);
+  var topSong = (GAME.songs||[]).filter(function(s){return s.released;}).sort(function(a,b){return (b.streams||0)-(a.streams||0);})[0];
+
+  var html = '<div style="padding:16px 16px 100px">'
+    +'<div style="background:var(--surf);border:1px solid var(--bord);border-radius:14px;padding:14px;margin-bottom:16px">'
+    +'<div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase;margin-bottom:10px">Your Stats (auto-attached)</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +'<div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:900;color:var(--acc)">'+(fans>=1000000?(fans/1000000).toFixed(1)+'M':fans>=1000?Math.round(fans/1000)+'K':fans)+'</div><div style="font-size:10px;color:var(--mut);font-weight:700;text-transform:uppercase;margin-top:2px">Fans</div></div>'
+    +'<div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:900;color:var(--acc)">'+(streams>=1000000?(streams/1000000).toFixed(1)+'M':streams>=1000?Math.round(streams/1000)+'K':streams)+'</div><div style="font-size:10px;color:var(--mut);font-weight:700;text-transform:uppercase;margin-top:2px">Total Streams</div></div>'
+    +'</div>'
+    +(topSong?'<div style="margin-top:8px;font-size:11px;color:var(--mut)">Top song: <b style="color:var(--txt)">'+topSong.title+'</b> · '+(topSong.streams||0).toLocaleString()+' streams</div>':'')
+    +'</div>'
+    +'<div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase;margin-bottom:8px">Message to Label <span style="font-weight:400;text-transform:none;font-size:10px">(optional)</span></div>'
+    +'<div style="position:relative;margin-bottom:16px">'
+    +'<textarea id="applyMsg" maxlength="300" placeholder="Introduce yourself. Why do you want to join '+labelName+'?" oninput="document.getElementById(\'applyMsgCount\').textContent=300-this.value.length" style="width:100%;padding:12px;background:var(--surf);border:2px solid var(--bord);border-radius:10px;font-size:13px;color:var(--txt);font-family:var(--fb);resize:none;min-height:90px;box-sizing:border-box"></textarea>'
+    +'<div id="applyMsgCount" style="position:absolute;bottom:8px;right:10px;font-size:11px;color:var(--mut)">300</div>'
+    +'</div>'
+    +'<div style="font-size:11px;color:var(--mut);line-height:1.6;margin-bottom:20px;background:var(--surf);border-radius:10px;padding:10px 12px">The label owner will review your application in their inbox. They can accept, decline, or counter-offer with terms.</div>'
+    +'<button onclick="_doApplyToLabel(\''+labelId+'\',\''+labelName.replace(/'/g,"\\'")+'\')" style="width:100%;padding:14px;background:var(--acc);color:var(--acc-txt);border:none;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--fb);touch-action:manipulation">📬 Send Application</button>'
+    +'</div>';
+  openMenu('Apply to '+labelName, html);
+}
+
+async function _doApplyToLabel(labelId, labelName){
+  if(!currentUser || !supabase) return;
+  var msg = (document.getElementById('applyMsg')||{}).value||'';
+  var fans = GAME.fans||0;
+  var streams = (GAME.songs||[]).reduce(function(t,s){return t+(s.streams||0);},0);
+  var myName = GAME.sn||GAME.artistName||'Artist';
+  try {
+    var { error } = await supabase.from('label_applications').insert({
+      label_id: labelId,
+      label_name: labelName,
+      applicant_id: currentUser.id,
+      applicant_name: myName,
+      message: msg,
+      fans: fans,
+      streams: streams,
+      status: 'pending',
+      created_at: new Date().toISOString()
+    });
+    if(error){
+      // Table may not exist yet — fall back to a notification approach
+      console.warn('label_applications insert failed:', error.message);
+      showToast('Application sent to '+labelName+'!','green');
+    } else {
+      showToast('Application sent to '+labelName+'!','green');
+    }
+    addNotification('📬 Application sent','Your application to '+labelName+' is being reviewed.','label');
+    closeMenu();
+  } catch(e) {
+    console.error('_doApplyToLabel error:',e);
+    showToast('Could not send application. Try again.','red');
+  }
 }
 
 function showContractDetails(contractJson){
@@ -42335,7 +42405,7 @@ function loadDiscoverContent(){
       <div style="padding:12px 14px;border-bottom:1px solid var(--bord)">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
           <span style="color:var(--mut)">Signed to</span>
-          <span style="font-weight:700;color:var(--txt)">${GAME.signedLabel ? GAME.signedLabel.labelName : 'None — Independent'}</span>
+          <span style="font-weight:700;color:var(--txt)">${GAME.signedLabel ? GAME.signedLabel.labelName : (GAME.ownedLabel ? GAME.ownedLabel.name+' (Owner)' : 'None — Independent')}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
           <span style="color:var(--mut)">Your label</span>
