@@ -17324,8 +17324,8 @@ function processLabelWeekly(){
       sl.advanceRecouped = Math.min(sl.advancePaid, (sl.advanceRecouped||0) + streamCut);
     }
 
-    // Check expiry
-    if((GAME.week||1) >= sl.expiresWeek){
+    // Check expiry — owners are self-signed indefinitely, never expire
+    if(!sl.isOwner && (GAME.week||1) >= sl.expiresWeek){
       var _exitArtist = GAME.artistName || GAME.sn || 'Artist';
       var _exitLabel  = sl.labelName || 'label';
       GAME.signedLabel = null;
@@ -40928,7 +40928,7 @@ function _silentDayCatchUp(day, showFirst){
   // showFirst: show notifications only for the first missed day
   const info = dayInfo(day);
 
-  // Auto-release scheduled songs
+  // Auto-release scheduled songs (singles with scheduledReleaseDay stamped directly)
   if(GAME.songs) GAME.songs.forEach(function(song){
     if(!song.released && song.scheduledReleaseDay === day){
       song.released = true;
@@ -40937,10 +40937,36 @@ function _silentDayCatchUp(day, showFirst){
       song.weeklyStreams = 0;
       song.weeksOnChart = 0;
       song.chartPosition = null;
+      delete song.scheduledReleaseDay;
+      delete song.scheduledReleaseDate;
       if(!GAME.releases) GAME.releases = [];
-      GAME.releases.push({id:Date.now()+day,title:song.title,type:'single',songs:[{id:song.id,title:song.title}],releaseDay:day});
+      // Only add a release entry if one doesn't already exist covering this song
+      var alreadyInRelease = GAME.releases.some(function(r){ return r.songs && r.songs.some(function(s){ return s && s.id===song.id; }); });
+      if(!alreadyInRelease) GAME.releases.push({id:Date.now()+day,title:song.title,type:'single',songs:[{id:song.id,title:song.title}],releaseDay:day});
       if(showFirst) addNotification('🎵 "'+song.title+'" released while you were away!','','release');
     }
+  });
+  // Auto-release pending EP/album entries in GAME.releases
+  if(GAME.releases) GAME.releases.forEach(function(release){
+    if(!release.pending || release.scheduledReleaseDay !== day) return;
+    release.pending = false;
+    release.releaseDay = day;
+    release.releaseWeek = info.week;
+    // Mark each unreleased song in the EP as released
+    (release.songs||[]).forEach(function(rs){
+      var song = rs && GAME.songs && GAME.songs.find(function(s){ return s.id===rs.id; });
+      if(song && !song.released){
+        song.released = true;
+        song.releaseDay = day;
+        song.releaseWeek = info.week;
+        song.weeklyStreams = 0;
+        song.weeksOnChart = 0;
+        song.chartPosition = null;
+        delete song.scheduledReleaseDay;
+        delete song.scheduledReleaseDate;
+      }
+    });
+    if(showFirst) addNotification('🎵 "'+release.title+'" released while you were away!','','release');
   });
 
   // Energy/creativity reset each day
@@ -41027,7 +41053,7 @@ function _onDayAdvanced(newDay){
     }
   }
 
-  // Auto-release any songs scheduled for today
+  // Auto-release any songs scheduled for today (singles stamped directly)
   if(GAME.songs) GAME.songs.forEach(function(song){
     if(!song.released && song.scheduledReleaseDay === newDay){
       song.released = true;
@@ -41036,10 +41062,34 @@ function _onDayAdvanced(newDay){
       song.weeklyStreams = 0;
       song.weeksOnChart = 0;
       song.chartPosition = null;
+      delete song.scheduledReleaseDay;
+      delete song.scheduledReleaseDate;
       if(!GAME.releases) GAME.releases = [];
-      GAME.releases.push({ id:Date.now(), title:song.title, type:'single', songs:[{id:song.id,title:song.title}], releaseDay:newDay });
+      var alreadyInRelease2 = GAME.releases.some(function(r){ return r.songs && r.songs.some(function(s){ return s && s.id===song.id; }); });
+      if(!alreadyInRelease2) GAME.releases.push({ id:Date.now(), title:song.title, type:'single', songs:[{id:song.id,title:song.title}], releaseDay:newDay });
       addNotification('🎵 "'+song.title+'" is out now!', 'Your scheduled release just dropped. Good luck on the charts!', 'release');
     }
+  });
+  // Auto-release pending EP/album entries in GAME.releases
+  if(GAME.releases) GAME.releases.forEach(function(release){
+    if(!release.pending || release.scheduledReleaseDay !== newDay) return;
+    release.pending = false;
+    release.releaseDay = newDay;
+    release.releaseWeek = info.week;
+    (release.songs||[]).forEach(function(rs){
+      var song = rs && GAME.songs && GAME.songs.find(function(s){ return s.id===rs.id; });
+      if(song && !song.released){
+        song.released = true;
+        song.releaseDay = newDay;
+        song.releaseWeek = info.week;
+        song.weeklyStreams = 0;
+        song.weeksOnChart = 0;
+        song.chartPosition = null;
+        delete song.scheduledReleaseDay;
+        delete song.scheduledReleaseDate;
+      }
+    });
+    addNotification('🎵 "'+release.title+'" is out now!', 'Your scheduled release just dropped. Good luck on the charts!', 'release');
   });
 
   processScheduledActivities(newDay);
