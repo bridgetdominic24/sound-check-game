@@ -2107,6 +2107,14 @@ async function logoutUser(){
       window._timerInitialised = false;
       window._dayWriting = false;
       _authSuccessRunning = false;
+      // CRITICAL: Stop the day-advance timer and reset the epoch marker so the
+      // stale interval cannot fire a spurious day increment between logout and
+      // the next initServerTime() call on re-login.
+      if(typeof timerInterval !== 'undefined' && timerInterval){
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      window._lastEpochDay = undefined;
 
       // CRITICAL: Reset ALL session data to prevent bleeding between accounts
       GAME = null;
