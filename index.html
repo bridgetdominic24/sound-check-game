@@ -3113,6 +3113,12 @@ async function onAuthSuccess(){
         // Initialize server time (multiplayer only)
         initServerTime();
 
+        // Sync accepted collabs on login so the sender (Player A) sees the
+        // accepted track in their library without having to open Messages first.
+        if(GAME_MODE === 'multi' && typeof syncAcceptedCollabs === 'function'){
+          syncAcceptedCollabs().catch(function(e){ console.warn('[Login] syncAcceptedCollabs error:', e); });
+        }
+
         // Pre-load all players so every streaming platform can show them immediately
         // (without this, platforms only show other players after Loopify is opened first)
         if(GAME_MODE === 'multi' && typeof _fetchAllPlayers === 'function'){
@@ -15852,6 +15858,8 @@ function showSignedArtistView(){
 function showLabelOwnerDashboard(startTab){
   var ol = GAME.ownedLabel;
   if(!ol){showUnsignedView();return;}
+  // Reset the applications-fetch guard so _odInbox re-fetches from Supabase each visit
+  if(ol) ol._appsFetched = false;
   // Auto-sign owner if they somehow don't have signedLabel set (pre-fix saves)
   if(!GAME.signedLabel){
     GAME.signedLabel = {
@@ -15883,7 +15891,7 @@ function showLabelOwnerDashboard(startTab){
   var tierDef = LABEL_TIERS[ol.tier]||LABEL_TIERS.indie;
   var roster = ol.roster||[];
   var approvalQueue = roster.flatMap(function(a){ return (a.pendingReleases||[]).filter(function(r){ return r.status==='pending'; }); });
-  var inboxCount = approvalQueue.length + (ol.pendingCollabRequests||[]).length + (ol.pendingPressRequests||[]).length;
+  var inboxCount = approvalQueue.length + (ol.pendingCollabRequests||[]).length + (ol.pendingPressRequests||[]).length + (ol.pendingApplications||[]).length;
   var weeklyRosterCut = roster.reduce(function(s,a){
     var cut=(a.cut||ol.defaultCut||25)/100;
     return s+(a.weeklyEarnings||0)*cut;
@@ -16132,7 +16140,21 @@ function _odRoster(){
 }
 
 // ── OWNER DASHBOARD TAB: INBOX ──
-function _odInbox(){ return _llInbox(); }
+function _odInbox(){
+  var ol = GAME.ownedLabel;
+  // Async-fetch pending applications from Supabase when the tab first opens.
+  // We show what we have immediately, then re-render once the fetch lands.
+  if(GAME_MODE==='multi' && ol && ol.id && supabase && !ol._appsFetched){
+    ol._appsFetched = true;
+    supabase.from('label_applications').select('*').eq('label_id',ol.id).eq('status','pending').then(function(res){
+      ol.pendingApplications = (res.data||[]);
+      // If the inbox panel is still visible, re-render it with the fresh data
+      var body = document.getElementById('odBody');
+      if(body) body.innerHTML = _llInbox();
+    }).catch(function(){ ol.pendingApplications = []; });
+  }
+  return _llInbox();
+}
 
 // ── OWNER DASHBOARD TAB: FINANCES ──
 function _odFinances(){
@@ -17968,6 +17990,17 @@ function _llInbox(){
   (ol.pendingCollabRequests||[]).forEach(function(cr){
     items.push({type:'COLLAB',color:'#2a1e3a',tc:cr.id,urgent:false,title:cr.artist1Name+' + '+cr.artist2Name+' want to collab',desc:'"'+cr.songTitle+'" · '+(cr.genre||'Pop')+' · Roster bonus applies.',crid:cr.id});
   });
+  // Pending label applications (fetched from Supabase by _odInbox)
+  (ol.pendingApplications||[]).forEach(function(app){
+    var fansStr = typeof _fmtFans==='function' ? _fmtFans(app.fans||0) : ((app.fans||0)>=1000?Math.round((app.fans||0)/1000)+'K':String(app.fans||0));
+    var streamStr = typeof _fmtStreams==='function' ? _fmtStreams(app.streams||0) : ((app.streams||0)>=1000000?((app.streams||0)/1000000).toFixed(1)+'M':(app.streams||0)>=1000?Math.round((app.streams||0)/1000)+'K':String(app.streams||0));
+    var snippet = app.message ? ' · "'+app.message.slice(0,40)+(app.message.length>40?'…':'')+'"' : '';
+    items.push({type:'APPLY',color:'#1a2a3a',tc:app.id,urgent:false,
+      title:app.applicant_name+' applied to join '+ol.name,
+      desc:fansStr+' fans · '+streamStr+' streams'+snippet,
+      appId:app.id,appUserId:app.applicant_id,appName:app.applicant_name
+    });
+  });
   // Room Service press requests
   (ol.pendingPressRequests||[]).forEach(function(pr){
     items.push({type:'PRESS',color:'#3a1e2a',tc:pr.id,urgent:true,title:'Room Service is asking about '+pr.artistName,desc:'"'+pr.headline+'"',prid:pr.id,artistName:pr.artistName});
@@ -17982,8 +18015,8 @@ function _llInbox(){
 
   items.forEach(function(item){
     var urgBadge = item.urgent ? '<div style="position:absolute;top:-7px;right:12px;background:var(--red);color:#fff;font-size:9px;font-weight:900;border-radius:3px;padding:2px 8px;letter-spacing:.5px">URGENT</div>' : '';
-    var tagColors = {RELEASE:'#1e3a2e',COLLAB:'#2a1e3a',PRESS:'#3a1e2a',MONEY:'var(--acc-bg)'};
-    var tagTxtColors = {RELEASE:'var(--green)',COLLAB:'var(--purple)',PRESS:'var(--pink)',MONEY:'var(--acc)'};
+    var tagColors = {RELEASE:'#1e3a2e',COLLAB:'#2a1e3a',PRESS:'#3a1e2a',MONEY:'var(--acc-bg)',APPLY:'#1a2a3a'};
+    var tagTxtColors = {RELEASE:'var(--green)',COLLAB:'var(--purple)',PRESS:'var(--pink)',MONEY:'var(--acc)',APPLY:'#7eb8f0'};
     var tc = tagColors[item.type]||'var(--card)';
     var ttc = tagTxtColors[item.type]||'var(--mut)';
 
@@ -17994,6 +18027,8 @@ function _llInbox(){
       btns = '<div style="display:flex;gap:7px;margin-top:10px"><button onclick="llInboxApproveCollab(\''+item.crid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:none;background:var(--purple);color:#fff;cursor:pointer;font-family:var(--fb)">Approve</button><button onclick="showCollabCompare(\''+item.crid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">Compare</button><button onclick="llInboxBlockCollab(\''+item.crid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:none;color:var(--red);cursor:pointer;font-family:var(--fb)">Block</button></div>';
     } else if(item.type==='PRESS'){
       btns = '<div style="display:flex;gap:7px;margin-top:10px"><button onclick="showPressStatement(\''+item.prid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">Issue Statement</button><button onclick="llPressDismiss(\''+item.prid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:none;color:var(--mut);cursor:pointer;font-family:var(--fb)">No Comment</button></div>';
+    } else if(item.type==='APPLY'){
+      btns = '<div style="display:flex;gap:7px;margin-top:10px"><button onclick="llInboxAcceptApplication(\''+item.appId+'\',\''+item.appUserId+'\',\''+item.appName.replace(/'/g,"\\'")+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:none;background:#1d6fa4;color:#fff;cursor:pointer;font-family:var(--fb)">Accept & Offer</button><button onclick="llInboxDeclineApplication(\''+item.appId+'\',\''+item.appUserId+'\',\''+item.appName.replace(/'/g,"\\'")+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:none;color:var(--red);cursor:pointer;font-family:var(--fb)">Decline</button></div>';
     }
 
     out += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:13px;margin-bottom:10px;position:relative">'+urgBadge+'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><h4 style="font-size:13.5px;font-weight:700;line-height:1.35;margin:0">'+item.title+'</h4><span style="font-size:9px;font-weight:800;letter-spacing:.8px;padding:2px 8px;border-radius:4px;flex:none;background:'+tc+';color:'+ttc+'">'+item.type+'</span></div><p style="font-size:11.5px;color:var(--mut);line-height:1.5;margin:5px 0 0">'+item.desc+'</p>'+btns+'</div>';
@@ -22418,17 +22453,18 @@ async function submitCounter(requestId,currentRound){
     });
     
     // Notify the other party
-    if(req.from_user_id){
+    // Notify the other party (whoever is NOT the current user)
+    var _counterNotifTarget = req.from_user_id === currentUser.id ? req.to_user_id : req.from_user_id;
+    if(_counterNotifTarget){
       const {error:notifError}=await supabase.from('notifications').insert({
-        user_id:req.from_user_id,
+        user_id:_counterNotifTarget,
         type:'collab_countered',
-            type:'collab_countered',
-            platform:'system',
-            fromuserid:currentUser.id,
-            fromusername:myName,
-            message:myName+' countered your '+req.collab_type+' request',
-            timestamp:Date.now(),
-            read:false
+        platform:'system',
+        fromuserid:currentUser.id,
+        fromusername:myName,
+        message:myName+' countered your '+req.collab_type+' request',
+        timestamp:Date.now(),
+        read:false
       });
       if(notifError) console.error('Notification error:',notifError);
     }
@@ -22995,11 +23031,83 @@ async function _doApplyToLabel(labelId, labelName){
       showToast('Application sent to '+labelName+'!','green');
     }
     addNotification('📬 Application sent','Your application to '+labelName+' is being reviewed.','label');
+
+    // Notify the label owner so it appears in their inbox
+    try {
+      var { data: labelRow } = await supabase.from('labels').select('owner_id').eq('id', labelId).single();
+      if(labelRow && labelRow.owner_id && labelRow.owner_id !== currentUser.id){
+        await supabase.from('notifications').insert({
+          user_id: labelRow.owner_id,
+          type: 'label_application',
+          platform: 'system',
+          fromuserid: currentUser.id,
+          fromusername: myName,
+          message: myName+' applied to join '+labelName+' — '+_fmtFans(fans)+' fans, '+_fmtStreams(streams)+' streams. Check your label inbox.',
+          timestamp: Date.now(),
+          read: false
+        });
+      }
+    } catch(ne){ console.warn('Label owner notification error:', ne); }
+
     closeMenu();
   } catch(e) {
     console.error('_doApplyToLabel error:',e);
     showToast('Could not send application. Try again.','red');
   }
+}
+
+// ── Label inbox: accept / decline a scout application ──────────────────────
+async function llInboxAcceptApplication(appId, applicantUserId, applicantName){
+  // For now: mark the application as reviewed and send the applicant a notification
+  // so they know to expect a signing offer. Full signing flow goes through the
+  // existing label offer / _sendSigningOffer path.
+  if(!supabase || !currentUser) return;
+  try {
+    await supabase.from('label_applications').update({status:'reviewing'}).eq('id',appId);
+    var ol = GAME.ownedLabel;
+    if(ol && applicantUserId){
+      await supabase.from('notifications').insert({
+        user_id: applicantUserId,
+        type: 'label_offer',
+        platform: 'system',
+        fromuserid: currentUser.id,
+        fromusername: ol.name||'A label',
+        message: (ol.name||'A label')+' is interested in signing you! Watch for a formal offer.',
+        timestamp: Date.now(),
+        read: false
+      });
+    }
+    // Remove from in-memory list so it disappears without a reload
+    if(ol && ol.pendingApplications){
+      ol.pendingApplications = ol.pendingApplications.filter(function(a){ return a.id !== appId; });
+    }
+    showToast('Offer interest sent to '+applicantName+'!','green');
+    window._odTab && window._odTab(2);
+  } catch(e){ showToast('Error: '+(e.message||e),'error'); }
+}
+async function llInboxDeclineApplication(appId, applicantUserId, applicantName){
+  if(!supabase || !currentUser) return;
+  try {
+    await supabase.from('label_applications').update({status:'declined'}).eq('id',appId);
+    var ol = GAME.ownedLabel;
+    if(ol && applicantUserId){
+      await supabase.from('notifications').insert({
+        user_id: applicantUserId,
+        type: 'label_application',
+        platform: 'system',
+        fromuserid: currentUser.id,
+        fromusername: ol.name||'A label',
+        message: (ol.name||'A label')+' passed on your application. Keep growing!',
+        timestamp: Date.now(),
+        read: false
+      });
+    }
+    if(ol && ol.pendingApplications){
+      ol.pendingApplications = ol.pendingApplications.filter(function(a){ return a.id !== appId; });
+    }
+    showToast('Application from '+applicantName+' declined.','#888');
+    window._odTab && window._odTab(2);
+  } catch(e){ showToast('Error: '+(e.message||e),'error'); }
 }
 
 function showContractDetails(contractJson){
@@ -34855,15 +34963,17 @@ async function csSubmitCounter(requestId){
   try{
     var {data:req,error:fetchErr}=await supabase.from('collab_requests').select('*').eq('id',requestId).single();
     if(fetchErr||!req) throw fetchErr||new Error('Not found');
+    // Use only columns that exist in collab_requests. Map counter values onto
+    // offered_fee / royalty_pct (same columns the old submitCounter path uses)
+    // and track who countered via last_counter_by.
     var {error:upErr}=await supabase.from('collab_requests').update({
       status:'countered',
-      round:2,
-      counter_payment_type:payType,
-      counter_flat_amount:flatAmt,
-      counter_royalty_pct:royaltyPct,
-      counter_payment_summary:countSum,
-      countered_by:currentUser.id,
-      countered_at:new Date().toISOString()
+      round:(req.round||1)+1,
+      offered_fee:flatAmt,
+      royalty_pct:royaltyPct,
+      message:countSum,
+      last_counter_by:currentUser.id,
+      responded_at:new Date().toISOString()
     }).eq('id',requestId);
     if(upErr) throw upErr;
     // Notify original proposer
