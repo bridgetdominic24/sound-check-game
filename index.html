@@ -21728,11 +21728,11 @@ async function cpSendProposal(artistId,artistName){
     royaltyPct=0;
   } else if(payType==='royalty'){
     flatAmt=0;
-    royaltyPct=cp.royaltyPct||35;
+    royaltyPct=(cp.royaltyPct!=null)?cp.royaltyPct:35;
   } else {
     var mEl=document.getElementById('cp-mix-amt');
     flatAmt=parseInt(mEl?mEl.value:0)||0;
-    royaltyPct=cp.mixRoyalty||35;
+    royaltyPct=(cp.mixRoyalty!=null)?cp.mixRoyalty:35;
   }
   var note=(document.getElementById('cp-note')||{}).value||'';
   var paymentSummary=payType==='flat'?('$'+flatAmt.toLocaleString()+' flat fee'):payType==='royalty'?(royaltyPct+'% royalty'):('$'+flatAmt.toLocaleString()+' + '+royaltyPct+'%');
@@ -34798,7 +34798,7 @@ function openCollabCounterSheet(req){
     +'</div></div>';
 
   window._csPayType='flat';
-  window._csRoyalty=req.royalty_pct||35;
+  window._csRoyalty=(req.royalty_pct!=null)?req.royalty_pct:35;
   window._csMixRoyalty=35;
   var _csPhone=document.getElementById('phone');
   var _csSheet=document.createElement('div');
@@ -34840,8 +34840,8 @@ async function csSubmitCounter(requestId){
   var payType=window._csPayType||'flat';
   var flatAmt=0,royaltyPct=0;
   if(payType==='flat'){var el=document.getElementById('cs-flat-amt');flatAmt=parseInt(el?el.value:0)||0;}
-  else if(payType==='royalty'){royaltyPct=window._csRoyalty||35;}
-  else{var el2=document.getElementById('cs-mix-amt');flatAmt=parseInt(el2?el2.value:0)||0;royaltyPct=window._csMixRoyalty||35;}
+  else if(payType==='royalty'){royaltyPct=(window._csRoyalty!=null)?window._csRoyalty:35;}
+  else{var el2=document.getElementById('cs-mix-amt');flatAmt=parseInt(el2?el2.value:0)||0;royaltyPct=(window._csMixRoyalty!=null)?window._csMixRoyalty:35;}
   var countSum=payType==='flat'?('$'+flatAmt.toLocaleString()+' flat fee'):payType==='royalty'?(royaltyPct+'% royalty'):('$'+flatAmt.toLocaleString()+' + '+royaltyPct+'%');
 
   try{
