@@ -2044,7 +2044,7 @@ function updateNotificationBadges(count){
 function showNotificationToast(notif){
   // Create toast that slides from top
   var toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed;top:-100px;left:50%;transform:translateX(-50%);z-index:200000;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:14px 20px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);min-width:280px;max-width:90%;font-family:-apple-system,sans-serif;transition:top 0.3s ease';
+  toast.style.cssText = 'position:fixed;top:-100px;left:50%;transform:translateX(-50%);z-index:2147483647;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:14px 20px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);min-width:280px;max-width:90%;font-family:-apple-system,sans-serif;transition:top 0.3s ease';
   
   var icon = '🔔';
   if(notif.type === 'like') icon = '❤️';
@@ -2107,6 +2107,14 @@ async function logoutUser(){
       window._timerInitialised = false;
       window._dayWriting = false;
       _authSuccessRunning = false;
+      // CRITICAL: Stop the day-advance timer and reset the epoch marker so the
+      // stale interval cannot fire a spurious day increment between logout and
+      // the next initServerTime() call on re-login.
+      if(typeof timerInterval !== 'undefined' && timerInterval){
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      window._lastEpochDay = undefined;
 
       // CRITICAL: Reset ALL session data to prevent bleeding between accounts
       GAME = null;
@@ -3104,6 +3112,12 @@ async function onAuthSuccess(){
         
         // Initialize server time (multiplayer only)
         initServerTime();
+
+        // Sync accepted collabs on login so the sender (Player A) sees the
+        // accepted track in their library without having to open Messages first.
+        if(GAME_MODE === 'multi' && typeof syncAcceptedCollabs === 'function'){
+          syncAcceptedCollabs().catch(function(e){ console.warn('[Login] syncAcceptedCollabs error:', e); });
+        }
 
         // Pre-load all players so every streaming platform can show them immediately
         // (without this, platforms only show other players after Loopify is opened first)
@@ -9005,79 +9019,79 @@ const PROMO_TYPES = {
   social: {
     name: 'Social Media Push', icon: '📱', region: 'North America', category: 'digital',
     desc: 'Promote on Pentagram, Rookie, Y. Reach followers & trending audiences.',
-    costPerListener: 0.15, minBudget: 500, maxBudget: 10000,
+    costPerListener: 0.15, minBudget: 20000, maxBudget: 100000,
     fanRegion: 'North America', streamBoost: 1.2, hyp: 5
   },
   ads: {
     name: 'Targeted Ads', icon: '🎯', region: 'North America', category: 'digital',
     desc: 'Paid digital ads targeting specific demographics. Higher cost, controlled reach.',
-    costPerListener: 0.20, minBudget: 1000, maxBudget: 15000,
+    costPerListener: 0.20, minBudget: 50000, maxBudget: 200000,
     fanRegion: 'North America', streamBoost: 1.3, hype: 3
   },
   teaser: {
     name: 'Teaser Content', icon: '🎬', region: 'North America', category: 'digital',
     desc: 'Behind-the-scenes clips, snippets, studio footage. Low cost, high viral potential.',
-    costPerListener: 0.07, minBudget: 300, maxBudget: 3000,
+    costPerListener: 0.07, minBudget: 0, maxBudget: 30000,
     fanRegion: 'North America', streamBoost: 1.1, hype: 8, viralChance: 0.08
   },
   grassroots: {
     name: 'Grassroots Campaign', icon: '🌿', region: 'North America', category: 'digital',
     desc: 'Street teams, local events, flyering. Cheap but localized. High fan loyalty.',
-    costPerListener: 0.08, minBudget: 500, maxBudget: 5000,
+    costPerListener: 0.08, minBudget: 10000, maxBudget: 50000,
     fanRegion: 'North America', streamBoost: 1.0, hype: 4
   },
   email: {
     name: 'Fan Email Campaign', icon: '💌', region: 'North America', category: 'fans',
     desc: 'Direct email to existing fans. Very cheap, high conversion rate.',
-    costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
+    costPerListener: 0.06, minBudget: 1500, maxBudget: 1500,
     fanRegion: 'North America', streamBoost: 1.0, hype: 2
   },
   email_eu: {
     name: 'Fan Email (Europe)', icon: '💌', region: 'Europe', category: 'fans',
     desc: 'Direct email to existing European fans. Very cheap, high conversion rate.',
-    costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
+    costPerListener: 0.06, minBudget: 1500, maxBudget: 1500,
     fanRegion: 'Europe', streamBoost: 1.0, hype: 2
   },
   email_af: {
     name: 'Fan Email (Africa)', icon: '💌', region: 'Africa', category: 'fans',
     desc: 'Direct email to existing African fans. Very cheap, high conversion rate.',
-    costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
+    costPerListener: 0.06, minBudget: 1500, maxBudget: 1500,
     fanRegion: 'Africa', streamBoost: 1.0, hype: 2
   },
   email_as: {
     name: 'Fan Email (Asia)', icon: '💌', region: 'Asia', category: 'fans',
     desc: 'Direct email to existing Asian fans. Very cheap, high conversion rate.',
-    costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
+    costPerListener: 0.06, minBudget: 1500, maxBudget: 1500,
     fanRegion: 'Asia', streamBoost: 1.0, hype: 2
   },
   email_sa: {
     name: 'Fan Email (South America)', icon: '💌', region: 'South America', category: 'fans',
     desc: 'Direct email to existing South American fans. Very cheap, high conversion rate.',
-    costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
+    costPerListener: 0.06, minBudget: 1500, maxBudget: 1500,
     fanRegion: 'South America', streamBoost: 1.0, hype: 2
   },
   email_oc: {
     name: 'Fan Email (Oceania)', icon: '💌', region: 'Oceania', category: 'fans',
     desc: 'Direct email to existing Oceanian fans. Very cheap, high conversion rate.',
-    costPerListener: 0.06, minBudget: 100, maxBudget: 2000,
+    costPerListener: 0.06, minBudget: 1500, maxBudget: 1500,
     fanRegion: 'Oceania', streamBoost: 1.0, hype: 2
   },
   billboard_na: {
     name: 'Billboard (North America)', icon: '🏙️', region: 'North America', category: 'ooh',
     desc: 'Static billboard in Times Square, Sunset Strip, or downtown Toronto. Brand recognition + hype spike.',
-    costPerListener: 0.30, minBudget: 5000, maxBudget: 50000,
+    costPerListener: 0.30, minBudget: 120000, maxBudget: 1200000,
     fanRegion: 'North America', streamBoost: 1.4, hype: 20, ooh: true
   },
   transit_na: {
     name: 'Transit Advertising (NA)', icon: '🚇', region: 'North America', category: 'ooh',
     desc: 'Ads on NYC Subway, Toronto TTC, LA Metro. Seen by millions daily. Steady fan growth.',
-    costPerListener: 0.18, minBudget: 2000, maxBudget: 20000,
+    costPerListener: 0.18, minBudget: 40000, maxBudget: 80000,
     fanRegion: 'North America', streamBoost: 1.2, hype: 10, ooh: true
   },
   led_truck_na: {
     name: 'LED Truck Campaign (NA)', icon: '🚛', region: 'North America', category: 'ooh',
     desc: 'Mobile LED trucks playing your visuals through city streets. Targeted, memorable.',
-    costPerListener: 0.22, minBudget: 1500, maxBudget: 12000,
+    costPerListener: 0.22, minBudget: 30000, maxBudget: 70000,
     fanRegion: 'North America', streamBoost: 1.15, hype: 12, ooh: true, viralChance: 0.05
   },
 
@@ -9085,25 +9099,25 @@ const PROMO_TYPES = {
   sync_eu: {
     name: 'Sync Licensing Push (Europe)', icon: '📰', region: 'Europe', category: 'press',
     desc: 'Pitch to European TV, film, and ad agencies. Passive income + massive exposure.',
-    costPerListener: 0.40, minBudget: 3000, maxBudget: 25000,
+    costPerListener: 0.40, minBudget: 30000, maxBudget: 250000,
     fanRegion: 'Europe', streamBoost: 1.5, hype: 18, syncChance: 0.15
   },
   festival_eu: {
     name: 'Festival Circuit (Europe)', icon: '🎪', region: 'Europe', category: 'fans',
     desc: 'Eurosonic, Great Escape, Primavera. Industry tastemakers discover breakthrough acts.',
-    costPerListener: 0.50, minBudget: 5000, maxBudget: 40000,
+    costPerListener: 0.50, minBudget: 50000, maxBudget: 400000,
     fanRegion: 'Europe', streamBoost: 1.6, hype: 25, viralChance: 0.10
   },
   billboard_eu: {
     name: 'Billboard (Europe)', icon: '🏛️', region: 'Europe', category: 'ooh',
     desc: 'Static billboard in London, Paris, Berlin, Amsterdam. Cultural credibility.',
-    costPerListener: 0.28, minBudget: 4000, maxBudget: 35000,
+    costPerListener: 0.28, minBudget: 120000, maxBudget: 1200000,
     fanRegion: 'Europe', streamBoost: 1.3, hype: 18, ooh: true
   },
   transit_eu: {
     name: 'Transit Advertising (Europe)', icon: '🚉', region: 'Europe', category: 'ooh',
     desc: 'London Underground, Paris Métro, Berlin U-Bahn. High frequency, builds familiarity.',
-    costPerListener: 0.20, minBudget: 2500, maxBudget: 22000,
+    costPerListener: 0.20, minBudget: 40000, maxBudget: 80000,
     fanRegion: 'Europe', streamBoost: 1.2, hype: 12, ooh: true
   },
 
@@ -9111,69 +9125,69 @@ const PROMO_TYPES = {
   street_af: {
     name: 'Street Team (Africa)', icon: '🤝', region: 'Africa', category: 'fans',
     desc: 'Physical presence in Lagos, Accra, Nairobi. QR codes, merchandise. Word-of-mouth king.',
-    costPerListener: 0.05, minBudget: 200, maxBudget: 5000,
+    costPerListener: 0.05, minBudget: 2000, maxBudget: 50000,
     fanRegion: 'Africa', streamBoost: 1.1, hype: 8, diasporaSpill: 0.15
   },
   shortform_af: {
     name: 'Data-Light Content (Africa)', icon: '📲', region: 'Africa', category: 'digital',
     desc: 'Short-form clips optimised for low data users. WhatsApp chain sharing mechanic.',
-    costPerListener: 0.06, minBudget: 300, maxBudget: 4000,
+    costPerListener: 0.06, minBudget: 3000, maxBudget: 40000,
     fanRegion: 'Africa', streamBoost: 1.3, hype: 10, viralChance: 0.12
   },
   diaspora_af: {
     name: 'Diaspora Marketing', icon: '🌐', region: 'Africa', category: 'digital',
     desc: 'Target African diaspora in UK, US, Canada. Music echoes back to the continent.',
-    costPerListener: 0.18, minBudget: 1500, maxBudget: 15000,
+    costPerListener: 0.18, minBudget: 15000, maxBudget: 150000,
     fanRegion: 'Africa', streamBoost: 1.4, hype: 12, crossRegion: 'North America', crossPct: 0.20
   },
   billboard_af: {
     name: 'Billboard (Africa)', icon: '🌆', region: 'Africa', category: 'ooh',
     desc: 'Billboards in Lagos, Accra, Johannesburg, Nairobi. Brand presence in major cities.',
-    costPerListener: 0.10, minBudget: 800, maxBudget: 8000,
+    costPerListener: 0.10, minBudget: 120000, maxBudget: 1200000,
     fanRegion: 'Africa', streamBoost: 1.2, hype: 14, ooh: true
   },
   led_truck_af: {
     name: 'LED Truck (Africa)', icon: '🚐', region: 'Africa', category: 'ooh',
     desc: 'Sound trucks and LED vehicles in Lekki, Victoria Island, Westlands. Pure spectacle.',
-    costPerListener: 0.08, minBudget: 500, maxBudget: 6000,
+    costPerListener: 0.08, minBudget: 30000, maxBudget: 70000,
     fanRegion: 'Africa', streamBoost: 1.15, hype: 16, ooh: true, viralChance: 0.08
   },
   // ── ASIA ──────────────────────────────────────────────────────
   social_as: {
     name: 'Asian Social Campaign', icon: '📱', region: 'Asia', category: 'digital',
     desc: 'Platform-native content for Asian apps. High engagement, fast spread.',
-    costPerListener: 0.15, minBudget: 1500, maxBudget: 12000,
+    costPerListener: 0.15, minBudget: 20000, maxBudget: 100000,
     fanRegion: 'Asia', streamBoost: 1.2, hype: 10
   },
   billboard_as: {
     name: 'Billboard (Asia)', icon: '🏯', region: 'Asia', category: 'ooh',
     desc: 'Digital screens in Shibuya, Seoul, Mumbai, Shanghai. Iconic locations.',
-    costPerListener: 0.35, minBudget: 6000, maxBudget: 50000,
+    costPerListener: 0.35, minBudget: 120000, maxBudget: 1200000,
     fanRegion: 'Asia', streamBoost: 1.4, hype: 22, ooh: true
   },
   // ── SOUTH AMERICA ─────────────────────────────────────────────
   remix_sa: {
     name: 'Reggaeton/Funk Remix Campaign', icon: '🎶', region: 'South America', category: 'digital',
     desc: 'Collab remix with a local SA artist. Their fanbase becomes your fanbase.',
-    costPerListener: 0.20, minBudget: 2000, maxBudget: 15000,
+    costPerListener: 0.20, minBudget: 20000, maxBudget: 150000,
     fanRegion: 'South America', streamBoost: 1.5, hype: 18, crossRegion: 'Europe', crossPct: 0.10
   },
   carnival_sa: {
     name: 'Carnival/Festival Timing (SA)', icon: '🎭', region: 'South America', category: 'fans',
     desc: 'Release during Brazilian Carnival or Colombian Feria. 2× cost, 5× exposure.',
-    costPerListener: 0.40, minBudget: 3000, maxBudget: 25000,
+    costPerListener: 0.40, minBudget: 30000, maxBudget: 250000,
     fanRegion: 'South America', streamBoost: 2.0, hype: 30, seasonal: true, viralChance: 0.15
   },
   billboard_sa: {
     name: 'Billboard (South America)', icon: '🏙️', region: 'South America', category: 'ooh',
     desc: 'Billboards in São Paulo, Buenos Aires, Bogotá, Lima.',
-    costPerListener: 0.15, minBudget: 1500, maxBudget: 12000,
+    costPerListener: 0.15, minBudget: 120000, maxBudget: 1200000,
     fanRegion: 'South America', streamBoost: 1.3, hype: 14, ooh: true
   },
   led_truck_sa: {
     name: 'LED Trucks (South America)', icon: '🚛', region: 'South America', category: 'ooh',
     desc: 'Sound vehicles through the streets of São Paulo and Buenos Aires.',
-    costPerListener: 0.12, minBudget: 800, maxBudget: 8000,
+    costPerListener: 0.12, minBudget: 30000, maxBudget: 70000,
     fanRegion: 'South America', streamBoost: 1.2, hype: 12, ooh: true
   },
 
@@ -9181,22 +9195,44 @@ const PROMO_TYPES = {
   festival_oc: {
     name: 'Festival Circuit (Oceania)', icon: '🎪', region: 'Oceania', category: 'fans',
     desc: 'Splendour in the Grass, Laneway, Falls Festival. Loyal fanbase guaranteed.',
-    costPerListener: 0.45, minBudget: 4000, maxBudget: 25000,
+    costPerListener: 0.45, minBudget: 40000, maxBudget: 250000,
     fanRegion: 'Oceania', streamBoost: 1.5, hype: 22, viralChance: 0.08
   },
   billboard_oc: {
     name: 'Billboard (Oceania)', icon: '🦘', region: 'Oceania', category: 'ooh',
     desc: 'Billboards in Sydney, Melbourne, Auckland. Smaller market, high conversion.',
-    costPerListener: 0.22, minBudget: 1500, maxBudget: 10000,
+    costPerListener: 0.22, minBudget: 120000, maxBudget: 1200000,
     fanRegion: 'Oceania', streamBoost: 1.2, hype: 12, ooh: true
   },
   commercial_oc: {
     name: 'Commercial Radio (Oceania)', icon: '📡', region: 'Oceania', category: 'press',
     desc: 'Australian commercial stations. Reaches mainstream audience fast.',
-    costPerListener: 0.30, minBudget: 2000, maxBudget: 15000,
+    costPerListener: 0.30, minBudget: 20000, maxBudget: 150000,
     fanRegion: 'Oceania', streamBoost: 1.4, hype: 16
   }
 };
+
+// ── PROMO SPEND VALIDATION ─────────────────────────────────────
+function _validatePromoSpend(promoKey, amount) {
+  var promo = PROMO_TYPES[promoKey];
+  if (!promo) return false;
+  var min = promo.minBudget || promo.costMin || 0;
+  var max = promo.maxBudget || promo.costMax || Infinity;
+  if (min === 0 && max === 0) return true; // free promo
+  if (amount < min) {
+    if (typeof showToast === 'function') {
+      showToast('Minimum spend for ' + (promo.name||promoKey) + ' is $' + min.toLocaleString());
+    }
+    return false;
+  }
+  if (amount > max) {
+    if (typeof showToast === 'function') {
+      showToast('Maximum spend for ' + (promo.name||promoKey) + ' is $' + max.toLocaleString());
+    }
+    return false;
+  }
+  return true;
+}
 
 // ── PROMO SCREEN RENDER HELPERS ────────────────────────────────
 var PROMO_CATEGORIES_LIST = [
@@ -9434,7 +9470,7 @@ function selectPromoOption(element, promoKey, songId){
           <label style="display:block;font-size:10px;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase">Weekly Budget</label>
           <div style="display:flex;align-items:center;gap:6px">
             <span style="color:var(--mut);font-weight:700">$</span>
-            <input type="number" class="promo-budget-input" value="${promo.minBudget}" min="${promo.minBudget}" max="${promo.maxBudget}" step="100" style="flex:1;padding:10px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--txt);font-size:13px;font-weight:600" oninput="updatePromoMultiEstimate(${songId})">
+            <input type="number" class="promo-budget-input" value="${promo.minBudget}" min="${promo.minBudget}" max="${promo.maxBudget}" step="100" style="flex:1;padding:10px;background:var(--surf);border:1px solid var(--bord);border-radius:8px;color:var(--txt);font-size:13px;font-weight:600" oninput="this.value=Math.max(${promo.minBudget},Math.min(${promo.maxBudget||9999999},parseInt(this.value)||${promo.minBudget}));updatePromoMultiEstimate(${songId})">
           </div>
           <div style="font-size:9px;color:var(--mut);margin-top:4px">Min: $${promo.minBudget.toLocaleString()} - Max: $${promo.maxBudget.toLocaleString()}</div>
         </div>
@@ -9581,6 +9617,10 @@ function launchPromoCampaign(songId){
       return;
     }
 
+    if(!_validatePromoSpend(promoKey, budget)){
+      return;
+    }
+
     totalFirstWeekCost += budget;
     campaignsToLaunch.push({ promoKey, budget, duration });
   });
@@ -9634,11 +9674,7 @@ function launchPromoCampaign(songId){
   _closeOverlay();
   setTimeout(()=>{
     showSongDetails(songId);
-    var toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--acc);color:var(--acc-txt);padding:12px 20px;border-radius:20px;font-size:13px;font-weight:700;z-index:300000;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
-    toast.textContent = launchedPromos.join(' + ')+' campaigns launched!';
-    document.body.appendChild(toast);
-    setTimeout(()=>toast.remove(), 3000);
+    setTimeout(function(){ showToast(launchedPromos.join(' + ')+' campaigns launched!', 'green'); }, 80);
   }, 300);
 
   window.currentPromoSong = {id: songId, selectedPromos: {}};
@@ -10583,19 +10619,19 @@ function openPreReleaseHub(song) {
 
   var ACTIVITIES = [
     // id, label, sublabel, icon, cost, energy, pts, weeksReq
-    ['morning_wave',        'Talk Show — Morning Wave',  'Mainstream reach · $2,500',           '🌞', 2500, 20, 6, 6],
-    ['press_preview',       'Press Preview',             'Early listen for outlets · energy',   '📰', 0,    15, 4, 6],
-    ['fan_contest',         'Fan Contest',               'Fan art, covers, theories · free',    '🏆', 0,    10, 3, 6],
-    ['merch_preorder',      'Merch Pre-Order',           'Production cost · loyal fans',        '👕', 1200, 10, 4, 6],
-    ['exclusive_interview', 'Exclusive Interview',       'One outlet gets first access · free', '🎙', 0,    0,  5, 6],
-    ['presave',             'Pre-Save Campaign',         '+0.18× day-1 velocity · $1,500',      '💾', 1500, 15, 6, 4],
-    ['billboard_reservation','Billboard Reservation',   'Goes live on release day',             '🏙', 2500, 5,  4, 4],
-    ['concept_photo',       'Concept Photo Drop',        'Pentagram post · free',               '📸', 0,    10, 4, 4],
-    ['mv_teaser',           'MV Filming Teaser',         'BTS clip · Rookie · free',            '🎬', 0,    10, 3, 4],
-    ['social_countdown',    'Social Countdown (7 days)', 'Daily posts · consistency bonus',     '📅', 0,    10, 8, 2],
-    ['listening_party',     'Listening Party',           'Online (free) or venue ($1,500)',     '🎧', 0,    20, 7, 2],
-    ['audio_snippet',       'Audio Snippet',             '15-sec clip · Rookie · free',         '🔊', 0,    8,  3, 2],
-    ['lyric_preview',       'Lyric Preview',             'Text art · Y · free',                 '✍', 0,    5,  2, 2],
+    ['morning_wave',        'Talk Show — Morning Wave',  'Mainstream reach · $25,000',          '🌞', 25000, 20, 6, 6],
+    ['press_preview',       'Press Preview',             'Early listen for outlets · $20,000',  '📰', 20000, 15, 4, 6],
+    ['fan_contest',         'Fan Contest',               'Fan art, covers, theories · $5,000',  '🏆', 5000,  10, 3, 6],
+    ['merch_preorder',      'Merch Pre-Order',           'Production cost · loyal fans',        '👕', 12000, 10, 4, 6],
+    ['exclusive_interview', 'Exclusive Interview',       'One outlet gets first access · free', '🎙', 0,     0,  5, 6],
+    ['presave',             'Pre-Save Campaign',         '+0.18× day-1 velocity · $15,000',     '💾', 15000, 15, 6, 4],
+    ['billboard_reservation','Billboard Reservation',   'Goes live on release day · $25,000',   '🏙', 25000, 5,  4, 4],
+    ['concept_photo',       'Concept Photo Drop',        'Pentagram post · free',               '📸', 0,     10, 4, 4],
+    ['mv_teaser',           'MV Filming Teaser',         'BTS clip · Rookie · free',            '🎬', 0,     10, 3, 4],
+    ['social_countdown',    'Social Countdown (7 days)', 'Daily posts · consistency bonus',     '📅', 0,     10, 8, 2],
+    ['listening_party',     'Listening Party',           'Online (free) or venue ($15,000)',    '🎧', 0,     20, 7, 2],
+    ['audio_snippet',       'Audio Snippet',             '15-sec clip · Rookie · free',         '🔊', 0,     8,  3, 2],
+    ['lyric_preview',       'Lyric Preview',             'Text art · Y · free',                 '✍', 0,     5,  2, 2],
   ];
 
   function actCards() {
@@ -15844,6 +15880,8 @@ function showSignedArtistView(){
 function showLabelOwnerDashboard(startTab){
   var ol = GAME.ownedLabel;
   if(!ol){showUnsignedView();return;}
+  // Reset the applications-fetch guard so _odInbox re-fetches from Supabase each visit
+  if(ol) ol._appsFetched = false;
   // Auto-sign owner if they somehow don't have signedLabel set (pre-fix saves)
   if(!GAME.signedLabel){
     GAME.signedLabel = {
@@ -15875,7 +15913,7 @@ function showLabelOwnerDashboard(startTab){
   var tierDef = LABEL_TIERS[ol.tier]||LABEL_TIERS.indie;
   var roster = ol.roster||[];
   var approvalQueue = roster.flatMap(function(a){ return (a.pendingReleases||[]).filter(function(r){ return r.status==='pending'; }); });
-  var inboxCount = approvalQueue.length + (ol.pendingCollabRequests||[]).length + (ol.pendingPressRequests||[]).length;
+  var inboxCount = approvalQueue.length + (ol.pendingCollabRequests||[]).length + (ol.pendingPressRequests||[]).length + (ol.pendingApplications||[]).length;
   var weeklyRosterCut = roster.reduce(function(s,a){
     var cut=(a.cut||ol.defaultCut||25)/100;
     return s+(a.weeklyEarnings||0)*cut;
@@ -16124,7 +16162,21 @@ function _odRoster(){
 }
 
 // ── OWNER DASHBOARD TAB: INBOX ──
-function _odInbox(){ return _llInbox(); }
+function _odInbox(){
+  var ol = GAME.ownedLabel;
+  // Async-fetch pending applications from Supabase when the tab first opens.
+  // We show what we have immediately, then re-render once the fetch lands.
+  if(GAME_MODE==='multi' && ol && ol.id && supabase && !ol._appsFetched){
+    ol._appsFetched = true;
+    supabase.from('label_applications').select('*').eq('label_id',ol.id).eq('status','pending').then(function(res){
+      ol.pendingApplications = (res.data||[]);
+      // If the inbox panel is still visible, re-render it with the fresh data
+      var body = document.getElementById('odBody');
+      if(body) body.innerHTML = _llInbox();
+    }).catch(function(){ ol.pendingApplications = []; });
+  }
+  return _llInbox();
+}
 
 // ── OWNER DASHBOARD TAB: FINANCES ──
 function _odFinances(){
@@ -17960,6 +18012,17 @@ function _llInbox(){
   (ol.pendingCollabRequests||[]).forEach(function(cr){
     items.push({type:'COLLAB',color:'#2a1e3a',tc:cr.id,urgent:false,title:cr.artist1Name+' + '+cr.artist2Name+' want to collab',desc:'"'+cr.songTitle+'" · '+(cr.genre||'Pop')+' · Roster bonus applies.',crid:cr.id});
   });
+  // Pending label applications (fetched from Supabase by _odInbox)
+  (ol.pendingApplications||[]).forEach(function(app){
+    var fansStr = typeof _fmtFans==='function' ? _fmtFans(app.fans||0) : ((app.fans||0)>=1000?Math.round((app.fans||0)/1000)+'K':String(app.fans||0));
+    var streamStr = typeof _fmtStreams==='function' ? _fmtStreams(app.streams||0) : ((app.streams||0)>=1000000?((app.streams||0)/1000000).toFixed(1)+'M':(app.streams||0)>=1000?Math.round((app.streams||0)/1000)+'K':String(app.streams||0));
+    var snippet = app.message ? ' · "'+app.message.slice(0,40)+(app.message.length>40?'…':'')+'"' : '';
+    items.push({type:'APPLY',color:'#1a2a3a',tc:app.id,urgent:false,
+      title:app.applicant_name+' applied to join '+ol.name,
+      desc:fansStr+' fans · '+streamStr+' streams'+snippet,
+      appId:app.id,appUserId:app.applicant_id,appName:app.applicant_name
+    });
+  });
   // Room Service press requests
   (ol.pendingPressRequests||[]).forEach(function(pr){
     items.push({type:'PRESS',color:'#3a1e2a',tc:pr.id,urgent:true,title:'Room Service is asking about '+pr.artistName,desc:'"'+pr.headline+'"',prid:pr.id,artistName:pr.artistName});
@@ -17974,8 +18037,8 @@ function _llInbox(){
 
   items.forEach(function(item){
     var urgBadge = item.urgent ? '<div style="position:absolute;top:-7px;right:12px;background:var(--red);color:#fff;font-size:9px;font-weight:900;border-radius:3px;padding:2px 8px;letter-spacing:.5px">URGENT</div>' : '';
-    var tagColors = {RELEASE:'#1e3a2e',COLLAB:'#2a1e3a',PRESS:'#3a1e2a',MONEY:'var(--acc-bg)'};
-    var tagTxtColors = {RELEASE:'var(--green)',COLLAB:'var(--purple)',PRESS:'var(--pink)',MONEY:'var(--acc)'};
+    var tagColors = {RELEASE:'#1e3a2e',COLLAB:'#2a1e3a',PRESS:'#3a1e2a',MONEY:'var(--acc-bg)',APPLY:'#1a2a3a'};
+    var tagTxtColors = {RELEASE:'var(--green)',COLLAB:'var(--purple)',PRESS:'var(--pink)',MONEY:'var(--acc)',APPLY:'#7eb8f0'};
     var tc = tagColors[item.type]||'var(--card)';
     var ttc = tagTxtColors[item.type]||'var(--mut)';
 
@@ -17986,6 +18049,8 @@ function _llInbox(){
       btns = '<div style="display:flex;gap:7px;margin-top:10px"><button onclick="llInboxApproveCollab(\''+item.crid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:none;background:var(--purple);color:#fff;cursor:pointer;font-family:var(--fb)">Approve</button><button onclick="showCollabCompare(\''+item.crid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">Compare</button><button onclick="llInboxBlockCollab(\''+item.crid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:none;color:var(--red);cursor:pointer;font-family:var(--fb)">Block</button></div>';
     } else if(item.type==='PRESS'){
       btns = '<div style="display:flex;gap:7px;margin-top:10px"><button onclick="showPressStatement(\''+item.prid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:var(--surf);color:var(--txt);cursor:pointer;font-family:var(--fb)">Issue Statement</button><button onclick="llPressDismiss(\''+item.prid+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:none;color:var(--mut);cursor:pointer;font-family:var(--fb)">No Comment</button></div>';
+    } else if(item.type==='APPLY'){
+      btns = '<div style="display:flex;gap:7px;margin-top:10px"><button onclick="llInboxAcceptApplication(\''+item.appId+'\',\''+item.appUserId+'\',\''+item.appName.replace(/'/g,"\\'")+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:none;background:#1d6fa4;color:#fff;cursor:pointer;font-family:var(--fb)">Accept & Offer</button><button onclick="llInboxDeclineApplication(\''+item.appId+'\',\''+item.appUserId+'\',\''+item.appName.replace(/'/g,"\\'")+'\')" style="flex:1;font-size:11px;font-weight:800;border-radius:9px;padding:9px 0;border:1px solid var(--bord);background:none;color:var(--red);cursor:pointer;font-family:var(--fb)">Decline</button></div>';
     }
 
     out += '<div style="background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:13px;margin-bottom:10px;position:relative">'+urgBadge+'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><h4 style="font-size:13.5px;font-weight:700;line-height:1.35;margin:0">'+item.title+'</h4><span style="font-size:9px;font-weight:800;letter-spacing:.8px;padding:2px 8px;border-radius:4px;flex:none;background:'+tc+';color:'+ttc+'">'+item.type+'</span></div><p style="font-size:11.5px;color:var(--mut);line-height:1.5;margin:5px 0 0">'+item.desc+'</p>'+btns+'</div>';
@@ -22410,17 +22475,18 @@ async function submitCounter(requestId,currentRound){
     });
     
     // Notify the other party
-    if(req.from_user_id){
+    // Notify the other party (whoever is NOT the current user)
+    var _counterNotifTarget = req.from_user_id === currentUser.id ? req.to_user_id : req.from_user_id;
+    if(_counterNotifTarget){
       const {error:notifError}=await supabase.from('notifications').insert({
-        user_id:req.from_user_id,
+        user_id:_counterNotifTarget,
         type:'collab_countered',
-            type:'collab_countered',
-            platform:'system',
-            fromuserid:currentUser.id,
-            fromusername:myName,
-            message:myName+' countered your '+req.collab_type+' request',
-            timestamp:Date.now(),
-            read:false
+        platform:'system',
+        fromuserid:currentUser.id,
+        fromusername:myName,
+        message:myName+' countered your '+req.collab_type+' request',
+        timestamp:Date.now(),
+        read:false
       });
       if(notifError) console.error('Notification error:',notifError);
     }
@@ -22987,11 +23053,83 @@ async function _doApplyToLabel(labelId, labelName){
       showToast('Application sent to '+labelName+'!','green');
     }
     addNotification('📬 Application sent','Your application to '+labelName+' is being reviewed.','label');
+
+    // Notify the label owner so it appears in their inbox
+    try {
+      var { data: labelRow } = await supabase.from('labels').select('owner_id').eq('id', labelId).single();
+      if(labelRow && labelRow.owner_id && labelRow.owner_id !== currentUser.id){
+        await supabase.from('notifications').insert({
+          user_id: labelRow.owner_id,
+          type: 'label_application',
+          platform: 'system',
+          fromuserid: currentUser.id,
+          fromusername: myName,
+          message: myName+' applied to join '+labelName+' — '+_fmtFans(fans)+' fans, '+_fmtStreams(streams)+' streams. Check your label inbox.',
+          timestamp: Date.now(),
+          read: false
+        });
+      }
+    } catch(ne){ console.warn('Label owner notification error:', ne); }
+
     closeMenu();
   } catch(e) {
     console.error('_doApplyToLabel error:',e);
     showToast('Could not send application. Try again.','red');
   }
+}
+
+// ── Label inbox: accept / decline a scout application ──────────────────────
+async function llInboxAcceptApplication(appId, applicantUserId, applicantName){
+  // For now: mark the application as reviewed and send the applicant a notification
+  // so they know to expect a signing offer. Full signing flow goes through the
+  // existing label offer / _sendSigningOffer path.
+  if(!supabase || !currentUser) return;
+  try {
+    await supabase.from('label_applications').update({status:'reviewing'}).eq('id',appId);
+    var ol = GAME.ownedLabel;
+    if(ol && applicantUserId){
+      await supabase.from('notifications').insert({
+        user_id: applicantUserId,
+        type: 'label_offer',
+        platform: 'system',
+        fromuserid: currentUser.id,
+        fromusername: ol.name||'A label',
+        message: (ol.name||'A label')+' is interested in signing you! Watch for a formal offer.',
+        timestamp: Date.now(),
+        read: false
+      });
+    }
+    // Remove from in-memory list so it disappears without a reload
+    if(ol && ol.pendingApplications){
+      ol.pendingApplications = ol.pendingApplications.filter(function(a){ return a.id !== appId; });
+    }
+    showToast('Offer interest sent to '+applicantName+'!','green');
+    window._odTab && window._odTab(2);
+  } catch(e){ showToast('Error: '+(e.message||e),'error'); }
+}
+async function llInboxDeclineApplication(appId, applicantUserId, applicantName){
+  if(!supabase || !currentUser) return;
+  try {
+    await supabase.from('label_applications').update({status:'declined'}).eq('id',appId);
+    var ol = GAME.ownedLabel;
+    if(ol && applicantUserId){
+      await supabase.from('notifications').insert({
+        user_id: applicantUserId,
+        type: 'label_application',
+        platform: 'system',
+        fromuserid: currentUser.id,
+        fromusername: ol.name||'A label',
+        message: (ol.name||'A label')+' passed on your application. Keep growing!',
+        timestamp: Date.now(),
+        read: false
+      });
+    }
+    if(ol && ol.pendingApplications){
+      ol.pendingApplications = ol.pendingApplications.filter(function(a){ return a.id !== appId; });
+    }
+    showToast('Application from '+applicantName+' declined.','#888');
+    window._odTab && window._odTab(2);
+  } catch(e){ showToast('Error: '+(e.message||e),'error'); }
 }
 
 function showContractDetails(contractJson){
@@ -31737,7 +31875,7 @@ function showSongStats(songId){
     ];
     
     // Per-platform streaming rates (artist net after platform cut)
-    var _platRates={spotify:0.003,apple:0.007,youtube:0.001,amazon:0.004,soundcloud:0.004,itunes:0};
+    var _platRates={spotify:0.001,apple:0.002,youtube:0.0003,amazon:0.0008,soundcloud:0.0008,itunes:0};
     platforms.forEach(p=>{
       const streams=song.platforms[p.key];
       const earnings=(streams*(_platRates[p.key]||0.003)).toFixed(2);
@@ -34847,15 +34985,17 @@ async function csSubmitCounter(requestId){
   try{
     var {data:req,error:fetchErr}=await supabase.from('collab_requests').select('*').eq('id',requestId).single();
     if(fetchErr||!req) throw fetchErr||new Error('Not found');
+    // Use only columns that exist in collab_requests. Map counter values onto
+    // offered_fee / royalty_pct (same columns the old submitCounter path uses)
+    // and track who countered via last_counter_by.
     var {error:upErr}=await supabase.from('collab_requests').update({
       status:'countered',
-      round:2,
-      counter_payment_type:payType,
-      counter_flat_amount:flatAmt,
-      counter_royalty_pct:royaltyPct,
-      counter_payment_summary:countSum,
-      countered_by:currentUser.id,
-      countered_at:new Date().toISOString()
+      round:(req.round||1)+1,
+      offered_fee:flatAmt,
+      royalty_pct:royaltyPct,
+      message:countSum,
+      last_counter_by:currentUser.id,
+      responded_at:new Date().toISOString()
     }).eq('id',requestId);
     if(upErr) throw upErr;
     // Notify original proposer
@@ -41842,7 +41982,7 @@ function _processDailyStreams(){
       totalNewStreams   += _bonused;
       song.platforms[_exclKey] = (song.platforms[_exclKey]||0) + _bonused;
       // Revenue rate for exclusive platform
-      var _exclRateMap = {spotify:0.003, apple:0.007, soundcloud:0.004};
+      var _exclRateMap = {spotify:0.001, apple:0.002, soundcloud:0.0008};
       totalRev += _bonused * (_exclRateMap[_exclKey] || 0.003) * _royMult;
 
     } else {
@@ -41882,7 +42022,7 @@ function _processDailyStreams(){
       if(_itPurchases > 0) GAME.fanLoyalty = Math.min(100, (GAME.fanLoyalty||0) + Math.ceil(_itPurchases*0.01));
 
       // Revenue: streaming platforms + iMusic — apply royalty fraction before paying out
-      const rev = (Math.floor(dailyNew*_sp2/_tot2)*0.003 + Math.floor(dailyNew*_ap2/_tot2)*0.007 + Math.floor(dailyNew*_yt2/_tot2)*0.001 + Math.floor(dailyNew*(_am2+_sc2)/_tot2)*0.004 + _iMusicRev2) * _royMult;
+      const rev = (Math.floor(dailyNew*_sp2/_tot2)*0.001 + Math.floor(dailyNew*_ap2/_tot2)*0.002 + Math.floor(dailyNew*_yt2/_tot2)*0.0003 + Math.floor(dailyNew*(_am2+_sc2)/_tot2)*0.0008 + _iMusicRev2) * _royMult;
       totalRev += rev;
     }
 
@@ -42606,18 +42746,64 @@ function getArtistName(){
   return (S && (S.artistName || S.sn)) || (GAME && GAME.artistName) || 'Artist';
 }
 
-function showToast(msg, color){
-  var colors = {red:'#fe2c55',green:'#2ecc71',blue:'#1d9bf0',gold:'#f39c12',purple:'#9b59b6',orange:'#e67e22'};
-  var bg = colors[color] || color || '#333';
-  var old = document.getElementById('gameToast');
+function showToast(msg, type, duration){
+  // type can be a color name ('green','red','blue','yellow') or a hex string
+  var colors = {red:'#fe2c55',green:'#2ecc71',blue:'#1d9bf0',gold:'#f39c12',purple:'#9b59b6',orange:'#e67e22',yellow:'#d97706'};
+  var bg = colors[type] || (type && type[0]==='#' ? type : null) || 'var(--acc, #7c3aed)';
+
+  // Remove any existing toast
+  var old = document.getElementById('sc-toast');
   if(old) old.remove();
+  if(window._scToastTimer) clearTimeout(window._scToastTimer);
+
   var toast = document.createElement('div');
-  toast.id = 'gameToast';
-  toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:'+bg+';color:#fff;padding:12px 20px;border-radius:24px;font-size:14px;font-weight:700;z-index:300000;box-shadow:0 4px 20px rgba(0,0,0,0.3);pointer-events:none;max-width:80%;text-align:center';
+  toast.id = 'sc-toast';
   toast.innerHTML = msg;
+  // Always append to body — never inside an overlay
+  // z-index 2147483647 = max possible, always above everything
+  toast.style.cssText = [
+    'position:fixed',
+    'bottom:28px',
+    'left:50%',
+    'transform:translateX(-50%) translateY(80px)',
+    'z-index:2147483647',
+    'background:'+bg,
+    'color:#fff',
+    'font-size:13px',
+    'font-weight:700',
+    'border-radius:99px',
+    'padding:10px 20px',
+    'pointer-events:none',
+    'transition:transform 0.22s ease,opacity 0.22s ease',
+    'opacity:0',
+    'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
+    'max-width:85vw',
+    'text-align:center',
+    'word-break:break-word',
+    'white-space:normal',
+    'font-family:-apple-system,"Segoe UI",Roboto,sans-serif'
+  ].join(';');
   document.body.appendChild(toast);
-  setTimeout(function(){ if(toast.parentNode) toast.remove(); }, 3000);
+
+  // Animate in (double rAF ensures transition fires)
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      toast.style.transform = 'translateX(-50%) translateY(0)';
+      toast.style.opacity = '1';
+    });
+  });
+
+  // Auto-dismiss
+  var ms = duration || 2400;
+  window._scToastTimer = setTimeout(function(){
+    toast.style.transform = 'translateX(-50%) translateY(80px)';
+    toast.style.opacity = '0';
+    setTimeout(function(){ var el=document.getElementById('sc-toast'); if(el) el.remove(); }, 250);
+  }, ms);
 }
+// Aliases so all existing call sites work regardless of the name they use
+window._showToast = showToast;
+window.toast = showToast;
 
 async function updateDMBadges(){
   if(!GAME || !currentUser) return;
