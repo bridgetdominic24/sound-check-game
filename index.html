@@ -3954,6 +3954,45 @@ async function loadCloudSave(){
         markDirty();
       }
 
+      // MIGRATION: One-time fan distribution correction (redistribute non-home fans by genre)
+      if(!GAME._fanDistributionFixed && GAME.fansByRegion){
+        var totalFansNow = Object.values(GAME.fansByRegion)
+          .reduce(function(s,v){ return s+(v||0); }, 0);
+        var homeRegion2 = GAME.hometown
+          ? (typeof CITIES !== 'undefined' && CITIES[GAME.hometown]
+              ? CITIES[GAME.hometown].region : 'North America')
+          : 'North America';
+        var homeFans = GAME.fansByRegion[homeRegion2] || 0;
+        var nonHomeFans = totalFansNow - homeFans;
+
+        if(nonHomeFans > 0){
+          var weights2 = _getRegionFanWeights();
+          var homeWeight = weights2[homeRegion2] || 0;
+          var remainWeight = 1 - homeWeight;
+          var regions = Object.keys(GAME.fansByRegion).filter(function(r){
+            return r !== homeRegion2;
+          });
+
+          var assigned = 0;
+          regions.forEach(function(r, i){
+            if(i === regions.length - 1){
+              GAME.fansByRegion[r] = nonHomeFans - assigned;
+            } else {
+              var w = remainWeight > 0 ? (weights2[r] || 0) / remainWeight : 0;
+              var share = Math.floor(nonHomeFans * w);
+              var variance = Math.floor(share * (Math.random() * 0.4 - 0.2));
+              GAME.fansByRegion[r] = Math.max(0, share + variance);
+              assigned += GAME.fansByRegion[r];
+            }
+          });
+
+          GAME.fans = Object.values(GAME.fansByRegion)
+            .reduce(function(s,v){ return s+(v||0); }, 0);
+        }
+        GAME._fanDistributionFixed = true;
+        markDirty();
+      }
+
       // MIGRATION: Fix old energy format (3 slots → single pool)
       if(GAME.energy && typeof GAME.energy === 'object'){
         const total = (GAME.energy.morning || 0) + (GAME.energy.afternoon || 0) + (GAME.energy.night || 0);
@@ -5231,9 +5270,96 @@ function rollCollabSession(myGenre, theirGenre, relationshipScore, myWellbeing, 
   else { if(roll<0.15) return 'lightning'; if(roll<0.60) return 'mediocre'; return 'publicBreakdown'; }
 }
 
+function _addFansWeighted(count) {
+  if(!count || count <= 0) return;
+  if(!GAME.fansByRegion) GAME.fansByRegion = {};
+  var weights = _getRegionFanWeights();
+  Object.entries(weights).forEach(function(pair) {
+    var region = pair[0];
+    var share = Math.floor(count * pair[1]);
+    GAME.fansByRegion[region] = (GAME.fansByRegion[region] || 0) + share;
+  });
+  // Any rounding remainder goes to home region
+  var homeRegion = GAME.hometown
+    ? (typeof CITIES !== 'undefined' && CITIES[GAME.hometown]
+        ? CITIES[GAME.hometown].region : 'North America')
+    : 'North America';
+  var distributed = Object.values(weights)
+    .reduce(function(s,w){ return s + Math.floor(count * w); }, 0);
+  var remainder = count - distributed;
+  if(remainder > 0){
+    GAME.fansByRegion[homeRegion] = (GAME.fansByRegion[homeRegion] || 0) + remainder;
+  }
+  // Keep GAME.fans in sync
+  GAME.fans = Object.values(GAME.fansByRegion)
+    .reduce(function(s,v){ return s+(v||0); }, 0);
+}
+
+function _getRegionFanWeights() {
+  var genre = GAME.genre || 'Pop';
+  var homeRegion = GAME.hometown
+    ? (typeof CITIES !== 'undefined' && CITIES[GAME.hometown]
+        ? CITIES[GAME.hometown].region : 'North America')
+    : 'North America';
+
+  // Base weights — what % of new fans come from each region
+  var weights = {
+    'North America':  0.22,
+    'Europe':         0.18,
+    'Asia':           0.18,
+    'Africa':         0.16,
+    'South America':  0.14,
+    'Oceania':        0.07,
+  };
+
+  // Genre regional bonuses — added on top of base
+  var genreBonus = {
+    'Afrobeats':   { 'Africa': 0.25, 'North America': 0.05 },
+    'K-pop':       { 'Asia': 0.30,   'North America': 0.05 },
+    'Hip-hop':     { 'North America': 0.15, 'Europe': 0.05 },
+    'R&B':         { 'North America': 0.12, 'Europe': 0.05 },
+    'Alternative': { 'Europe': 0.12, 'North America': 0.05 },
+    'Electronic':  { 'Europe': 0.18, 'Asia': 0.05 },
+    'Pop':         {},  // neutral — equal across all
+    'Dream Pop':   { 'Europe': 0.10, 'North America': 0.05 },
+    'Hyperpop':    { 'North America': 0.10, 'Europe': 0.08 },
+    'Bubblegum Pop': { 'North America': 0.10, 'Asia': 0.08 },
+    'Electropop':  { 'Europe': 0.10, 'North America': 0.08 },
+  };
+
+  // Apply genre bonus
+  var bonus = genreBonus[genre] || {};
+  Object.entries(bonus).forEach(function(pair) {
+    weights[pair[0]] = (weights[pair[0]] || 0) + pair[1];
+  });
+
+  // Home region gets a small additional bonus
+  if(homeRegion && weights[homeRegion] !== undefined){
+    weights[homeRegion] += 0.08;
+  }
+
+  // Active promo campaigns add regional weight
+  if(GAME.activePromoCampaigns){
+    GAME.activePromoCampaigns.forEach(function(c){
+      var region = c.region || c.fanRegion;
+      if(region && weights[region] !== undefined){
+        weights[region] += 0.06; // each active regional promo adds 6%
+      }
+    });
+  }
+
+  // Normalize so all weights sum to 1.0
+  var total = Object.values(weights).reduce(function(s,v){ return s+v; }, 0);
+  Object.keys(weights).forEach(function(r){
+    weights[r] = weights[r] / total;
+  });
+
+  return weights;
+}
+
 function _redistributeFansToRegions(){
   // One-time: if all fans are in North America but we have streams,
-  // redistribute some to other regions (10% spread)
+  // redistribute some to other regions using genre-weighted distribution
   if(GAME._fansRedistributed) return;
   if(!GAME.fansByRegion) return;
   const naFans = GAME.fansByRegion['North America'] || 0;
@@ -5241,13 +5367,21 @@ function _redistributeFansToRegions(){
   // Only redistribute if 95%+ of fans are in NA (old data)
   if(naFans < totalFans * 0.95) { GAME._fansRedistributed = true; return; }
   if(naFans < 100) { GAME._fansRedistributed = true; return; }
-  // Spread 15% of NA fans to other regions
-  const toSpread = Math.floor(naFans * 0.15);
-  const splits = {'Europe': 0.35, 'Asia': 0.25, 'Africa': 0.20, 'South America': 0.12, 'Oceania': 0.08};
-  Object.entries(splits).forEach(([r, pct]) => {
-    GAME.fansByRegion[r] = (GAME.fansByRegion[r]||0) + Math.floor(toSpread * pct);
+  // Spread 15% of NA fans to other regions using genre weights
+  var weights = _getRegionFanWeights();
+  var homeRegion = GAME.hometown
+    ? (typeof CITIES !== 'undefined' && CITIES[GAME.hometown]
+        ? CITIES[GAME.hometown].region : 'North America')
+    : 'North America';
+  var toSpread = Math.floor(naFans * 0.15);
+  Object.entries(weights).forEach(function(pair) {
+    var r = pair[0];
+    var pct = pair[1];
+    if(r !== homeRegion) {
+      GAME.fansByRegion[r] = (GAME.fansByRegion[r] || 0) + Math.floor(toSpread * pct);
+    }
   });
-  GAME.fansByRegion['North America'] = naFans - toSpread;
+  GAME.fansByRegion[homeRegion] = naFans - toSpread;
   GAME._fansRedistributed = true;
 }
 
@@ -9833,18 +9967,8 @@ function processPromoCampaigns(){
       const listenersThisWeek = campaign.listenersPerWeek || 0;
       const permanentFans = Math.floor(listenersThisWeek * 0.8);
 
-      // Spread fans across regions — promo targets the campaign's region, rest go global
-      if(!GAME.fansByRegion) GAME.fansByRegion = {};
-      const ALL_REGIONS = ['North America','Europe','Asia','Africa','South America','Oceania'];
-      const targetRegion = campaign.region || GAME.homeRegion || 'North America';
-      // 50% to target region, 50% spread across others
-      const targetFans = Math.floor(permanentFans * 0.5);
-      const spreadFans = permanentFans - targetFans;
-      GAME.fansByRegion[targetRegion] = (GAME.fansByRegion[targetRegion]||0) + targetFans;
-      const otherRegions = ALL_REGIONS.filter(function(r){ return r !== targetRegion; });
-      otherRegions.forEach(function(r){
-        GAME.fansByRegion[r] = (GAME.fansByRegion[r]||0) + Math.floor(spreadFans / otherRegions.length);
-      });
+      // Spread fans across regions using genre-weighted distribution
+      _addFansWeighted(permanentFans);
 
       // Also add streams to the song
       song.streams = (song.streams || 0) + listenersThisWeek;
@@ -19890,19 +20014,29 @@ function showFansDetail(){
   const regionFans = GAME.fansByRegion;
   const maxFans = Math.max(...Object.values(regionFans), 1);
 
+  function _logScale(fans, maxFans) {
+    if(!fans || fans <= 0) return 0;
+    if(!maxFans || maxFans <= 0) return 0;
+    var logFans = Math.log(fans + 1);
+    var logMax = Math.log(maxFans + 1);
+    return Math.min(1, logFans / logMax);
+  }
   function regionOpacity(region, base){
-    const f = regionFans[region] || 0;
-    return Math.max(0.08, Math.min(1, base * (f / maxFans) + 0.12)).toFixed(2);
+    var f = regionFans[region] || 0;
+    var scale = _logScale(f, maxFans);
+    return Math.max(0.08, Math.min(1, base * scale + 0.12)).toFixed(2);
   }
   function dotOpacity(region, base){
-    const f = regionFans[region] || 0;
-    if(f === 0) return '0'; // no fans → completely invisible
-    return Math.max(0.15, Math.min(0.98, base * (f / maxFans) + 0.15)).toFixed(2);
+    var f = regionFans[region] || 0;
+    if(f === 0) return '0';
+    var scale = _logScale(f, maxFans);
+    return Math.max(0.35, Math.min(0.98, base * scale + 0.20)).toFixed(2);
   }
   function glowRadius(region, max){
-    const f = regionFans[region] || 0;
-    if(f === 0) return '0'; // no fans → no glow ring
-    return Math.max(2, Math.min(max, (f / maxFans) * max)).toFixed(1);
+    var f = regionFans[region] || 0;
+    if(f === 0) return '0';
+    var scale = _logScale(f, maxFans);
+    return Math.max(3, Math.min(max, scale * max)).toFixed(1);
   }
 
   const naO = dotOpacity('North America', 0.95);
@@ -20085,7 +20219,7 @@ function showFansDetail(){
 
     if(analyzed){
       const percentage=totalFans>0?Math.round((fans/totalFans)*100):0;
-      const marketSizes={'North America':10000,'Europe':9000,'Asia':12000,'South America':7000,'Africa':6000,'Oceania':4000};
+      const marketSizes={'North America':80000000,'Europe':65000000,'Asia':120000000,'South America':40000000,'Africa':45000000,'Oceania':12000000};
       const popularity=Math.min(100,Math.round((fans/marketSizes[region])*100));
       html+=`<div onclick="showRegionDetails('${region}')" style="background:var(--surf);padding:12px;border-radius:10px;margin-bottom:8px;border-left:3px solid #4CAF50;cursor:pointer">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -20145,14 +20279,14 @@ function showRegionDetails(region){
   
   // Calculate popularity (0-100%) based on fan count relative to potential market
   const marketSizes = {
-    'North America': 10000, 
-    'Europe': 9000,
-    'Asia': 12000,
-    'South America': 7000,
-    'Africa': 6000,
-    'Oceania': 4000
+    'North America':  80000000,
+    'Europe':         65000000,
+    'Asia':          120000000,
+    'South America':  40000000,
+    'Africa':         45000000,
+    'Oceania':        12000000
   };
-  const marketSize = marketSizes[region] || 8000;
+  const marketSize = marketSizes[region] || 40000000;
   const popularity = Math.min(100, Math.round((fans / marketSize) * 100));
   
   // Simulate growth trend (random for now - could track historical data later)
@@ -20191,10 +20325,14 @@ function showRegionDetails(region){
           </div>
         </div>
         <div style="font-size:12px;color:var(--mut);text-align:center">
-          ${popularity < 20 ? 'Undiscovered - huge growth potential!' : 
-            popularity < 50 ? 'Rising artist - building momentum' : 
-            popularity < 80 ? 'Popular - strong fanbase established' : 
-            'Superstar status - dominating the market!'}
+          ${popularity >= 80 ? 'Superstar — you own this market'
+            : popularity >= 60 ? 'Established — a major force here'
+            : popularity >= 40 ? 'Popular — strong regional presence'
+            : popularity >= 20 ? 'Growing — fans are finding you'
+            : popularity >= 10 ? 'Emerging — building momentum'
+            : popularity >= 5  ? 'Known — a small but real fanbase'
+            : popularity >= 1  ? 'Niche — cult following forming'
+            : 'Unknown — barely any presence here'}
         </div>
       </div>
       
@@ -20206,6 +20344,7 @@ function showRegionDetails(region){
           <div style="flex:1">
             <div style="font-size:24px;font-weight:700;color:${growth.color}">${growth.percent > 0 ? '+' : ''}${growth.percent}%/week</div>
             <div style="font-size:14px;color:var(--mut)">${growth.text}</div>
+            <div style="font-size:12px;color:var(--mut);margin-top:2px">${fans < marketSize * 0.05 ? 'Early market — normal to fluctuate' : fans < marketSize * 0.20 ? 'Growing market' : 'Established market'}</div>
           </div>
         </div>
       </div>
