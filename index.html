@@ -3922,11 +3922,38 @@ async function loadCloudSave(){
       Object.assign(GAME, data.game_data);
       _sanitizeGameState(GAME);
       Object.assign(S, data.character_data);
-      
+
       // Initialize new fields for old saves
       if(!GAME.messages) GAME.messages = [];
       if(!GAME.pendingCollabs) GAME.pendingCollabs = [];
-      
+
+      // MIGRATION: Backfill releaseDateStr / releaseDOW and fix weeksOnChart
+      if(!GAME._releaseDateBackfilled){
+        var _rdOrigin = new Date(2017, 0, 1).getTime();
+        var _rdMonths   = ['January','February','March','April','May','June',
+                           'July','August','September','October','November','December'];
+        var _rdDayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        (GAME.songs || []).forEach(function(s){
+          if(!s.released) return;
+          if(!s.releaseDateStr && s.releaseDay){
+            var rd = new Date(_rdOrigin + (s.releaseDay - 1) * 86400000);
+            s.releaseDateStr = _rdDayNames[rd.getDay()] + ', '
+              + _rdMonths[rd.getMonth()] + ' ' + rd.getDate()
+              + ', ' + rd.getFullYear();
+            s.releaseDOW = rd.getDay() + 1;
+          } else if(!s.releaseDateStr && s.releaseWeek){
+            s.releaseDateStr = gameWeekToDate(s.releaseWeek, 1);
+            s.releaseDOW = 1;
+          }
+          if(s.releaseWeek && s.releaseWeek > 0 && GAME.week >= s.releaseWeek){
+            var correctWeeks = Math.max(1, (GAME.week - s.releaseWeek) + 1);
+            if(correctWeeks > (s.weeksOnChart || 0)) s.weeksOnChart = correctWeeks;
+          }
+        });
+        GAME._releaseDateBackfilled = true;
+        markDirty();
+      }
+
       // MIGRATION: Fix old energy format (3 slots → single pool)
       if(GAME.energy && typeof GAME.energy === 'object'){
         const total = (GAME.energy.morning || 0) + (GAME.energy.afternoon || 0) + (GAME.energy.night || 0);
@@ -8457,24 +8484,27 @@ async function getAllChartsData(){
           .map(ws => {
             // Check if this song was on last week's chart
             let lastPos = null;
-            let weeks = ws.weeksOnChart || 0;
-            
+
+            // Get last position for movement arrows (still use history)
             if(GAME.chartHistory && GAME.chartHistory[GAME.week - 1]){
-              const lastWeekSong = GAME.chartHistory[GAME.week - 1].find(s => 
-                s.name === `${ws.title} - ${ws.artist}` || 
+              const lastWeekSong = GAME.chartHistory[GAME.week - 1].find(s =>
+                s.name === `${ws.title} - ${ws.artist}` ||
                 (s.title === ws.title && s.artist === ws.artist)
               );
               if(lastWeekSong){
                 lastPos = lastWeekSong.position || lastWeekSong.chartPosition;
-                weeks = (lastWeekSong.weeksOnChart || 0) + 1;
-              } else {
-                weeks = 1; // New to charts
               }
-            } else {
-              weeks = 1; // First week, no history
             }
-            
-            // Update the world song's weeks on chart
+
+            // Calculate weeks from releaseWeek — never resets
+            let weeks;
+            if(ws.releaseWeek && ws.releaseWeek > 0 && GAME.week >= ws.releaseWeek){
+              weeks = Math.max(1, (GAME.week - ws.releaseWeek) + 1);
+            } else if(ws.weeksOnChart > 0){
+              weeks = ws.weeksOnChart + 1; // preserve existing count
+            } else {
+              weeks = 1;
+            }
             ws.weeksOnChart = weeks;
             
             return {
@@ -8562,11 +8592,17 @@ async function getAllChartsData(){
         // doesn't double-count.
         if(realSong._chartedWeek !== GAME.week){
           realSong._chartedWeek = GAME.week;
-          if(prevPosition !== null){
-            realSong.weeksOnChart = (realSong.weeksOnChart || 1) + 1;
+
+          if(realSong.releaseWeek && realSong.releaseWeek > 0){
+            // Always derive from release week — immune to resets
+            realSong.weeksOnChart = Math.max(1, (GAME.week - realSong.releaseWeek) + 1);
+          } else if(realSong.weeksOnChart > 0){
+            realSong.weeksOnChart = realSong.weeksOnChart + 1;
           } else {
-            realSong.weeksOnChart = 1; // chart debut this week
+            realSong.weeksOnChart = 1;
+            realSong.chartEntryWeek = GAME.week;
           }
+
           if(!realSong.peakPosition || song.position < realSong.peakPosition){
             realSong.peakPosition = song.position;
           }
@@ -10743,7 +10779,11 @@ function showSongDetails(songId){
   var statusColor=isReleased?'#2ed573':isRecorded?'#ff9800':isInProg?'#a29bfe':'#667eea';
 
   // Real dates
-  var releaseDateStr=song.releaseWeek?gameWeekToDate(song.releaseWeek,1)+' (Week '+song.releaseWeek+')':null;
+  var releaseDateStr=song.releaseDateStr
+    ? song.releaseDateStr+' (Week '+song.releaseWeek+')'
+    : song.releaseWeek
+      ? gameWeekToDate(song.releaseWeek,song.releaseDOW||1)+' (Week '+song.releaseWeek+')'
+      : null;
   var recordedDateStr=song.recordedWeek?gameWeekToDate(song.recordedWeek,song.recordedDay||1):(song.released && !song.recordedWeek?'(Before Recording Tracking)':null);
   var writtenDateStr=song.writtenWeek
     ? gameWeekToDate(song.writtenWeek,song.writtenDay||1)
@@ -14702,8 +14742,9 @@ function simulateWorldWeek() {
     GAME.songs.forEach(song => {
       // Release collab songs on their scheduled week
       if(song.isCollab && !song.released && song.releaseWeek === GAME.week){
-        song.released = true;
-        
+        _setReleaseFields(song, GAME.day);
+        song.weeklyStreams = 0;
+
         // Generate initial streams (based on artist tier)
         const npc = GAME.worldSimulation.npcs.find(a => a.name === song.artist);
         if(npc){
@@ -33074,6 +33115,39 @@ function showReleaseReview(){
   openMenu('',html);
 }
 
+// ── RELEASE FIELD HELPER ──────────────────────────────────────
+// Single source of truth for setting all release metadata on a song.
+// Every release code path calls this instead of setting fields individually.
+function _setReleaseFields(song, dayNum) {
+  if (!song) return;
+  var d = dayNum || GAME.day || 1;
+  var info = dayInfo(d);
+
+  song.released    = true;
+  song.releaseDay  = d;
+  song.releaseWeek = info.week;
+  song.releaseDOW  = info.dow + 1; // 1=Sunday … 7=Saturday
+
+  // Human-readable date — stored permanently so display never re-derives it
+  var origin = new Date(2017, 0, 1).getTime();
+  var realDate = new Date(origin + (d - 1) * 86400000);
+  var months   = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  song.releaseDateStr = dayNames[realDate.getDay()] + ', '
+    + months[realDate.getMonth()] + ' ' + realDate.getDate()
+    + ', ' + realDate.getFullYear();
+
+  // Reset chart fields on release
+  song.weeksOnChart  = 0;
+  song.chartPosition = null;
+  if (!song.peakPosition) song.peakPosition = null;
+
+  // Remove scheduling fields — no longer needed after release
+  delete song.scheduledReleaseDay;
+  delete song.scheduledReleaseDate;
+}
+
 function proceedToPromotions(){
   const songId=GAME.pendingReleaseSong || (GAME.pendingReleaseSongs && GAME.pendingReleaseSongs[0]);
   if(!songId){ alert('Error: No song selected for release'); return; }
@@ -33520,8 +33594,7 @@ function releaseSingle(songId){
     const song=GAME.songs.find(s=>s.id===id);
     if(!song||song.released)return;
     
-    song.released=true;
-    song.releaseWeek=GAME.week;
+    _setReleaseFields(song, GAME.day);
     // Notify collab partner if this is a multiplayer collab
     if(GAME_MODE==='multi' && song.collaborators && song.collaborators.length > 0){
       song.collaborators.forEach(function(partner){
@@ -33547,7 +33620,6 @@ function releaseSingle(songId){
         }).eq('id', song.collab_request_id).catch(err=>null);
       }
     }
-    song.releaseDay=GAME.day;
     song.releaseYear=GAME.year;
     song.releaseType=type;
     song.streams=0;
@@ -33555,9 +33627,6 @@ function releaseSingle(songId){
     // Count release as hype activity (protects from decay this week)
     GAME._hypeActivityThisWeek = Math.min(5, (GAME._hypeActivityThisWeek||0) + 3);
     song.playlists=[];
-    song.chartPosition=null;
-    song.peakPosition=null;
-    song.weeksOnChart=0;
     
     // Check if this fulfills crowdfunding promise
     checkCrowdfundingDebt(type);
@@ -41141,19 +41210,21 @@ function _silentDayCatchUp(day, showFirst){
   // Auto-release scheduled songs (singles with scheduledReleaseDay stamped directly)
   if(GAME.songs) GAME.songs.forEach(function(song){
     if(!song.released && song.scheduledReleaseDay === day){
-      song.released = true;
-      song.releaseDay = day;
-      song.releaseWeek = info.week;
+      _setReleaseFields(song, day);
       song.weeklyStreams = 0;
-      song.weeksOnChart = 0;
-      song.chartPosition = null;
-      delete song.scheduledReleaseDay;
-      delete song.scheduledReleaseDate;
       if(!GAME.releases) GAME.releases = [];
       // Only add a release entry if one doesn't already exist covering this song
       var alreadyInRelease = GAME.releases.some(function(r){ return r.songs && r.songs.some(function(s){ return s && s.id===song.id; }); });
-      if(!alreadyInRelease) GAME.releases.push({id:Date.now()+day,title:song.title,type:'single',songs:[{id:song.id,title:song.title}],releaseDay:day});
-      if(showFirst) addNotification('🎵 "'+song.title+'" released while you were away!','','release');
+      if(!alreadyInRelease) GAME.releases.push({
+        id: Date.now()+day,
+        title: song.title,
+        type: 'single',
+        songs: [{id: song.id, title: song.title}],
+        releaseDay: day,
+        releaseWeek: song.releaseWeek,
+        releaseDateStr: song.releaseDateStr
+      });
+      if(showFirst) addNotification('🎵 "'+song.title+'" released while you were away!','Released '+(song.releaseDateStr||''),'release');
     }
   });
   // Auto-release pending EP/album entries in GAME.releases
@@ -41166,14 +41237,8 @@ function _silentDayCatchUp(day, showFirst){
     (release.songs||[]).forEach(function(rs){
       var song = rs && GAME.songs && GAME.songs.find(function(s){ return s.id===rs.id; });
       if(song && !song.released){
-        song.released = true;
-        song.releaseDay = day;
-        song.releaseWeek = info.week;
+        _setReleaseFields(song, day);
         song.weeklyStreams = 0;
-        song.weeksOnChart = 0;
-        song.chartPosition = null;
-        delete song.scheduledReleaseDay;
-        delete song.scheduledReleaseDate;
       }
     });
     if(showFirst) addNotification('🎵 "'+release.title+'" released while you were away!','','release');
