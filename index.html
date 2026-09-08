@@ -2044,7 +2044,7 @@ function updateNotificationBadges(count){
 function showNotificationToast(notif){
   // Create toast that slides from top
   var toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed;top:-100px;left:50%;transform:translateX(-50%);z-index:200000;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:14px 20px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);min-width:280px;max-width:90%;font-family:-apple-system,sans-serif;transition:top 0.3s ease';
+  toast.style.cssText = 'position:fixed;top:-100px;left:50%;transform:translateX(-50%);z-index:2147483647;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:14px 20px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);min-width:280px;max-width:90%;font-family:-apple-system,sans-serif;transition:top 0.3s ease';
   
   var icon = '🔔';
   if(notif.type === 'like') icon = '❤️';
@@ -9674,11 +9674,7 @@ function launchPromoCampaign(songId){
   _closeOverlay();
   setTimeout(()=>{
     showSongDetails(songId);
-    var toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--acc);color:var(--acc-txt);padding:12px 20px;border-radius:20px;font-size:13px;font-weight:700;z-index:300000;pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
-    toast.textContent = launchedPromos.join(' + ')+' campaigns launched!';
-    document.body.appendChild(toast);
-    setTimeout(()=>toast.remove(), 3000);
+    setTimeout(function(){ showToast(launchedPromos.join(' + ')+' campaigns launched!', 'green'); }, 80);
   }, 300);
 
   window.currentPromoSong = {id: songId, selectedPromos: {}};
@@ -42750,18 +42746,64 @@ function getArtistName(){
   return (S && (S.artistName || S.sn)) || (GAME && GAME.artistName) || 'Artist';
 }
 
-function showToast(msg, color){
-  var colors = {red:'#fe2c55',green:'#2ecc71',blue:'#1d9bf0',gold:'#f39c12',purple:'#9b59b6',orange:'#e67e22'};
-  var bg = colors[color] || color || '#333';
-  var old = document.getElementById('gameToast');
+function showToast(msg, type, duration){
+  // type can be a color name ('green','red','blue','yellow') or a hex string
+  var colors = {red:'#fe2c55',green:'#2ecc71',blue:'#1d9bf0',gold:'#f39c12',purple:'#9b59b6',orange:'#e67e22',yellow:'#d97706'};
+  var bg = colors[type] || (type && type[0]==='#' ? type : null) || 'var(--acc, #7c3aed)';
+
+  // Remove any existing toast
+  var old = document.getElementById('sc-toast');
   if(old) old.remove();
+  if(window._scToastTimer) clearTimeout(window._scToastTimer);
+
   var toast = document.createElement('div');
-  toast.id = 'gameToast';
-  toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:'+bg+';color:#fff;padding:12px 20px;border-radius:24px;font-size:14px;font-weight:700;z-index:300000;box-shadow:0 4px 20px rgba(0,0,0,0.3);pointer-events:none;max-width:80%;text-align:center';
+  toast.id = 'sc-toast';
   toast.innerHTML = msg;
+  // Always append to body — never inside an overlay
+  // z-index 2147483647 = max possible, always above everything
+  toast.style.cssText = [
+    'position:fixed',
+    'bottom:28px',
+    'left:50%',
+    'transform:translateX(-50%) translateY(80px)',
+    'z-index:2147483647',
+    'background:'+bg,
+    'color:#fff',
+    'font-size:13px',
+    'font-weight:700',
+    'border-radius:99px',
+    'padding:10px 20px',
+    'pointer-events:none',
+    'transition:transform 0.22s ease,opacity 0.22s ease',
+    'opacity:0',
+    'box-shadow:0 4px 16px rgba(0,0,0,0.25)',
+    'max-width:85vw',
+    'text-align:center',
+    'word-break:break-word',
+    'white-space:normal',
+    'font-family:-apple-system,"Segoe UI",Roboto,sans-serif'
+  ].join(';');
   document.body.appendChild(toast);
-  setTimeout(function(){ if(toast.parentNode) toast.remove(); }, 3000);
+
+  // Animate in (double rAF ensures transition fires)
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      toast.style.transform = 'translateX(-50%) translateY(0)';
+      toast.style.opacity = '1';
+    });
+  });
+
+  // Auto-dismiss
+  var ms = duration || 2400;
+  window._scToastTimer = setTimeout(function(){
+    toast.style.transform = 'translateX(-50%) translateY(80px)';
+    toast.style.opacity = '0';
+    setTimeout(function(){ var el=document.getElementById('sc-toast'); if(el) el.remove(); }, 250);
+  }, ms);
 }
+// Aliases so all existing call sites work regardless of the name they use
+window._showToast = showToast;
+window.toast = showToast;
 
 async function updateDMBadges(){
   if(!GAME || !currentUser) return;
