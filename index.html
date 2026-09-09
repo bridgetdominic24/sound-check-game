@@ -34692,42 +34692,45 @@ async function syncAcceptedCollabs(){
         if(req.song_written_week && !existingTrack.writtenWeek) existingTrack.writtenWeek = req.song_written_week;
         if(req.song_recorded_week && !existingTrack.recordedWeek) existingTrack.recordedWeek = req.song_recorded_week;
         if(req.song_genre && !existingTrack.genre) existingTrack.genre = req.song_genre;
-        // SYNC RELEASED COLLAB: If sender released, sync to receiver
-        if(req.accepted_song_released && !existingTrack.released){
+        // SYNC RELEASED COLLAB: If sender released, sync release state and live stream count
+        if(req.accepted_song_released){
           var _releaseWeek = req.accepted_song_release_week || GAME.week;
-          existingTrack.released = true;
-          existingTrack.streams = req.accepted_song_streams || 0;
-          existingTrack.releaseWeek = _releaseWeek;
-          existingTrack.releaseDay = GAME.day;
-          existingTrack.releaseYear = GAME.year;
-          existingTrack.weeksOnChart = Math.max(1, (GAME.week - _releaseWeek) + 1);
-          existingTrack.platforms = (typeof req.accepted_song_platforms === 'string' ? JSON.parse(req.accepted_song_platforms || '{}') : req.accepted_song_platforms) || {};
-          // Build release date string
-          if(!existingTrack.releaseDateStr){
-            try{
-              var _rdOrig2 = new Date(2017, 0, 1).getTime();
-              var _rdDay2 = existingTrack.releaseDay || 1;
-              var _rdMs2 = _rdOrig2 + (_rdDay2 - 1) * 86400000;
-              var _rdDate2 = new Date(_rdMs2);
-              var _rdMths2 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-              var _rdDays2 = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-              existingTrack.releaseDateStr = _rdDays2[_rdDate2.getDay()] + ', ' + _rdMths2[_rdDate2.getMonth()] + ' ' + _rdDate2.getDate() + ', ' + _rdDate2.getFullYear();
-              existingTrack.releaseDOW = _rdDate2.getDay() + 1;
-            }catch(e){}
-          }
-          // Give receiver fans proportional to initial streams
-          if(existingTrack.streams > 0){
-            var _fanGain2 = Math.floor(existingTrack.streams * 0.0002);
-            _addFansWeighted(_fanGain2);
-          }
-          // Give receiver royalty income for initial release streams
-          if(existingTrack.streams > 0 && (existingTrack.royalty_pct || 0) > 0){
-            var _initRoyaltyIncome = Math.floor(existingTrack.streams * 0.004 * (existingTrack.royalty_pct / 100));
-            if(_initRoyaltyIncome > 0){
-              GAME.money = (GAME.money || 0) + _initRoyaltyIncome;
-              GAME.messages.push({type:'collab_payment',from:'System',message:'💰 Earned $' + _initRoyaltyIncome.toLocaleString() + ' royalty from "' + existingTrack.title + '" release streams',time:new Date(),subType:'collab'});
+          var _syncedStreams = req.accepted_song_streams || 0;
+          var _syncedPlatforms = (typeof req.accepted_song_platforms === 'string'
+            ? JSON.parse(req.accepted_song_platforms || '{}')
+            : req.accepted_song_platforms) || {};
+
+          if(!existingTrack.released){
+            // First time seeing this as released — full init
+            existingTrack.released = true;
+            existingTrack.releaseWeek = _releaseWeek;
+            existingTrack.releaseDay = GAME.day;
+            existingTrack.releaseYear = GAME.year;
+            existingTrack.weeksOnChart = Math.max(1, (GAME.week - _releaseWeek) + 1);
+            // Build release date string if missing
+            if(!existingTrack.releaseDateStr){
+              try{
+                var _rdOrig2 = new Date(2017, 0, 1).getTime();
+                var _rdDay2 = existingTrack.releaseDay || 1;
+                var _rdDate2 = new Date(_rdOrig2 + (_rdDay2 - 1) * 86400000);
+                var _rdMths2 = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                var _rdDays2 = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                existingTrack.releaseDateStr = _rdDays2[_rdDate2.getDay()] + ', ' + _rdMths2[_rdDate2.getMonth()] + ' ' + _rdDate2.getDate() + ', ' + _rdDate2.getFullYear();
+                existingTrack.releaseDOW = _rdDate2.getDay() + 1;
+              }catch(e){}
+            }
+            // Give receiver fans proportional to initial streams
+            if(_syncedStreams > 0 && typeof _addFansWeighted === 'function'){
+              _addFansWeighted(Math.floor(_syncedStreams * 0.0002));
             }
           }
+
+          // Always sync the live stream count from sender (updated daily)
+          existingTrack.streams = _syncedStreams;
+          if(_syncedPlatforms && Object.keys(_syncedPlatforms).length > 0){
+            existingTrack.platforms = _syncedPlatforms;
+          }
+
           saveToCloud();
         }
       } else if(req.song_id && req.song_title){
@@ -41538,6 +41541,18 @@ function _onDayAdvanced(newDay){
   applyDailyRefresh();
   checkDailyEconomy();
   if(GAME_MODE==='multi' && (GAME.week||1) % 7 === 0) processLabelWeekly();
+
+  // Push live stream counts to collab_requests so receiver always sees current numbers
+  if(GAME_MODE === 'multi' && supabase && currentUser && GAME.songs){
+    GAME.songs.forEach(function(song){
+      if(!song.released || !song.collab_request_id || song.isCollabReceiver) return;
+      supabase.from('collab_requests').update({
+        accepted_song_streams: song.streams || 0,
+        accepted_song_platforms: JSON.stringify(song.platforms || {})
+      }).eq('id', song.collab_request_id).catch(function(){});
+    });
+  }
+
   saveToCloud();
 }
 
