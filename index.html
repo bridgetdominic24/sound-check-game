@@ -8539,11 +8539,13 @@ async function getAllChartsData(){
     genre: s.genre,
     isPlayer: true,
     songId: s.id,
-    weeksOnChart: s.weeksOnChart || 1,
+    weeksOnChart: s.releaseWeek
+      ? Math.max(1, (GAME.week - s.releaseWeek) + 1)
+      : (s.weeksOnChart || 1),
     coverImage: s.coverImage || s.cover,
     chartPosition: s.chartPosition || null,
     // CRITICAL FIX: Reset lastChartPosition for song debuts — should only exist if weeks > 1
-    lastChartPosition: (s.weeksOnChart || 1) === 1 ? null : (s.lastChartPosition || s.chartPosition || null)
+    lastChartPosition: (s.releaseWeek ? Math.max(1,(GAME.week-s.releaseWeek)+1) : (s.weeksOnChart||1)) === 1 ? null : (s.lastChartPosition || s.chartPosition || null)
   }));
   
   // MULTIPLAYER: Load real player songs from Supabase (FRESH DATA)
@@ -8586,7 +8588,9 @@ async function getAllChartsData(){
                 isPlayer: false,
                 songId: song.id,
                 playerId: player.id,
-                weeksOnChart: song.weeksOnChart || 1,
+                weeksOnChart: song.releaseWeek
+                  ? Math.max(1, (GAME.week - song.releaseWeek) + 1)
+                  : (song.weeksOnChart || 1),
                 coverImage: song.coverImage || song.cover,
                 chartPosition: song.chartPosition || null,
                 lastChartPosition: song.lastChartPosition || song.chartPosition || null
